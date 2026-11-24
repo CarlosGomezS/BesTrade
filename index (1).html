@@ -1,0 +1,1245 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#070d0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cocodrilo">
+<link rel="manifest" href="./manifest.json">
+<title>Radar Cocodrilo Pro — App Buffett</title>
+<style>
+:root{
+  --bg:#060a08;
+  --bg2:#0b120e;
+  --glass:rgba(15,24,19,.82);
+  --glass-strong:rgba(10,17,13,.93);
+  --card:#0e1712;
+  --card2:#14221a;
+  --line:rgba(148,196,162,.13);
+  --line2:rgba(148,196,162,.25);
+  --text:#f1f8f3;
+  --muted:#8fa898;
+  --emerald:#4ade80;
+  --emerald2:#22c55e;
+  --emeraldBg:rgba(34,197,94,.14);
+  --gold:#f4c96b;
+  --goldBg:rgba(244,201,107,.14);
+  --red:#f87171;
+  --redBg:rgba(248,113,113,.14);
+  --blue:#60a5fa;
+  --blueBg:rgba(96,165,250,.14);
+  --nav-h:68px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;overscroll-behavior-y:contain}
+body{
+  background:
+    radial-gradient(680px 420px at 10% -5%, rgba(34,197,94,.16), transparent 62%),
+    radial-gradient(560px 380px at 95% 2%, rgba(244,201,107,.10), transparent 60%),
+    var(--bg);
+  color:var(--text);
+  font:14.5px/1.46 "Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  padding-top:calc(58px + env(safe-area-inset-top));
+  padding-bottom:calc(var(--nav-h) + 22px + env(safe-area-inset-bottom));
+}
+a{color:var(--emerald);text-decoration:none}
+
+/* FIXED APP TOP BAR */
+.appbar{
+  position:fixed;top:0;left:0;right:0;z-index:30;
+  padding:env(safe-area-inset-top) 14px 0;
+  height:calc(58px + env(safe-area-inset-top));
+  background:var(--glass-strong);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+}
+.appbar-inner{
+  width:100%;max-width:960px;height:58px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{
+  width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:20px;flex-shrink:0;
+  background:linear-gradient(145deg,#6ee7b7,#15803d);
+  box-shadow:0 4px 18px rgba(34,197,94,.32), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.brand h1{margin:0;font-size:15.5px;letter-spacing:.06em;font-weight:900;white-space:nowrap}
+.brand small{display:block;font-size:9.5px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+
+.appbar-right{display:flex;align-items:center;gap:8px}
+.live-pill{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;
+  font-size:11px;font-weight:800;background:var(--emeraldBg);color:var(--emerald);
+  border:1px solid rgba(74,222,128,.3);white-space:nowrap;
+}
+.live-pill.demo{background:var(--goldBg);color:var(--gold);border-color:rgba(244,201,107,.35)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+
+.icon-btn{
+  width:38px;height:38px;border-radius:11px;border:1px solid var(--line2);
+  background:rgba(255,255,255,.04);color:var(--text);display:grid;place-items:center;
+  cursor:pointer;font-size:16px;transition:all .15s;
+}
+.icon-btn:active{transform:scale(.94);background:rgba(255,255,255,.1)}
+
+/* MAIN CONTAINER */
+.main{max-width:960px;margin:0 auto;padding:14px 14px 10px}
+.view{display:none;animation:fadeUp .2s ease}
+.view.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* BUTTONS */
+.btn{
+  border:1px solid var(--line2);background:rgba(255,255,255,.05);color:var(--text);
+  padding:10px 14px;border-radius:12px;font-weight:750;font-size:13px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all .15s;min-height:40px;
+}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(135deg,#4ade80,#22c55e);color:#04170a;border-color:transparent;box-shadow:0 6px 18px rgba(34,197,94,.26)}
+.btn.gold{background:linear-gradient(135deg,#f6d583,#d9a441);color:#1d1404;border-color:transparent}
+.btn.sm{padding:8px 11px;font-size:12px;border-radius:10px;min-height:36px}
+.btn.full{width:100%}
+
+/* HERO CARD */
+.hero-card{
+  background:linear-gradient(145deg,rgba(24,44,32,.88),rgba(12,20,15,.94));
+  border:1px solid rgba(74,222,128,.26);border-radius:22px;padding:16px;margin-bottom:14px;
+  position:relative;overflow:hidden;
+}
+.hero-card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(360px 160px at 0% 0%, rgba(74,222,128,.16), transparent 65%);
+}
+.eyebrow{font-size:10px;font-weight:850;letter-spacing:.13em;text-transform:uppercase;color:var(--emerald)}
+.hero-title{font-size:22px;line-height:1.18;margin:5px 0 4px;font-weight:900;letter-spacing:-.02em}
+.hero-sub{margin:0;color:#b7ccb9;font-size:12.5px}
+
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.kpi{
+  background:rgba(6,11,8,.68);border:1px solid var(--line);border-radius:14px;padding:10px 10px;
+  cursor:pointer;transition:border-color .15s,transform .12s;
+}
+.kpi:active{transform:scale(.97)}
+.kpi span{display:block;font-size:10.5px;color:var(--muted)}
+.kpi strong{display:block;font-size:21px;font-weight:900;margin-top:1px;font-variant-numeric:tabular-nums}
+.kpi.g strong{color:var(--emerald)}
+.kpi.y strong{color:var(--gold)}
+
+/* DEMO BANNER */
+.demo-bar{
+  display:none;margin-bottom:12px;padding:10px 13px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(244,201,107,.15),rgba(244,201,107,.06));
+  border:1px solid rgba(244,201,107,.35);color:#f9e4b2;font-size:12px;
+  align-items:center;justify-content:space-between;gap:10px;
+}
+.demo-bar.show{display:flex}
+
+/* HORIZONTAL CHIPS */
+.chips-scroll{
+  display:flex;gap:7px;overflow-x:auto;padding:2px 0 8px;margin-bottom:8px;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.chips-scroll::-webkit-scrollbar{display:none}
+.fchip{
+  white-space:nowrap;border:1px solid var(--line2);background:rgba(255,255,255,.04);
+  color:var(--muted);padding:8px 13px;border-radius:99px;font-size:12px;font-weight:750;cursor:pointer;
+  transition:all .15s;
+}
+.fchip.active{background:var(--emeraldBg);color:var(--emerald);border-color:rgba(74,222,128,.45)}
+
+/* SEARCH + SORT BAR */
+.search-row{display:flex;gap:8px;margin-bottom:14px}
+.search-box{flex:1;position:relative}
+.search-box input{
+  width:100%;height:42px;padding:0 12px 0 36px;border-radius:13px;
+  border:1px solid var(--line2);background:#0a120d;color:var(--text);font:inherit;font-size:13.5px;outline:none;
+}
+.search-box input:focus{border-color:var(--emerald);box-shadow:0 0 0 3px rgba(74,222,128,.13)}
+.search-box span{position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.6;font-size:14px}
+.sort-sel{
+  height:42px;border-radius:13px;border:1px solid var(--line2);background:#0a120d;
+  color:var(--text);padding:0 10px;font:inherit;font-size:12.5px;font-weight:650;max-width:148px;
+}
+
+/* STOCK CARDS */
+.cards-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:740px){.cards-grid{grid-template-columns:1fr 1fr}}
+
+.stock-card{
+  background:linear-gradient(165deg,rgba(18,30,23,.95),rgba(10,17,13,.98));
+  border:1px solid var(--line);border-radius:20px;padding:15px;
+  display:flex;flex-direction:column;gap:11px;position:relative;overflow:hidden;
+}
+.stock-card.opp{
+  border-color:rgba(74,222,128,.42);
+  box-shadow:0 8px 28px rgba(34,197,94,.11);
+}
+.stock-card.opp::after{
+  content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#4ade80,#f4c96b,#4ade80);
+}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.card-id{min-width:0;flex:1}
+.card-name{font-size:16px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-meta{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tkr{
+  background:rgba(255,255,255,.07);border:1px solid var(--line2);color:var(--text);
+  padding:2px 7px;border-radius:7px;font-weight:800;font-size:11px;letter-spacing:.05em;
+}
+.right-tools{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.star-btn{
+  width:36px;height:36px;border-radius:11px;border:1px solid var(--line);
+  background:rgba(255,255,255,.03);color:var(--muted);font-size:17px;
+  display:grid;place-items:center;cursor:pointer;transition:all .15s;
+}
+.star-btn.fav{background:var(--goldBg);border-color:rgba(244,201,107,.45);color:var(--gold)}
+
+/* SCORE RING */
+.ring{position:relative;width:52px;height:52px;flex-shrink:0}
+.ring svg{width:52px;height:52px;transform:rotate(-90deg)}
+.ring-txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.ring-txt b{font-size:15px;font-weight:900}
+.ring-txt small{font-size:8px;color:var(--muted);text-transform:uppercase;margin-top:1px}
+
+.pills{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.pill{
+  display:inline-flex;align-items:center;gap:4px;border-radius:99px;
+  padding:4px 9px;font-size:10px;font-weight:850;letter-spacing:.03em;
+  background:var(--emeraldBg);color:var(--emerald);border:1px solid rgba(74,222,128,.3);
+}
+.pill.gold{background:var(--goldBg);color:var(--gold);border-color:rgba(244,201,107,.35)}
+.pill.red{background:var(--redBg);color:var(--red);border-color:rgba(248,113,113,.35)}
+.pill.blue{background:var(--blueBg);color:var(--blue);border-color:rgba(96,165,250,.35)}
+.pill.gray{background:rgba(255,255,255,.05);color:var(--muted);border-color:var(--line)}
+
+/* VALUATION BAR */
+.val-box{background:rgba(6,11,8,.68);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.val-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.val-price{font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
+.val-dd{font-size:11.5px;font-weight:750}
+.val-track{position:relative;height:9px;border-radius:99px;background:linear-gradient(90deg,#166534 0%,#22c55e 40%,#ca8a04 68%,#dc2626 100%);margin:6px 0}
+.val-pin{
+  position:absolute;top:50%;transform:translate(-50%,-50%);
+  width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #060a08;
+  box-shadow:0 0 10px rgba(255,255,255,.85);
+}
+.val-labels{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.mini4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mcell{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:7px 8px}
+.mcell span{display:block;font-size:9.5px;color:var(--muted)}
+.mcell b{display:block;font-size:13px;margin-top:2px;font-variant-numeric:tabular-nums}
+
+.chips-tags{display:flex;gap:5px;flex-wrap:wrap}
+.tag{font-size:10.5px;padding:3px 8px;border-radius:8px;background:rgba(74,222,128,.08);color:#c4f1d2;border:1px solid rgba(74,222,128,.16)}
+.tag.bad{background:rgba(248,113,113,.09);color:#fecaca;border-color:rgba(248,113,113,.22)}
+
+.card-actions{display:flex;gap:8px;margin-top:auto}
+
+/* PANELS (MAPA, FAVORITAS, AJUSTES) */
+.panel{
+  background:var(--glass);border:1px solid var(--line);border-radius:20px;
+  padding:16px;margin-bottom:14px;
+}
+.panel h3{margin:0 0 10px;font-size:15.5px;font-weight:850}
+.radar-svg{width:100%;height:265px;display:block;border-radius:14px;background:rgba(5,10,7,.78);border:1px solid var(--line)}
+.chart-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:9px;font-size:11px;color:var(--muted)}
+.chart-legend span{display:inline-flex;align-items:center;gap:5px}
+.chart-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+.rank-item{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer;
+}
+.rank-item:last-child{border-bottom:0}
+.sector-row{margin-bottom:10px;cursor:pointer}
+.sector-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px}
+.sbar-track{height:7px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+.sbar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#22c55e,#86efac)}
+
+/* FAVORITES NOTE */
+.fav-note{
+  width:100%;border:1px solid var(--line);background:#08100b;color:var(--text);
+  border-radius:10px;padding:8px 10px;font:inherit;font-size:12.5px;resize:vertical;min-height:42px;
+}
+
+/* CHECKLIST BUFFETT */
+.check-card{
+  display:flex;gap:11px;align-items:flex-start;padding:12px;border-radius:14px;
+  background:rgba(255,255,255,.03);border:1px solid var(--line);margin-bottom:8px;cursor:pointer;
+}
+.check-card.checked{background:var(--emeraldBg);border-color:rgba(74,222,128,.4)}
+.check-box{
+  width:22px;height:22px;border-radius:7px;border:2px solid var(--line2);flex-shrink:0;
+  display:grid;place-items:center;font-size:13px;font-weight:900;margin-top:1px;
+}
+.check-card.checked .check-box{background:var(--emerald);border-color:var(--emerald);color:#04160a}
+
+/* INPUTS */
+label.flabel{display:block;font-size:12px;font-weight:700;color:#bdd0c2;margin:10px 0 5px}
+input.finput{
+  width:100%;height:42px;border-radius:12px;border:1px solid var(--line2);
+  background:#09110c;color:var(--text);padding:0 12px;font:inherit;font-size:13px;
+}
+
+.notice{padding:11px 13px;border-radius:13px;font-size:12.5px;margin:9px 0;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.notice.good{background:var(--emeraldBg);border-color:rgba(74,222,128,.3);color:#d1fae5}
+.notice.warn{background:var(--goldBg);border-color:rgba(244,201,107,.35);color:#fef3c7}
+.notice.bad{background:var(--redBg);border-color:rgba(248,113,113,.35);color:#fee2e2}
+.empty{border:1px dashed var(--line2);border-radius:18px;padding:30px 18px;text-align:center;color:var(--muted)}
+
+/* BOTTOM NAVIGATION BAR (NATIVE APP STYLE) */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:40;
+  background:var(--glass-strong);
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  border-top:1px solid var(--line2);
+  padding:6px 8px calc(8px + env(safe-area-inset-bottom));
+  display:flex;justify-content:center;
+}
+.bottom-nav-inner{
+  width:100%;max-width:580px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:4px;
+}
+.nav-item{
+  border:0;background:transparent;color:var(--muted);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  padding:6px 4px;border-radius:14px;cursor:pointer;position:relative;
+  transition:color .16s, background .16s;
+}
+.nav-item svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.nav-item span{font-size:10.5px;font-weight:750;letter-spacing:.01em}
+.nav-item.active{color:var(--emerald);background:rgba(74,222,128,.12)}
+.nav-badge{
+  position:absolute;top:2px;right:calc(50% - 22px);
+  min-width:17px;height:17px;padding:0 5px;border-radius:99px;
+  background:var(--emerald);color:#04160a;font-size:10px;font-weight:900;
+  display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(34,197,94,.5);
+}
+.nav-badge.gold{background:var(--gold);color:#1d1404;box-shadow:0 2px 8px rgba(244,201,107,.45)}
+.nav-badge.show{display:flex}
+
+/* BOTTOM SHEET MODAL */
+.modal{
+  position:fixed;inset:0;background:rgba(2,5,3,.78);backdrop-filter:blur(8px);
+  display:none;align-items:flex-end;justify-content:center;z-index:60;
+}
+.modal.show{display:flex}
+.sheet{
+  width:100%;max-width:760px;max-height:90vh;overflow:auto;
+  background:linear-gradient(165deg,#122018,#09100c);
+  border:1px solid var(--line2);border-bottom:0;
+  border-radius:26px 26px 0 0;padding:12px 18px calc(24px + env(safe-area-inset-bottom));
+  box-shadow:0 -18px 60px rgba(0,0,0,.75);
+  animation:slideUp .22s ease;
+}
+@media(min-width:760px){
+  .modal{align-items:center;padding:16px}
+  .sheet{border-radius:24px;border-bottom:1px solid var(--line2);padding:18px 22px 22px}
+}
+@keyframes slideUp{from{transform:translateY(36px);opacity:.6}to{transform:translateY(0);opacity:1}}
+.sheet-handle{width:42px;height:4px;border-radius:99px;background:rgba(255,255,255,.22);margin:0 auto 12px}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.subbars{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.sbar-item{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.sbar-top{display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px}
+.dcf3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.dcf-card{background:rgba(6,11,8,.72);border:1px solid var(--line);border-radius:14px;padding:10px 8px;text-align:center}
+.dcf-card.base{border-color:rgba(74,222,128,.45);background:rgba(34,197,94,.09)}
+.dcf-card span{display:block;font-size:10px;color:var(--muted)}
+.dcf-card b{display:block;font-size:16px;margin:3px 0 2px}
+.ext-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+.toast{
+  position:fixed;bottom:calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+  left:50%;transform:translateX(-50%);
+  background:#e9f9ee;color:#05210e;padding:11px 16px;border-radius:14px;
+  font-weight:800;font-size:12.5px;box-shadow:0 12px 32px rgba(0,0,0,.55);
+  display:none;z-index:90;max-width:90vw;text-align:center;
+}
+@media(max-width:520px){
+  .subbars{grid-template-columns:1fr}
+  .dcf3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP APP BAR -->
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <div class="logo">🐊</div>
+      <div>
+        <h1>COCODRILO PRO</h1>
+        <small id="appSubtitle">RADAR BUFFETT · AUTOMÁTICO</small>
+      </div>
+    </div>
+    <div class="appbar-right">
+      <span class="live-pill" id="modeBadge"><i class="dot"></i> Demo</span>
+      <button class="icon-btn" id="refreshBtn" title="Actualizar datos">↻</button>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN APP CONTENT -->
+<main class="main">
+
+  <!-- VIEW 1: RADAR (HOME) -->
+  <section class="view active" id="view-radar">
+    <div class="demo-bar" id="demoBar">
+      <span>✨ <b>Vista previa:</b> conecta tu GitHub en la pestaña <b>App</b> para ver +1.000 empresas reales.</span>
+      <button class="btn sm gold" id="goConfigBtn">Conectar</button>
+    </div>
+
+    <div class="hero-card">
+      <div class="eyebrow" id="heroEyebrow">Actualización automática</div>
+      <h2 class="hero-title" id="heroTitle">Buscando gangas de calidad…</h2>
+      <p class="hero-sub" id="heroSub">Solo resalta en verde empresas con ROIC alto, caja real, poca deuda y precio castigado.</p>
+      <div class="kpi-row">
+        <div class="kpi g" data-quick="OPORTUNIDAD">
+          <span>🟢 Oportunidad</span>
+          <strong id="kOpp">0</strong>
+        </div>
+        <div class="kpi y" data-quick="VIGILAR">
+          <span>🟡 Vigilar</span>
+          <strong id="kWatch">0</strong>
+        </div>
+        <div class="kpi" data-quick="ALL">
+          <span>🌍 Analizadas</span>
+          <strong id="kTotal">0</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="chips-scroll" id="quickChips">
+      <button class="fchip active" data-filter="ALL">Todas</button>
+      <button class="fchip" data-filter="OPORTUNIDAD">🟢 Oportunidades</button>
+      <button class="fchip" data-filter="VIGILAR">🟡 En vigilancia</button>
+      <button class="fchip" data-filter="REG:Europa">🇪🇺 Europa</button>
+      <button class="fchip" data-filter="REG:EE. UU.">🇺🇸 EE. UU.</button>
+      <button class="fchip" data-filter="CALIDAD_CARA">🔵 Calidad cara</button>
+      <button class="fchip" data-filter="DESCARTADA">🔴 Descartadas</button>
+    </div>
+
+    <div class="search-row">
+      <div class="search-box">
+        <span>🔍</span>
+        <input id="searchInput" placeholder="Buscar empresa, ticker o sector…">
+      </div>
+      <select class="sort-sel" id="sortSelect">
+        <option value="smart">Mejor señal</option>
+        <option value="score">Mayor Score</option>
+        <option value="discount">Más barata DCF</option>
+        <option value="drawdown">Mayor caída 52s</option>
+        <option value="pfcf">Menor P/FCF</option>
+      </select>
+    </div>
+
+    <div id="radarList"></div>
+  </section>
+
+  <!-- VIEW 2: MAPA Y EXPLORAR -->
+  <section class="view" id="view-map">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <h3 style="margin:0">🎯 Mapa Cocodrilo (Calidad vs Descuento)</h3>
+        <span class="pill" style="font-size:10px">Toca un punto</span>
+      </div>
+      <svg class="radar-svg" id="radarSvg" viewBox="0 0 460 265" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="chart-legend">
+        <span><i style="background:#4ade80"></i>Oportunidad</span>
+        <span><i style="background:#f4c96b"></i>Vigilar</span>
+        <span><i style="background:#60a5fa"></i>Calidad cara</span>
+        <span><i style="background:#f87171"></i>Descartada</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>📉 Grandes negocios más castigados (Caída 52 semanas)</h3>
+      <p style="margin:-4px 0 8px;font-size:12px;color:var(--muted)">Solo empresas que aprueban el filtro de calidad Buffett (Score ≥ 75).</p>
+      <div id="topDropsHost"></div>
+    </div>
+
+    <div class="panel">
+      <h3>📊 Calidad media por sector (toca para filtrar)</h3>
+      <div id="sectorBarsHost"></div>
+    </div>
+  </section>
+
+  <!-- VIEW 3: FAVORITAS -->
+  <section class="view" id="view-favs">
+    <div class="panel">
+      <div class="eyebrow">Tu lista personal de vigilancia</div>
+      <h3 style="margin:4px 0 4px">⭐ Empresas favoritas</h3>
+      <p style="margin:0;font-size:12.5px;color:var(--muted)">Toca la estrella en cualquier empresa del Radar para seguirla aquí y apuntar tu tesis (se guarda en tu móvil).</p>
+    </div>
+    <div id="favsHost"></div>
+  </section>
+
+  <!-- VIEW 4: APP / MÉTODO BUFFETT -->
+  <section class="view" id="view-app">
+    <div class="panel">
+      <div class="eyebrow">Checklist obligatorio antes de poner 1 €</div>
+      <h3 style="margin:4px 0 6px">🐊 Los 4 filtros de Warren Buffett</h3>
+      <p style="margin:0 0 12px;font-size:12.5px;color:var(--muted)">El bot filtra los números. Antes de comprar una alerta verde, marca estos 4 puntos:</p>
+
+      <div id="checklistHost"></div>
+      <div id="checklistStatus"></div>
+      <button class="btn sm full" id="resetChecklistBtn" style="margin-top:6px">Reiniciar checklist</button>
+    </div>
+
+    <div class="panel">
+      <div class="eyebrow">Conexión para App / APK WebView</div>
+      <h3 style="margin:4px 0 6px">📡 Fuente de datos automáticos</h3>
+      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Si conviertes este HTML en una APK local, pega aquí la URL de tu <code>latest-scan.json</code> en GitHub Pages para que tu app se actualice sola cada día sin recompilar la APK.</p>
+      <label class="flabel">URL remota de latest-scan.json (opcional)</label>
+      <input class="finput" id="remoteUrlInput" placeholder="https://tu-usuario.github.io/radar-cocodrilo-pro/data/latest-scan.json">
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn primary sm" id="saveRemoteUrlBtn" style="flex:1">Guardar y sincronizar</button>
+        <button class="btn sm" id="loadLocalJsonBtn">📂 Cargar JSON</button>
+        <input type="file" id="jsonFileInput" accept=".json" style="display:none">
+      </div>
+      <div class="notice" id="syncStatusBox" style="margin-top:10px">Estado: comprobando fuente de datos…</div>
+    </div>
+
+    <div class="panel">
+      <div class="eyebrow">Puesta en marcha</div>
+      <h3 style="margin:4px 0 8px">📲 Cómo convertirla en App en tu móvil</h3>
+      <div class="notice good"><b>Opción A (La más fácil — PWA gratis):</b> Sube el ZIP a GitHub, activa <b>GitHub Pages</b>, abre la URL en Chrome (Android) o Safari (iOS) y pulsa <b>«Añadir a pantalla de inicio»</b>. Se instala con su icono 🐊, pantalla completa y menú abajo sin barra del navegador.</div>
+      <div class="notice"><b>Opción B (APK instalable):</b> Usa un generador WebView apuntando directamente a tu URL de GitHub Pages (así cada cambio y escaneo diario de +1.000 empresas se actualiza solo), o empaqueta este HTML y pega arriba la URL de tu <code>latest-scan.json</code>.</div>
+    </div>
+  </section>
+
+</main>
+
+<!-- FIXED BOTTOM NAVIGATION BAR -->
+<nav class="bottom-nav" role="tablist" aria-label="Navegación principal">
+  <div class="bottom-nav-inner">
+    <button class="nav-item active" data-view="radar">
+      <span class="nav-badge" id="badgeOpp">0</span>
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Radar</span>
+    </button>
+    <button class="nav-item" data-view="map">
+      <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><circle cx="17" cy="7" r="2.2"/><circle cx="12" cy="12" r="1.8"/><circle cx="8" cy="16" r="1.5"/><circle cx="16" cy="14" r="1.5"/></svg>
+      <span>Mapa</span>
+    </button>
+    <button class="nav-item" data-view="favs">
+      <span class="nav-badge gold" id="badgeFav">0</span>
+      <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span>Favoritas</span>
+    </button>
+    <button class="nav-item" data-view="app">
+      <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span>Método</span>
+    </button>
+  </div>
+</nav>
+
+<!-- BOTTOM SHEET DETAIL MODAL -->
+<div class="modal" id="detailModal">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <div>
+        <div class="eyebrow" id="mSub">INFORME BUFFETT</div>
+        <h2 id="mTitle" style="margin:3px 0 0;font-size:19px">Empresa</h2>
+      </div>
+      <button class="icon-btn" id="closeModalBtn">✕</button>
+    </div>
+    <div id="mBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(()=>{'use strict';
+
+const STORE = {
+  FAVS: 'cocodriloApp.favs.v7',
+  NOTES: 'cocodriloApp.notes.v7',
+  REMOTE_URL: 'cocodriloApp.remoteUrl.v7',
+  CHECKS: 'cocodriloApp.checks.v7'
+};
+
+const DEMO_PAYLOAD = {
+  is_demo: true,
+  generated_at: new Date().toISOString(),
+  universe_mode: "demo (ejemplo)",
+  total_scanned: 1024,
+  total_ok: 8,
+  counts: { oportunidades: 3, vigilar: 2, calidad_cara: 2, descartadas: 1 },
+  companies: [
+    {
+      ticker:"UNH", name:"UnitedHealth Group", region:"EE. UU.", currency:"USD", sector:"Healthcare", industry:"Healthcare Plans", sector_profile:"general",
+      market_cap_b:315, price:342.0, high_52w:606.0, low_52w:310.0, drawdown_52w_pct:-43.6, trailing_pe:14.2, forward_pe:13.4, p_fcf:12.8,
+      roic_pct:19.4, operating_margin_pct:8.7, revenue_growth_pct:9.2, eps_cagr_pct:11.5, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:1.35, ebitda_negative:false, share_change_pct:-3.2, dividend_yield_pct:2.4,
+      quality_score:88, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", discount_vs_base_pct:34.2, upside_base_pct:52.0, below_bear:true,
+      score_breakdown:{ roic:100, margin:73, fcf:100, debt:80, growth:100, shareholder:100 },
+      strengths:["ROIC excelente (19.4%)", "Genera caja real todos los años (4/4)", "Recompra acciones netas (-3.2%)"],
+      hard_fails:[],
+      dcf:{ fcf_per_share:26.7, net_cash_per_share:-38.0, assumed_growth_pct:9.5, intrinsic_bear:375.0, intrinsic_base:520.0, intrinsic_bull:615.0, target_price:390.0, margin_safety_pct:25 },
+      ai_check:"1) Ventaja competitiva: escala nacional masiva y poder de negociación con hospitales intactos.\n2) Riesgo: presión temporal de costes médicos y tarifas públicas.\n3) Veredicto: apunta a bache TEMPORAL de márgenes mientras actualizan pólizas; verificar noticias recientes."
+    },
+    {
+      ticker:"ASML.AS", name:"ASML Holding N.V.", region:"Europa", currency:"EUR", sector:"Technology", industry:"Semiconductors", sector_profile:"tech",
+      market_cap_b:270, price:648.0, high_52w:985.0, low_52w:612.0, drawdown_52w_pct:-34.2, trailing_pe:28.1, forward_pe:22.4, p_fcf:24.5,
+      roic_pct:31.2, operating_margin_pct:32.8, revenue_growth_pct:14.0, eps_cagr_pct:16.2, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:-0.15, ebitda_negative:false, share_change_pct:-2.8, dividend_yield_pct:1.05,
+      quality_score:96, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", discount_vs_base_pct:27.6, upside_base_pct:38.1, below_bear:false,
+      score_breakdown:{ roic:100, margin:100, fcf:100, debt:100, growth:100, shareholder:100 },
+      strengths:["ROIC excelente (31.2%)", "Márgenes operativos muy altos (32.8%)", "Más caja que deuda (Caja Neta)"],
+      hard_fails:[],
+      dcf:{ fcf_per_share:26.5, net_cash_per_share:4.2, assumed_growth_pct:13.0, intrinsic_bear:625.0, intrinsic_base:895.0, intrinsic_bull:1060.0, target_price:671.0, margin_safety_pct:25 },
+      ai_check:"1) Ventaja competitiva: monopolio absoluto mundial en litografía EUV.\n2) Riesgo: ciclicidad de pedidos de semiconductores y restricciones a China.\n3) Veredicto: problema de ciclo TEMPORAL en una de las mejores empresas de Europa."
+    },
+    {
+      ticker:"ADBE", name:"Adobe Inc.", region:"EE. UU.", currency:"USD", sector:"Technology", industry:"Software", sector_profile:"tech",
+      market_cap_b:165, price:368.0, high_52w:587.0, low_52w:351.0, drawdown_52w_pct:-37.3, trailing_pe:24.0, forward_pe:17.5, p_fcf:18.4,
+      roic_pct:27.5, operating_margin_pct:36.2, revenue_growth_pct:10.4, eps_cagr_pct:13.1, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:-0.25, ebitda_negative:false, share_change_pct:-4.5, dividend_yield_pct:0,
+      quality_score:94, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", discount_vs_base_pct:29.9, upside_base_pct:42.7, below_bear:true,
+      score_breakdown:{ roic:100, margin:100, fcf:100, debt:100, growth:100, shareholder:100 },
+      strengths:["ROIC excelente (27.5%)", "Márgenes operativos muy altos (36.2%)", "Recompra acciones netas (-4.5%)"],
+      hard_fails:[],
+      dcf:{ fcf_per_share:20.0, net_cash_per_share:5.8, assumed_growth_pct:10.0, intrinsic_bear:392.0, intrinsic_base:525.0, intrinsic_bull:620.0, target_price:394.0, margin_safety_pct:25 },
+      ai_check:"1) Ventaja competitiva: estándar creativo mundial (coste de cambio alto).\n2) Riesgo: temor a competencia de herramientas de IA generativa.\n3) Veredicto: vigilar retención de suscriptores antes de entrar fuerte."
+    },
+    {
+      ticker:"GOOGL", name:"Alphabet Inc.", region:"EE. UU.", currency:"USD", sector:"Communication Services", industry:"Internet", sector_profile:"tech",
+      market_cap_b:2180, price:176.0, high_52w:208.0, low_52w:152.0, drawdown_52w_pct:-15.4, trailing_pe:21.2, forward_pe:18.8, p_fcf:25.1,
+      roic_pct:28.4, operating_margin_pct:32.1, revenue_growth_pct:13.5, eps_cagr_pct:15.4, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:-0.65, ebitda_negative:false, share_change_pct:-3.8, dividend_yield_pct:0.45,
+      quality_score:97, data_coverage_pct:100, passes_quality:true, status:"VIGILAR", discount_vs_base_pct:14.1, upside_base_pct:16.5, below_bear:false,
+      score_breakdown:{ roic:100, margin:100, fcf:100, debt:100, growth:100, shareholder:100 },
+      strengths:["ROIC excelente (28.4%)", "Más caja que deuda (Caja Neta)", "Recompra acciones netas (-3.8%)"],
+      hard_fails:[],
+      dcf:{ fcf_per_share:7.0, net_cash_per_share:6.8, assumed_growth_pct:11.5, intrinsic_bear:152.0, intrinsic_base:205.0, intrinsic_bull:242.0, target_price:154.0, margin_safety_pct:25 }
+    },
+    {
+      ticker:"ITX.MC", name:"Inditex (Zara)", region:"Europa", currency:"EUR", sector:"Consumer Cyclical", industry:"Apparel Retail", sector_profile:"general",
+      market_cap_b:142, price:45.6, high_52w:55.9, low_52w:42.1, drawdown_52w_pct:-18.4, trailing_pe:24.5, forward_pe:22.1, p_fcf:22.8,
+      roic_pct:29.0, operating_margin_pct:19.4, revenue_growth_pct:8.5, eps_cagr_pct:14.8, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:-1.1, ebitda_negative:false, share_change_pct:0.0, dividend_yield_pct:3.4,
+      quality_score:90, data_coverage_pct:100, passes_quality:true, status:"VIGILAR", discount_vs_base_pct:10.6, upside_base_pct:11.8, below_bear:false,
+      score_breakdown:{ roic:100, margin:80, fcf:100, debt:100, growth:100, shareholder:80 },
+      strengths:["ROIC excelente (29.0%)", "Más caja que deuda (Caja Neta)", "Genera caja real todos los años (4/4)"],
+      hard_fails:[],
+      dcf:{ fcf_per_share:2.0, net_cash_per_share:3.6, assumed_growth_pct:8.5, intrinsic_bear:39.0, intrinsic_base:51.0, intrinsic_bull:60.0, target_price:38.3, margin_safety_pct:25 }
+    },
+    {
+      ticker:"COST", name:"Costco Wholesale", region:"EE. UU.", currency:"USD", sector:"Consumer Defensive", industry:"Discount Stores", sector_profile:"retail",
+      market_cap_b:395, price:890.0, high_52w:940.0, low_52w:745.0, drawdown_52w_pct:-5.3, trailing_pe:51.2, forward_pe:46.5, p_fcf:53.9,
+      roic_pct:22.4, operating_margin_pct:3.6, revenue_growth_pct:7.8, eps_cagr_pct:12.4, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:-0.35, ebitda_negative:false, share_change_pct:-0.2, dividend_yield_pct:0.55,
+      quality_score:93, data_coverage_pct:100, passes_quality:true, status:"CALIDAD_CARA", discount_vs_base_pct:-42.0, upside_base_pct:-29.6, below_bear:false,
+      score_breakdown:{ roic:100, margin:87, fcf:100, debt:100, growth:100, shareholder:70 },
+      strengths:["ROIC excelente (22.4%)", "Margen sólido para retail de alto volumen (3.6%)", "Más caja que deuda (Caja Neta)"],
+      hard_fails:[],
+      dcf:{ fcf_per_share:16.5, net_cash_per_share:6.8, assumed_growth_pct:9.5, intrinsic_bear:365.0, intrinsic_base:516.0, intrinsic_bull:620.0, target_price:387.0, margin_safety_pct:25 }
+    },
+    {
+      ticker:"KO", name:"The Coca-Cola Company", region:"EE. UU.", currency:"USD", sector:"Consumer Defensive", industry:"Beverages", sector_profile:"general",
+      market_cap_b:290, price:67.4, high_52w:73.5, low_52w:58.2, drawdown_52w_pct:-8.3, trailing_pe:24.8, forward_pe:22.1, p_fcf:28.1,
+      roic_pct:16.8, operating_margin_pct:29.5, revenue_growth_pct:4.2, eps_cagr_pct:6.1, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:1.85, ebitda_negative:false, share_change_pct:-0.4, dividend_yield_pct:2.95,
+      quality_score:83, data_coverage_pct:100, passes_quality:true, status:"CALIDAD_CARA", discount_vs_base_pct:-14.2, upside_base_pct:-12.5, below_bear:false,
+      score_breakdown:{ roic:80, margin:100, fcf:100, debt:65, growth:80, shareholder:80 },
+      strengths:["ROIC excelente (16.8%)", "Margen operativo alto (29.5%)", "Genera caja real todos los años (4/4)"],
+      hard_fails:[],
+      dcf:{ fcf_per_share:2.4, net_cash_per_share:-6.5, assumed_growth_pct:5.5, intrinsic_bear:42.0, intrinsic_base:59.0, intrinsic_bull:69.0, target_price:44.3, margin_safety_pct:25 }
+    },
+    {
+      ticker:"EJEMPLO-DEUDA", name:"Empresa Muy Apalancada (Filtro Rojo)", region:"EE. UU.", currency:"USD", sector:"Industrials", industry:"Conglomerates", sector_profile:"general",
+      market_cap_b:12, price:24.0, high_52w:58.0, low_52w:22.0, drawdown_52w_pct:-58.6, trailing_pe:9.5, forward_pe:11.0, p_fcf:14.0,
+      roic_pct:4.1, operating_margin_pct:5.2, revenue_growth_pct:-7.5, eps_cagr_pct:-9.2, fcf_years_pos:2, fcf_years_total:4, net_debt_ebitda:4.9, ebitda_negative:false, share_change_pct:6.2, dividend_yield_pct:0,
+      quality_score:26, data_coverage_pct:100, passes_quality:false, status:"DESCARTADA", discount_vs_base_pct:12.0, upside_base_pct:13.6, below_bear:false,
+      score_breakdown:{ roic:0, margin:0, fcf:30, debt:0, growth:0, shareholder:0 },
+      strengths:[],
+      hard_fails:["ROIC demasiado bajo (4.1%)", "Deuda elevada (4.9x EBITDA)", "Contracción fuerte (-9.2% anual)"],
+      dcf:{ fcf_per_share:1.7, net_cash_per_share:-14.0, assumed_growth_pct:2.0, intrinsic_bear:12.0, intrinsic_base:27.3, intrinsic_bull:33.0, target_price:20.5, margin_safety_pct:25 }
+    }
+  ]
+};
+
+const CHECKLIST_ITEMS = [
+  { id:'c1', title:'1. Negocio predecible a 10–20 años', desc:'¿Entiendes cómo gana dinero y crees que la gente seguirá comprándolo dentro de una década?' },
+  { id:'c2', title:'2. Ventaja competitiva (Moat) intacta', desc:'¿Tiene marca fuerte, escala, efecto red o patentes que impidan a la competencia robarle clientes?' },
+  { id:'c3', title:'3. Directiva alineada y balance sano', desc:'¿Poca deuda, genera caja real todos los años y cuida al accionista (recompras/dividendos)?' },
+  { id:'c4', title:'4. Problema TEMPORAL, no permanente', desc:'¿Has comprobado en noticias por qué bajó y ves claro que es un bache pasajero?' }
+];
+
+let payload = DEMO_PAYLOAD;
+let activeView = 'radar';
+let activeFilter = 'ALL'; // ALL, OPORTUNIDAD, VIGILAR, CALIDAD_CARA, DESCARTADA, REG:Europa, SEC:Technology
+let favs = readJSON(STORE.FAVS, []);
+let notes = readJSON(STORE.NOTES, {});
+let checks = readJSON(STORE.CHECKS, {});
+let remoteUrl = localStorage.getItem(STORE.REMOTE_URL) || '';
+
+const $ = id => document.getElementById(id);
+
+function readJSON(k, def){
+  try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : def; } catch(e){ return def; }
+}
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtMoney(v, cur){ return (v===null||v===undefined||!Number.isFinite(Number(v))) ? '—' : `${Number(v).toFixed(2)} ${cur||''}`; }
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 3200);
+}
+
+function isFav(ticker){ return favs.includes(ticker); }
+function toggleFav(ticker){
+  if(isFav(ticker)){ favs = favs.filter(x => x !== ticker); toast(`${ticker} quitada de Favoritas`); }
+  else { favs.push(ticker); toast(`⭐ ${ticker} guardada en Favoritas`); }
+  localStorage.setItem(STORE.FAVS, JSON.stringify(favs));
+  renderAll();
+}
+
+function statusBadge(st){
+  if(st==='OPORTUNIDAD') return '<span class="pill">🟢 OPORTUNIDAD</span>';
+  if(st==='VIGILAR') return '<span class="pill gold">🟡 VIGILAR</span>';
+  if(st==='CALIDAD_CARA') return '<span class="pill blue">🔵 CALIDAD</span>';
+  return '<span class="pill red">🔴 DESCARTADA</span>';
+}
+function statusColor(st){
+  if(st==='OPORTUNIDAD') return '#4ade80';
+  if(st==='VIGILAR') return '#f4c96b';
+  if(st==='CALIDAD_CARA') return '#60a5fa';
+  return '#f87171';
+}
+
+function scoreRing(score, status){
+  const r = 20, circ = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, Number(score) || 0));
+  const offset = circ * (1 - pct / 100);
+  const col = status === 'DESCARTADA' ? '#f87171' : (pct >= 80 ? '#4ade80' : pct >= 70 ? '#f4c96b' : '#f87171');
+  return `<div class="ring">
+    <svg viewBox="0 0 52 52">
+      <circle cx="26" cy="26" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="4.5"></circle>
+      <circle cx="26" cy="26" r="${r}" fill="none" stroke="${col}" stroke-width="4.5" stroke-linecap="round"
+        stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"></circle>
+    </svg>
+    <div class="ring-txt"><b style="color:${col}">${pct}</b><small>pts</small></div>
+  </div>`;
+}
+
+function valPosPct(c){
+  const dcf = c.dcf;
+  if(!dcf || !dcf.intrinsic_base || !c.price) return 50;
+  const ratio = c.price / dcf.intrinsic_base;
+  return Math.max(4, Math.min(96, ((ratio - 0.5) / 1.0) * 100));
+}
+
+function buildBuffettPrompt(c){
+  const dcf = c.dcf || {};
+  return `Actúa como analista siguiendo estrictamente el método de Warren Buffett y Charlie Munger.
+Analiza la empresa ${c.name} (${c.ticker}), sector ${c.sector} (${c.region}).
+Datos actuales del Radar Cocodrilo:
+- Precio actual: ${c.price} ${c.currency} (caída desde máximo 52 semanas: ${c.drawdown_52w_pct ?? 'N/D'}%)
+- Puntuación Calidad: ${c.quality_score}/100 | ROIC: ${c.roic_pct ?? 'N/D'}% | Margen operativo: ${c.operating_margin_pct ?? 'N/D'}%
+- Deuda Neta / EBITDA: ${c.net_debt_ebitda ?? 'N/D'}x | P/FCF: ${c.p_fcf ?? 'N/D'}x | PER Futuro: ${c.forward_pe ?? 'N/D'}x
+- Valor intrínseco DCF conservador: ${dcf.intrinsic_base ?? 'N/D'} ${c.currency} (Objetivo -25%: ${dcf.target_price ?? 'N/D'} ${c.currency})
+
+Respóndeme en español claro, directo y para alguien que no es experto en bolsa sobre los 4 factores de Buffett:
+1. Negocio a 10-20 años: ¿seguirá la gente usando sus productos y ganando más dinero dentro de una década?
+2. Ventaja competitiva (Moat): ¿qué la protege de sus rivales y sigue intacta?
+3. Directiva y trato al accionista: ¿reinvierte bien, recompra acciones o paga dividendos sostenibles?
+4. Clave del Cocodrilo: ¿por qué ha bajado recientemente y parece un problema TEMPORAL (oportunidad) o PERMANENTE (trampa de valor)?
+Cierra con los 3 mayores riesgos por los que NO debería comprarla.`;
+}
+
+function copyPrompt(ticker){
+  const c = (payload.companies||[]).find(x => x.ticker === ticker);
+  if(!c) return;
+  const txt = buildBuffettPrompt(c);
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(() => toast('Prompt Buffett copiado. Pégalo en Gemini o ChatGPT.'));
+  } else {
+    prompt('Copia este prompt:', txt);
+  }
+}
+
+/* ===========================
+   RENDER CARDS
+   =========================== */
+function cardHTML(c, includeNote = false){
+  const dcf = c.dcf || null;
+  const fav = isFav(c.ticker);
+  const ddColor = (c.drawdown_52w_pct||0) <= -20 ? '#4ade80' : (c.drawdown_52w_pct||0) <= -10 ? '#f4c96b' : '#8fa898';
+  return `<article class="stock-card ${c.status==='OPORTUNIDAD' ? 'opp' : ''}">
+    <div class="card-top">
+      <div class="card-id">
+        <div class="card-name" title="${esc(c.name)}">${esc(c.name)}</div>
+        <div class="card-meta">
+          <span class="tkr">${esc(c.ticker)}</span>
+          <span>${esc(c.region)}</span>
+          <span>· ${esc(c.sector)}</span>
+        </div>
+        <div class="pills" style="margin-top:7px">
+          ${statusBadge(c.status)}
+          ${c.below_bear ? '<span class="pill gold">🔥 Bajo Conserv.</span>' : ''}
+        </div>
+      </div>
+      <div class="right-tools">
+        <button class="star-btn ${fav ? 'fav' : ''}" data-fav="${esc(c.ticker)}" title="Guardar en Favoritas">${fav ? '★' : '☆'}</button>
+        ${scoreRing(c.quality_score, c.status)}
+      </div>
+    </div>
+
+    <div class="val-box">
+      <div class="val-row">
+        <div>
+          <span style="font-size:10px;color:var(--muted);display:block">PRECIO ACTUAL</span>
+          <span class="val-price">${fmtMoney(c.price, c.currency)}</span>
+        </div>
+        <div style="text-align:right">
+          <span class="val-dd" style="color:${ddColor}">${c.drawdown_52w_pct!==null ? c.drawdown_52w_pct+'% vs máx 52s' : '—'}</span>
+          <div style="font-size:10.5px;color:var(--muted)">${c.discount_vs_base_pct!==null ? (c.discount_vs_base_pct>=0 ? `Descuento ${c.discount_vs_base_pct}% DCF` : `Prima ${Math.abs(c.discount_vs_base_pct)}% DCF`) : 'Sin DCF'}</div>
+        </div>
+      </div>
+      ${dcf ? `
+        <div class="val-track"><div class="val-pin" style="left:${valPosPct(c).toFixed(1)}%"></div></div>
+        <div class="val-labels">
+          <span>🎯 Obj: <b style="color:#86efac">${fmtMoney(dcf.target_price, c.currency)}</b></span>
+          <span>Valor Base: <b>${fmtMoney(dcf.intrinsic_base, c.currency)}</b></span>
+        </div>
+      ` : ''}
+    </div>
+
+    <div class="mini4">
+      <div class="mcell"><span>ROIC</span><b>${c.roic_pct!==null ? c.roic_pct+'%' : '—'}</b></div>
+      <div class="mcell"><span>Margen</span><b>${c.operating_margin_pct!==null ? c.operating_margin_pct+'%' : '—'}</b></div>
+      <div class="mcell"><span>P/FCF</span><b>${c.p_fcf!==null ? c.p_fcf+'x' : '—'}</b></div>
+      <div class="mcell"><span>Deuda</span><b>${c.ebitda_negative ? 'NEG' : (c.net_debt_ebitda!==null ? c.net_debt_ebitda+'x' : '—')}</b></div>
+    </div>
+
+    <div class="chips-tags">
+      ${(c.strengths||[]).slice(0,2).map(s => `<span class="tag">✓ ${esc(s)}</span>`).join('')}
+      ${(c.hard_fails||[]).slice(0,2).map(s => `<span class="tag bad">✕ ${esc(s)}</span>`).join('')}
+    </div>
+
+    ${includeNote ? `<textarea class="fav-note" data-note="${esc(c.ticker)}" placeholder="Tu nota personal (ej. Problema temporal, esperar resultados...)">${esc(notes[c.ticker] || '')}</textarea>` : ''}
+
+    <div class="card-actions">
+      <button class="btn sm primary" style="flex:1" data-open="${esc(c.ticker)}">Ver informe</button>
+      <button class="btn sm" data-prompt="${esc(c.ticker)}">🤖 Prompt IA</button>
+    </div>
+  </article>`;
+}
+
+function bindCardEvents(container){
+  container.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openModal(b.dataset.open));
+  container.querySelectorAll('[data-prompt]').forEach(b => b.onclick = () => copyPrompt(b.dataset.prompt));
+  container.querySelectorAll('[data-fav]').forEach(b => b.onclick = () => toggleFav(b.dataset.fav));
+  container.querySelectorAll('[data-note]').forEach(ta => ta.oninput = () => {
+    notes[ta.dataset.note] = ta.value;
+    localStorage.setItem(STORE.NOTES, JSON.stringify(notes));
+  });
+}
+
+/* ===========================
+   VIEW 1: RADAR
+   =========================== */
+function getFiltered(){
+  const list = payload.companies || [];
+  const q = $('searchInput').value.trim().toLowerCase();
+  const sort = $('sortSelect').value;
+
+  const out = list.filter(c => {
+    if(activeFilter.startsWith('REG:')){
+      if(c.region !== activeFilter.slice(4)) return false;
+    } else if(activeFilter.startsWith('SEC:')){
+      if(c.sector !== activeFilter.slice(4)) return false;
+    } else if(activeFilter !== 'ALL' && c.status !== activeFilter){
+      return false;
+    }
+    if(q && !(c.name||'').toLowerCase().includes(q) && !(c.ticker||'').toLowerCase().includes(q) && !(c.sector||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const order = { OPORTUNIDAD:0, VIGILAR:1, CALIDAD_CARA:2, DESCARTADA:3 };
+  out.sort((a,b) => {
+    if(sort==='score') return (b.quality_score||0)-(a.quality_score||0);
+    if(sort==='discount') return (b.discount_vs_base_pct??-999)-(a.discount_vs_base_pct??-999);
+    if(sort==='drawdown') return (a.drawdown_52w_pct??999)-(b.drawdown_52w_pct??999);
+    if(sort==='pfcf') return (a.p_fcf??9999)-(b.p_fcf??9999);
+    return (order[a.status]??9)-(order[b.status]??9) || (b.quality_score||0)-(a.quality_score||0) || (b.discount_vs_base_pct??-999)-(a.discount_vs_base_pct??-999);
+  });
+  return out;
+}
+
+function renderRadarView(){
+  const all = payload.companies || [];
+  const oppN = all.filter(x => x.status === 'OPORTUNIDAD').length;
+  const watchN = all.filter(x => x.status === 'VIGILAR').length;
+
+  $('kOpp').textContent = oppN;
+  $('kWatch').textContent = watchN;
+  $('kTotal').textContent = all.length;
+
+  const bOpp = $('badgeOpp');
+  bOpp.textContent = oppN;
+  bOpp.classList.toggle('show', oppN > 0);
+
+  const bFav = $('badgeFav');
+  bFav.textContent = favs.length;
+  bFav.classList.toggle('show', favs.length > 0);
+
+  const badge = $('modeBadge');
+  if(payload.is_demo){
+    badge.className = 'live-pill demo';
+    badge.innerHTML = '<i class="dot"></i> Demo';
+    $('demoBar').classList.add('show');
+  } else {
+    badge.className = 'live-pill';
+    badge.innerHTML = '<i class="dot"></i> En vivo';
+    $('demoBar').classList.remove('show');
+  }
+
+  const dt = payload.generated_at ? new Date(payload.generated_at).toLocaleDateString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Sin fecha';
+  $('heroEyebrow').textContent = `${dt} · ${(payload.universe_mode||'global').toUpperCase()}`;
+  $('heroTitle').textContent = oppN > 0
+    ? `${oppN} empresa${oppN===1?'':'s'} en Zona Cocodrilo`
+    : 'El cocodrilo espera: hoy sin gangas claras';
+  $('heroSub').textContent = oppN > 0
+    ? 'Alta calidad financiera + caída fuerte. Comprueba siempre si el motivo es temporal.'
+    : 'Ninguna empresa de alta calidad cumple hoy el margen de seguridad exigido.';
+
+  // Update active chip highlight
+  document.querySelectorAll('#quickChips .fchip').forEach(ch => {
+    ch.classList.toggle('active', ch.dataset.filter === activeFilter);
+  });
+
+  const filtered = getFiltered();
+  const host = $('radarList');
+  if(!filtered.length){
+    host.innerHTML = `<div class="empty">No hay empresas con este filtro.<br><button class="btn sm" style="margin-top:10px" id="clearFiltersBtn">Ver todas</button></div>`;
+    $('clearFiltersBtn').onclick = () => { activeFilter='ALL'; $('searchInput').value=''; renderRadarView(); };
+    return;
+  }
+  host.innerHTML = `<div class="cards-grid">${filtered.map(c => cardHTML(c, false)).join('')}</div>`;
+  bindCardEvents(host);
+}
+
+/* ===========================
+   VIEW 2: MAPA & ANALÍTICA
+   =========================== */
+function renderMapView(){
+  const list = payload.companies || [];
+  const svg = $('radarSvg');
+  const padL = 40, padR = 14, padT = 16, padB = 28, W = 460, H = 265;
+  const pw = W - padL - padR, ph = H - padT - padB;
+  const xMap = d => padL + ((Math.max(-55, Math.min(55, d)) + 55) / 110) * pw;
+  const yMap = s => padT + (1 - Math.max(0, Math.min(100, s)) / 100) * ph;
+
+  const zx = xMap(20), zy = yMap(100), zw = xMap(55) - zx, zh = yMap(75) - zy;
+  let html = `
+    <defs><linearGradient id="cz" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4ade80" stop-opacity=".25"/><stop offset="100%" stop-color="#22c55e" stop-opacity=".06"/></linearGradient></defs>
+    <rect x="${zx.toFixed(1)}" y="${zy.toFixed(1)}" width="${zw.toFixed(1)}" height="${zh.toFixed(1)}" rx="6" fill="url(#cz)" stroke="#4ade80" stroke-opacity=".5" stroke-dasharray="4 3"/>
+    <text x="${(zx+zw-6).toFixed(1)}" y="${(zy+14).toFixed(1)}" text-anchor="end" fill="#86efac" font-size="9.5" font-weight="800">🐊 ZONA COCODRILO</text>
+  `;
+  [25,50,75].forEach(y => {
+    const py = yMap(y).toFixed(1);
+    html += `<line x1="${padL}" y1="${py}" x2="${W-padR}" y2="${py}" stroke="rgba(255,255,255,.07)"/>`;
+    html += `<text x="${padL-6}" y="${Number(py)+3}" text-anchor="end" fill="#8ca394" font-size="9.5">${y}</text>`;
+  });
+  [-40,0,25,50].forEach(x => {
+    const px = xMap(x).toFixed(1);
+    html += `<line x1="${px}" y1="${padT}" x2="${px}" y2="${H-padB}" stroke="rgba(255,255,255,${x===0?.16:.06})"/>`;
+    html += `<text x="${px}" y="${H-10}" text-anchor="middle" fill="#8ca394" font-size="9.5">${x>0?'+':''}${x}%</text>`;
+  });
+  html += `<text x="${padL+pw/2}" y="${H-1}" text-anchor="middle" fill="#6f8777" font-size="8.5">← Cara · Descuento DCF · Barata →</text>`;
+  html += `<text x="11" y="${padT+ph/2}" text-anchor="middle" fill="#6f8777" font-size="8.5" transform="rotate(-90 11 ${padT+ph/2})">Calidad Buffett</text>`;
+
+  const pts = list.filter(c => c.discount_vs_base_pct !== null && c.discount_vs_base_pct !== undefined).slice(0, 180).reverse();
+  pts.forEach(c => {
+    const cx = xMap(c.discount_vs_base_pct).toFixed(1);
+    const cy = yMap(c.quality_score).toFixed(1);
+    const col = statusColor(c.status);
+    const r = c.status==='OPORTUNIDAD' ? 7 : c.status==='VIGILAR' ? 5.2 : 4;
+    html += `<circle data-dot="${esc(c.ticker)}" cx="${cx}" cy="${cy}" r="${r}" fill="${col}" fill-opacity="${c.status==='DESCARTADA'?.45:.95}" stroke="#060a08" stroke-width="1.2" style="cursor:pointer">
+      <title>${esc(c.name)} (${esc(c.ticker)}) · Score ${c.quality_score} · Descuento ${c.discount_vs_base_pct}%</title>
+    </circle>`;
+    if(c.status==='OPORTUNIDAD' && pts.length <= 45){
+      html += `<text x="${cx}" y="${Number(cy)-9}" text-anchor="middle" fill="#e9f9ee" font-size="8.5" font-weight="800" pointer-events="none">${esc(c.ticker)}</text>`;
+    }
+  });
+  svg.innerHTML = html;
+  svg.querySelectorAll('[data-dot]').forEach(el => el.onclick = () => openModal(el.dataset.dot));
+
+  // Top Drops in Quality businesses
+  const drops = list.filter(c => c.passes_quality && c.drawdown_52w_pct !== null)
+    .sort((a,b) => a.drawdown_52w_pct - b.drawdown_52w_pct).slice(0, 6);
+  const dHost = $('topDropsHost');
+  dHost.innerHTML = drops.length ? drops.map(c => `
+    <div class="rank-item" data-open="${esc(c.ticker)}">
+      <div style="min-width:0">
+        <b>${esc(c.name)}</b> <span class="tkr">${esc(c.ticker)}</span>
+        <div style="font-size:11.5px;color:var(--muted)">Score ${c.quality_score}/100 · P/FCF ${c.p_fcf ?? '—'}x</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <b style="color:#4ade80;font-size:15px">${c.drawdown_52w_pct}%</b>
+        <div style="font-size:11px;color:var(--muted)">${fmtMoney(c.price, c.currency)}</div>
+      </div>
+    </div>
+  `).join('') : '<div class="empty">Sin datos de caídas aún.</div>';
+  dHost.querySelectorAll('[data-open]').forEach(el => el.onclick = () => openModal(el.dataset.open));
+
+  // Sector breakdown
+  const bySec = {};
+  list.forEach(c => {
+    const s = c.sector || 'Otros';
+    if(!bySec[s]) bySec[s] = { count:0, sum:0, opps:0 };
+    bySec[s].count++; bySec[s].sum += (c.quality_score || 0);
+    if(c.status === 'OPORTUNIDAD') bySec[s].opps++;
+  });
+  const secs = Object.entries(bySec).map(([name, v]) => ({ name, count:v.count, avg:Math.round(v.sum/v.count), opps:v.opps }))
+    .sort((a,b) => b.opps - a.opps || b.avg - a.avg);
+  const sHost = $('sectorBarsHost');
+  sHost.innerHTML = secs.map(s => `
+    <div class="sector-row" data-sec="${esc(s.name)}">
+      <div class="sector-top">
+        <span><b>${esc(s.name)}</b> <span style="color:var(--muted)">(${s.count})</span></span>
+        <span>${s.opps ? `<b style="color:#4ade80">${s.opps} oport.</b> · ` : ''}Media ${s.avg}/100</span>
+      </div>
+      <div class="sbar-track"><div class="sbar-fill" style="width:${s.avg}%"></div></div>
+    </div>
+  `).join('');
+  sHost.querySelectorAll('[data-sec]').forEach(el => el.onclick = () => {
+    activeFilter = 'SEC:' + el.dataset.sec;
+    switchView('radar');
+    toast(`Filtrado por sector: ${el.dataset.sec}`);
+  });
+}
+
+/* ===========================
+   VIEW 3: FAVORITAS
+   =========================== */
+function renderFavsView(){
+  const all = payload.companies || [];
+  const favList = favs.map(tkr => all.find(c => c.ticker === tkr)).filter(Boolean);
+  const host = $('favsHost');
+  if(!favList.length){
+    host.innerHTML = `<div class="empty">
+      <p style="margin:0 0 12px">Todavía no has marcado ninguna empresa con estrella ⭐.</p>
+      <button class="btn primary sm" id="goRadarFromFavs">Explorar el Radar</button>
+    </div>`;
+    $('goRadarFromFavs').onclick = () => switchView('radar');
+    return;
+  }
+  host.innerHTML = `<div class="cards-grid">${favList.map(c => cardHTML(c, true)).join('')}</div>`;
+  bindCardEvents(host);
+}
+
+/* ===========================
+   VIEW 4: MÉTODO & CONFIG APP
+   =========================== */
+function renderAppView(){
+  const host = $('checklistHost');
+  host.innerHTML = CHECKLIST_ITEMS.map(item => {
+    const on = !!checks[item.id];
+    return `<div class="check-card ${on ? 'checked' : ''}" data-chk="${item.id}">
+      <div class="check-box">${on ? '✓' : ''}</div>
+      <div>
+        <b style="font-size:13.5px;display:block">${item.title}</b>
+        <span style="font-size:12px;color:var(--muted)">${item.desc}</span>
+      </div>
+    </div>`;
+  }).join('');
+  host.querySelectorAll('[data-chk]').forEach(el => el.onclick = () => {
+    const id = el.dataset.chk;
+    checks[id] = !checks[id];
+    localStorage.setItem(STORE.CHECKS, JSON.stringify(checks));
+    renderAppView();
+  });
+
+  const doneCount = CHECKLIST_ITEMS.filter(i => checks[i.id]).length;
+  $('checklistStatus').innerHTML = doneCount === 4
+    ? `<div class="notice good">✅ <b>4/4 superados:</b> cumples la disciplina del cocodrilo. Recuerda no meter demasiado porcentaje de tu dinero en una sola acción.</div>`
+    : `<div class="notice warn">Llevas <b>${doneCount}/4</b> filtros confirmados. Si dudas en el punto 4 (temporal vs permanente), mejor esperar.</div>`;
+
+  $('remoteUrlInput').value = remoteUrl;
+  $('syncStatusBox').innerHTML = payload.is_demo
+    ? `Estado: <b>Vista Previa (Demo)</b>. Sube el proyecto a GitHub o pega arriba tu URL de <code>latest-scan.json</code>.`
+    : `Estado: <b>Conectado a datos reales</b> (${(payload.companies||[]).length} empresas · ${(payload.universe_mode||'').toUpperCase()}).`;
+}
+
+/* ===========================
+   MODAL DETALLE (BOTTOM SHEET)
+   =========================== */
+function openModal(ticker){
+  const c = (payload.companies||[]).find(x => x.ticker === ticker);
+  if(!c) return;
+  const dcf = c.dcf || null;
+  const fav = isFav(c.ticker);
+  const bd = c.score_breakdown || {};
+  const pillars = [
+    ['ROIC / Capital', bd.roic],
+    ['Margen Operativo', bd.margin],
+    ['Caja Real (FCF)', bd.fcf],
+    ['Balance / Deuda', bd.debt],
+    ['Crecimiento', bd.growth],
+    ['Recompras / Div.', bd.shareholder]
+  ];
+
+  $('mSub').textContent = `${c.ticker} · ${c.region} · ${c.sector}${c.market_cap_b ? ' · ' + c.market_cap_b + 'B' : ''}`;
+  $('mTitle').textContent = c.name;
+
+  $('mBody').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+      <div class="pills">
+        ${statusBadge(c.status)}
+        ${c.below_bear ? '<span class="pill gold">🔥 Bajo Conservador</span>' : ''}
+      </div>
+      <div class="right-tools">
+        <button class="star-btn ${fav ? 'fav' : ''}" id="mFavBtn">${fav ? '★' : '☆'}</button>
+        ${scoreRing(c.quality_score, c.status)}
+      </div>
+    </div>
+
+    ${c.ai_check ? `<div class="notice good"><b>🤖 Filtro IA (Temporal vs Permanente):</b><br>${esc(c.ai_check).replace(/\n/g,'<br>')}</div>` : ''}
+    ${(c.hard_fails||[]).length ? `<div class="notice bad"><b>Alertas críticas:</b><br>• ${c.hard_fails.map(esc).join('<br>• ')}</div>` : ''}
+    ${(c.strengths||[]).length ? `<div class="notice"><b>Puntos fuertes:</b><br>• ${c.strengths.map(esc).join('<br>• ')}</div>` : ''}
+
+    <div class="eyebrow" style="margin:12px 0 6px">Desglose 6 Pilares Buffett</div>
+    <div class="subbars">
+      ${pillars.map(([lbl, val]) => {
+        const v = val ?? 0;
+        const col = v >= 75 ? '#4ade80' : v >= 45 ? '#f4c96b' : '#f87171';
+        return `<div class="sbar-item">
+          <div class="sbar-top"><span>${lbl}</span><b style="color:${col}">${val!==null&&val!==undefined ? v+'%' : 'N/D'}</b></div>
+          <div class="sbar-track"><div class="sbar-fill" style="width:${v}%;background:${col}"></div></div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="eyebrow" style="margin:14px 0 6px">Valoración DCF 10 años · Hoy: ${fmtMoney(c.price, c.currency)}</div>
+    ${dcf ? `
+      <div class="dcf3">
+        <div class="dcf-card"><span>Conservador</span><b>${fmtMoney(dcf.intrinsic_bear, c.currency)}</b></div>
+        <div class="dcf-card base"><span>Base (g=${dcf.assumed_growth_pct}%)</span><b style="color:#4ade80">${fmtMoney(dcf.intrinsic_base, c.currency)}</b><small style="color:#86efac;font-size:10.5px">🎯 Obj: <b>${fmtMoney(dcf.target_price, c.currency)}</b></small></div>
+        <div class="dcf-card"><span>Optimista</span><b>${fmtMoney(dcf.intrinsic_bull, c.currency)}</b></div>
+      </div>
+    ` : `<div class="notice warn">DCF no aplicable a este negocio.</div>`}
+
+    <div class="mini4" style="margin-top:8px">
+      <div class="mcell"><span>Máx 52s</span><b>${fmtMoney(c.high_52w,'')}</b></div>
+      <div class="mcell"><span>Fwd PER</span><b>${c.forward_pe ?? '—'}x</b></div>
+      <div class="mcell"><span>FCF +</span><b>${c.fcf_years_pos ?? '—'}/${c.fcf_years_total ?? '—'}a</b></div>
+      <div class="mcell"><span>Divid.</span><b>${c.dividend_yield_pct ?? 0}%</b></div>
+    </div>
+
+    <div class="ext-links">
+      <button class="btn primary full" id="mPromptBtn">🤖 Copiar Prompt Buffett para IA</button>
+      <a class="btn sm" style="flex:1" target="_blank" rel="noopener" href="https://finance.yahoo.com/quote/${encodeURIComponent(c.ticker)}">Yahoo Finance ↗</a>
+      <a class="btn sm" style="flex:1" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(c.name + ' ' + c.ticker + ' noticias bolsa')}">Ver Noticias ↗</a>
+    </div>
+  `;
+
+  $('mPromptBtn').onclick = () => copyPrompt(c.ticker);
+  $('mFavBtn').onclick = () => { toggleFav(c.ticker); openModal(c.ticker); };
+  $('detailModal').classList.add('show');
+}
+
+/* ===========================
+   NAVEGACIÓN Y CARGA DE DATOS
+   =========================== */
+function switchView(name){
+  activeView = name;
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  renderAll();
+}
+
+function renderAll(){
+  renderRadarView();
+  if(activeView === 'map') renderMapView();
+  if(activeView === 'favs') renderFavsView();
+  if(activeView === 'app') renderAppView();
+}
+
+async function fetchData(showToast = false){
+  const urls = [];
+  if(remoteUrl) urls.push(remoteUrl);
+  urls.push('./data/latest-scan.json');
+
+  let loaded = false;
+  for(const base of urls){
+    try {
+      const sep = base.includes('?') ? '&' : '?';
+      const r = await fetch(`${base}${sep}t=${Date.now()}`, { cache: 'no-store' });
+      if(!r.ok) continue;
+      const d = await r.json();
+      if(d && Array.isArray(d.companies) && d.companies.length > 0){
+        payload = d;
+        payload.is_demo = false;
+        loaded = true;
+        break;
+      }
+    } catch(e){}
+  }
+  if(!loaded) payload = DEMO_PAYLOAD;
+  renderAll();
+  if(showToast) toast(loaded ? `Sincronizado (${payload.companies.length} empresas reales)` : 'Mostrando vista previa (sin datos remotos aún)');
+}
+
+// Listeners
+document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => switchView(b.dataset.view));
+document.querySelectorAll('#quickChips .fchip').forEach(ch => ch.onclick = () => {
+  activeFilter = ch.dataset.filter;
+  renderRadarView();
+});
+document.querySelectorAll('[data-quick]').forEach(el => el.onclick = () => {
+  activeFilter = el.dataset.quick;
+  renderRadarView();
+});
+$('searchInput').oninput = renderRadarView;
+$('sortSelect').onchange = renderRadarView;
+$('refreshBtn').onclick = () => fetchData(true);
+$('goConfigBtn').onclick = () => switchView('app');
+$('closeModalBtn').onclick = () => $('detailModal').classList.remove('show');
+$('detailModal').onclick = e => { if(e.target.id === 'detailModal') $('detailModal').classList.remove('show'); };
+
+$('resetChecklistBtn').onclick = () => {
+  checks = {};
+  localStorage.setItem(STORE.CHECKS, '{}');
+  renderAppView();
+  toast('Checklist reiniciado');
+};
+
+$('saveRemoteUrlBtn').onclick = () => {
+  remoteUrl = $('remoteUrlInput').value.trim();
+  localStorage.setItem(STORE.REMOTE_URL, remoteUrl);
+  fetchData(true);
+};
+
+$('loadLocalJsonBtn').onclick = () => $('jsonFileInput').click();
+$('jsonFileInput').onchange = e => {
+  const f = e.target.files?.[0];
+  if(!f) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const parsed = JSON.parse(fr.result);
+      if(!Array.isArray(parsed.companies)) throw Error('Formato inválido');
+      payload = parsed;
+      payload.is_demo = false;
+      renderAll();
+      toast(`Cargadas ${payload.companies.length} empresas desde archivo`);
+      switchView('radar');
+    } catch(err){ toast('Archivo JSON no válido'); }
+  };
+  fr.readAsText(f);
+};
+
+fetchData(false);
+})();
+</script>
+</body>
+</html>
