@@ -31,9 +31,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: cocodrilo-scan
+  cancel-in-progress: false
+
 jobs:
   scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
@@ -56,16 +61,30 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scanner/buffett_scanner.py
-      
-      - name: Publicar resultados en el panel visual
+
+      - name: Actualizar panel visual automaticamente
         run: |
-          cp data/latest-scan.json /tmp/latest-scan.json
+          mkdir -p /tmp/cocodrilo_out
+          for f in data/latest-scan.json data/daily-scan.json; do
+            if [ -f "$f" ]; then cp "$f" /tmp/cocodrilo_out/; fi
+          done
           git fetch origin main
           git reset --hard origin/main
-          cp /tmp/latest-scan.json data/latest-scan.json
+          mkdir -p data
+          cp /tmp/cocodrilo_out/*.json data/
           git config user.name "Cocodrilo Bot"
           git config user.email "bot@users.noreply.github.com"
-          git add data/latest-scan.json
-          git diff --staged --quiet || git commit -m "Escaneo Diario"
+          git add data/
+          git diff --staged --quiet || git commit -m "Actualizacion diaria Radar Cocodrilo"
           git push
 
+      - name: Avisar a Telegram si falla el bot
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=ERROR en Radar Cocodrilo (${{ github.workflow }}). Revisa el fallo aqui: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            
