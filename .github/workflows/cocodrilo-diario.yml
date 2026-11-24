@@ -1,32 +1,31 @@
-name: 🐊 Escáner Diario Cocodrilo (~200 Élite Mundial)
+name: Escaner Diario Cocodrilo
 
 on:
   schedule:
-    # Lunes a Viernes a las 21:30 UTC (cierre Europa y EE. UU.)
-    - cron: '30 21 * * 1-5'
+    - cron: "30 21 * * 1-5"
   workflow_dispatch:
     inputs:
       universe:
-        description: 'Cuántas empresas analizar'
+        description: "Universo a analizar"
         required: true
-        default: 'elite200'
+        default: "elite200"
         type: choice
         options:
-          - 'elite200'
-          - 'sp500'
-          - 'global_1000'
+          - "elite200"
+          - "sp500"
+          - "global_1000"
       test_mode:
-        description: 'Enviar Telegram aunque hoy no haya oportunidades (Modo prueba)'
+        description: "Enviar Telegram aunque no haya oportunidades"
         required: true
-        default: 'true'
+        default: "true"
         type: choice
         options:
-          - 'true'
-          - 'false'
+          - "true"
+          - "false"
       custom_tickers:
-        description: 'Tickers extra opcionales separados por coma (ej. IBE.MC, ASML.AS)'
+        description: "Tickers extra separados por coma"
         required: false
-        default: ''
+        default: ""
         type: string
 
 permissions:
@@ -42,26 +41,26 @@ jobs:
       - name: Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Instalar dependencias
         run: pip install --no-cache-dir -r requirements.txt
 
-      - name: Ejecutar Escáner Cocodrilo y avisar a Telegram
+      - name: Ejecutar Escaner Cocodrilo y avisar a Telegram
         env:
           UNIVERSE_MODE: ${{ github.event.inputs.universe || 'elite200' }}
           TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}
           CUSTOM_TICKERS: ${{ github.event.inputs.custom_tickers || '' }}
-          MAX_WORKERS: '3'
+          MAX_WORKERS: "3"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scanner/buffett_scanner.py
 
-      - name: Actualizar panel visual automáticamente
+      - name: Actualizar panel visual automaticamente
         run: |
           git config user.name "Cocodrilo Bot"
           git config user.email "bot@users.noreply.github.com"
           git add data/latest-scan.json
-          git diff --staged --quiet || git commit -m "Actualización diaria Radar Cocodrilo"
+          git diff --staged --quiet || git commit -m "Actualizacion diaria Radar Cocodrilo"
           git push
