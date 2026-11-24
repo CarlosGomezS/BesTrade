@@ -1,0 +1,43 @@
+name: 🌎 Mega-Escáner Semanal (~1.000+ Empresas: S&P 500 + MidCap 400 + Nasdaq 100 + Europa)
+
+on:
+  schedule:
+    # Todos los sábados a las 09:00 UTC
+    - cron: '0 9 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mega-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Escanear +1.000 empresas globales y avisar a Telegram
+        env:
+          UNIVERSE_MODE: 'global_1000'
+          TEST_MODE: 'true'
+          MAX_WORKERS: '3'
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scanner/buffett_scanner.py
+
+      - name: Publicar resultados en el panel visual
+        run: |
+          git config user.name "Cocodrilo Bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/latest-scan.json
+          git diff --staged --quiet || git commit -m "Mega-escaneo semanal +1.000 empresas"
+          git push
