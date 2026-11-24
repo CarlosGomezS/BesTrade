@@ -49,7 +49,7 @@ jobs:
       - name: Ejecutar Escaner Cocodrilo y avisar a Telegram
         env:
           UNIVERSE_MODE: ${{ github.event.inputs.universe || 'elite200' }}
-          TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}
+          TEST_MODE: ${{ github.event.inputs.test_mode || 'true' }}
           CUSTOM_TICKERS: ${{ github.event.inputs.custom_tickers || '' }}
           MAX_WORKERS: "3"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
