@@ -50,7 +50,8 @@ MIN_MARKET_CAP_USD = float(os.environ.get("MIN_MARKET_CAP_USD", "1000000000"))  
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
-GEMINI_MODELS = ("gemini-2.5-flash", "gemini-2.5-flash-lite")
+GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
+
 
 SUBUNIT_CURRENCIES: Dict[str, Tuple[str, float]] = {
     "GBp": ("GBP", 100.0),
