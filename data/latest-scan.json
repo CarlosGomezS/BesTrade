@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-11-24T21:10:50.839096+00:00",
-  "universe_mode": "global_1000",
+  "generated_at": "2026-11-24T21:13:58.843755+00:00",
+  "universe_mode": "elite200",
   "total_scanned": 245,
   "total_ok": 242,
   "total_failed": 3,
-  "elapsed_sec": 102,
+  "elapsed_sec": 124,
   "counts": {
     "oportunidades": 17,
     "vigilar": 51,
@@ -1878,7 +1878,7 @@
       "industry": "Semiconductors",
       "sector_profile": "tech",
       "market_cap_b": 58.0,
-      "price": 1190.11,
+      "price": 1190.16,
       "high_52w": 1714.09,
       "low_52w": 864.45,
       "drawdown_52w_pct": -30.6,
