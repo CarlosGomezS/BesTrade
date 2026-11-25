@@ -1641,7 +1641,7 @@ def main() -> None:
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
-        "scanner_version": "v9-experto",
+        "scanner_version": "v10-oraculo",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe_mode": UNIVERSE_MODE,
         "total_scanned": total_scanned,
