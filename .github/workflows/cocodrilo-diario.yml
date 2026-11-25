@@ -25,7 +25,7 @@ on:
           - "true"
           - "false"
       custom_tickers:
-        description: "Tickers extra o exclusivos (ej. DECK, NVO, ASML.AS)"
+        description: "Tickers o nombres (ej. Alphabet, Inditex, DECK)"
         required: false
         default: ""
         type: string
@@ -68,7 +68,7 @@ jobs:
       - name: Actualizar panel visual automaticamente
         run: |
           mkdir -p /tmp/cocodrilo_out
-          for f in data/latest-scan.json data/daily-scan.json data/weekly-scan.json data/custom-scan.json; do
+          for f in data/latest-scan.json data/daily-scan.json data/weekly-scan.json data/custom-scan.json data/history.json; do
             if [ -f "$f" ]; then cp "$f" /tmp/cocodrilo_out/; fi
           done
           git fetch origin main
