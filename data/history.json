@@ -1,4 +1,33 @@
 {
-  "updated_at": "2026-11-25T17:57:00.128420+00:00",
-  "entries": []
+  "updated_at": "2026-11-25T20:49:00.829944+00:00",
+  "entries": [
+    {
+      "ticker": "ADBE",
+      "name": "Adobe Inc.",
+      "currency": "USD",
+      "tier": "GANGA",
+      "alert_date": "2026-11-25",
+      "alert_price": 233.52,
+      "quality_score": 100,
+      "ai_verdict": "TEMPORAL",
+      "last_price": 233.52,
+      "return_pct": 0.0,
+      "last_checked": "2026-11-25",
+      "current_status": "GANGA"
+    },
+    {
+      "ticker": "DECK",
+      "name": "Deckers Outdoor Corporation",
+      "currency": "USD",
+      "tier": "ENTRADA_YA",
+      "alert_date": "2026-11-25",
+      "alert_price": 85.19,
+      "quality_score": 100,
+      "ai_verdict": "TEMPORAL",
+      "last_price": 85.19,
+      "return_pct": 0.0,
+      "last_checked": "2026-11-25",
+      "current_status": "ENTRADA_YA"
+    }
+  ]
 }
