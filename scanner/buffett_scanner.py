@@ -1,13 +1,14 @@
 """Radar Cocodrilo Pro v8 — Escáner Global Paralelo (Warren Buffett & Charlie Munger).
 
-Novedades v8:
+Novedades v8 + Alerta Inmediata:
+- Nivel 0 'ENTRADA_YA': detecta anomalías extremas de precio en empresas de élite financiera
+  validadas por Gemini 3 (TEMPORAL), disparando alerta independiente + doble aviso en Telegram.
+- Vigilante intradía silencioso (URGENT_ONLY=true): revisa el mercado varias veces al día sin
+  tocar los JSON de la web y solo avisa si salta una oportunidad de entrada inmediata.
 - Soporte de sharding paralelo (SHARD_INDEX / SHARD_TOTAL) y fusión (MERGE_DIR) para escanear
   +2.000 empresas globales en ~8 minutos desde 6 runners simultáneos sin bloqueos de Yahoo Finance.
 - Modo 'rotacion_diaria' (~330 empresas/día, barriendo >2.000 diferentes cada 2 semanas) y
   modo 'custom' (análisis exprés de 1 o varios tickers lanzados desde la app móvil).
-- Clasificación en 3 niveles en Telegram y web: 🏆 GANGA, 🥇 MUY BUENA, 🥈 BUENA.
-- Gemini 3 (gemini-3.8-flash + respaldos) en modo escéptico Buffett/Munger con titulares reales.
-- JSON ligero en mega-escaneos (mantiene 100% de Oportunidades, Vigilar y Calidad Cara).
 """
 
 from __future__ import annotations
@@ -55,7 +56,6 @@ MERGE_DIR = os.environ.get("MERGE_DIR", "").strip()
 MAX_DISCARDED_IN_WEB_JSON = int(os.environ.get("MAX_DISCARDED_IN_WEB_JSON", "250"))
 URGENT_ONLY = os.environ.get("URGENT_ONLY", "false").strip().lower() == "true"
 URGENT_DOUBLE_PING = os.environ.get("URGENT_DOUBLE_PING", "true").strip().lower() == "true"
-
 
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
@@ -917,13 +917,37 @@ def classify_opportunity_tier(rec: Dict[str, Any]) -> Optional[str]:
     dd = rec.get("drawdown_52w_pct") if rec.get("drawdown_52w_pct") is not None else 0.0
     fpe = rec.get("forward_pe")
     pfcf = rec.get("p_fcf")
+    roic = rec.get("roic_pct") or 0.0
+    nde = rec.get("net_debt_ebitda")
+    f_pos = rec.get("fcf_years_pos")
+    f_tot = rec.get("fcf_years_total")
     in_dcf = bool(rec.get("in_dcf_zone"))
     below_bear = bool(rec.get("below_bear"))
     severe_warn = has_severe_warning(rec)
     verdict = rec.get("ai_verdict")
 
+    fcf_perfect = f_pos is not None and f_tot is not None and f_tot >= 3 and f_pos == f_tot
+    debt_fortress = nde is not None and nde <= 1.2
+    ultra_cheap = fpe is not None and fpe <= 15.5 and (pfcf is None or pfcf <= 15.0)
     multiple_sane = (fpe is not None and fpe <= 20.0) or (fpe is None and pfcf is not None and pfcf <= 16.0)
 
+    # NIVEL 0: ENTRADA INMEDIATA (Anomalía extrema + Calidad élite + IA confirma TEMPORAL)
+    if (
+        q >= 92
+        and roic >= 18.0
+        and debt_fortress
+        and fcf_perfect
+        and in_dcf
+        and below_bear
+        and 40.0 <= disc <= 75.0
+        and dd <= -25.0
+        and ultra_cheap
+        and not severe_warn
+        and verdict == "TEMPORAL"
+    ):
+        return "ENTRADA_YA"
+
+    # NIVEL 1: GANGA EXCEPCIONAL
     if (
         q >= 90
         and in_dcf
@@ -935,6 +959,7 @@ def classify_opportunity_tier(rec: Dict[str, Any]) -> Optional[str]:
     ):
         return "GANGA"
 
+    # NIVEL 2: MUY BUENA
     if (
         q >= 85
         and (in_dcf or (disc >= 20.0 and dd <= -18.0))
@@ -978,6 +1003,26 @@ def format_detailed_opp(r: Dict[str, Any], header_line: str) -> str:
     return "\n".join(block)
 
 
+def build_urgent_telegram_alert(entradas_ya: List[Dict[str, Any]], gap_pts: Optional[float] = None) -> str:
+    now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
+    lines = [
+        "🚨🔥🚨 <b>ALERTA MÁXIMA: ENTRAR YA</b> 🚨🔥🚨",
+        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo</i>",
+    ]
+    if gap_pts is not None and gap_pts >= 12:
+        lines.append(f"⚡ <b>MUY DESPLAZADA DEL RESTO:</b> saca <b>+{gap_pts:.0f} pts</b> de ventaja al siguiente valor.")
+
+    for idx, r in enumerate(entradas_ya[:3], start=1):
+        hdr = f"\n🚨👑 <b>#{idx} ENTRAR YA — {esc_html(r['name'])} ({esc_html(r['ticker'])})</b> · <i>{esc_html(r['region'])}</i>"
+        lines.append(format_detailed_opp(r, hdr))
+
+    lines.append(
+        "\n⚡ <b>ACCIÓN INMEDIATA:</b> dedica 3 minutos a confirmar las noticias de hoy y el último trimestre; "
+        "si no hay fraude ni deterioro estructural, es zona de entrada escalonada."
+    )
+    return "\n".join(lines)
+
+
 def build_telegram_report(
     results: List[Dict[str, Any]],
     failed_count: int,
@@ -1001,22 +1046,30 @@ def build_telegram_report(
     opps = [r for r in results if r["status"] == "OPORTUNIDAD"]
     watch = [r for r in results if r["status"] == "VIGILAR"]
 
+    entradas_ya = [r for r in opps if r.get("opportunity_tier") == "ENTRADA_YA"]
     gangas = [r for r in opps if r.get("opportunity_tier") == "GANGA"]
     muy_buenas = [r for r in opps if r.get("opportunity_tier") == "MUY_BUENA"]
     buenas = [r for r in opps if r.get("opportunity_tier") == "BUENA"]
 
-    for group in (gangas, muy_buenas, buenas):
+    for group in (entradas_ya, gangas, muy_buenas, buenas):
         group.sort(key=lambda r: -(r.get("conviction_score") or 0))
     watch.sort(key=lambda r: (r["drawdown_52w_pct"] if r["drawdown_52w_pct"] is not None else 0, -r["quality_score"]))
 
     if not opps and not watch and not TEST_MODE:
         return None
 
-    tier_summary = f"🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
+    ya_txt = f"🚨 {len(entradas_ya)} ENTRAR YA · " if entradas_ya else ""
+    tier_summary = f"{ya_txt}🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
         f"🐊 <b>RADAR COCODRILO PRO v8 — {date_str}</b>",
         f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
+
+    if entradas_ya:
+        lines.append("\n🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥\n🚨🔥 <b>ENTRAR YA — OPORTUNIDAD HISTÓRICA</b> 🔥🚨\n🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥")
+        for idx, r in enumerate(entradas_ya[:3], start=1):
+            hdr = f"\n🚨👑 <b>#{idx} ENTRAR YA — {esc_html(r['name'])} ({esc_html(r['ticker'])})</b> · <i>{esc_html(r['region'])}</i>"
+            lines.append(format_detailed_opp(r, hdr))
 
     if gangas:
         lines.append("\n━━━━━━━━━━━━━━━━━━━\n🚨🏆 <b>GANGA EXCEPCIONAL (MÁXIMA CONVICCIÓN)</b> 🏆🚨\n━━━━━━━━━━━━━━━━━━━")
@@ -1050,7 +1103,7 @@ def build_telegram_report(
                 f"• <b>{esc_html(r['ticker'])}</b> ({esc_html(r['name'][:22])}): <b>{r['price']} {r['currency']}</b> "
                 f"(52s: {dd}) | Score <b>{r['quality_score']}</b> | P/FCF {pfcf} | PER {fpe} | Obj: {obj}{ai_tag}{warn_tag}"
             )
-            if r.get("ai_check") and not gangas and not muy_buenas:
+            if r.get("ai_check") and not entradas_ya and not gangas and not muy_buenas:
                 lines.append(f"  <i>{esc_html(r['ai_check'])}</i>")
         if len(buenas) > 6:
             lines.append(f"<i>…y {len(buenas) - 6} buenas más en la app.</i>")
@@ -1084,7 +1137,7 @@ def build_telegram_report(
         lines.append(f"<i>ℹ️ {failed_count} tickers omitidos por falta de datos o capitalización &lt; 1B USD.</i>")
 
     lines.append(
-        "\n⚠️ <b>Regla de oro:</b> ni siquiera una 🏆 Ganga se compra sin 5 minutos de contraste de cuentas y noticias."
+        "\n⚠️ <b>Regla de oro:</b> ni siquiera una 🚨 ENTRAR YA o 🏆 Ganga se compra sin 3 minutos de contraste de cuentas y noticias."
     )
     return "\n".join(lines)
 
@@ -1217,9 +1270,9 @@ def main() -> None:
         if UNIVERSE_MODE == "custom":
             targets = results[:8]
         else:
-            max_ai = 8 if UNIVERSE_MODE in ("global_mega", "global_1000") else 6
+            max_ai = 8 if (UNIVERSE_MODE in ("global_mega", "global_1000") or URGENT_ONLY) else 6
             targets = [r for r in results if r["status"] == "OPORTUNIDAD"][:max_ai]
-            if not targets:
+            if not targets and not URGENT_ONLY:
                 targets = [r for r in results if r["status"] == "VIGILAR"][:2]
 
         for r in targets:
@@ -1235,7 +1288,7 @@ def main() -> None:
                 ai_status["last_error"] = ai_err
             time.sleep(2.5)
 
-    tier_order = {"GANGA": 0, "MUY_BUENA": 1, "BUENA": 2, None: 9}
+    tier_order = {"ENTRADA_YA": 0, "GANGA": 1, "MUY_BUENA": 2, "BUENA": 3, None: 9}
     for r in results:
         r["conviction_score"] = compute_conviction_score(r)
         r["opportunity_tier"] = classify_opportunity_tier(r)
@@ -1248,11 +1301,37 @@ def main() -> None:
         )
     )
 
+    entradas_ya = [r for r in results if r.get("opportunity_tier") == "ENTRADA_YA"]
+    opps_all = [r for r in results if r["status"] == "OPORTUNIDAD"]
+    gap_pts = None
+    if len(entradas_ya) >= 1 and len(opps_all) >= 2:
+        gap_pts = round((opps_all[0].get("conviction_score") or 0) - (opps_all[1].get("conviction_score") or 0), 1)
+
+    # MODO VIGILANTE INTRADÍA: no pisa ningún JSON y solo suena si hay una ENTRADA_YA real
+    if URGENT_ONLY:
+        if entradas_ya:
+            urgent_msg = build_urgent_telegram_alert(entradas_ya, gap_pts)
+            send_telegram(urgent_msg)
+            print(f"🚨 ALERTA MÁXIMA enviada ({len(entradas_ya)} empresas ENTRAR YA).")
+            if URGENT_DOUBLE_PING:
+                time.sleep(25)
+                tickers_str = ", ".join(r["ticker"] for r in entradas_ya[:3])
+                send_telegram(f"🔔🚨 <b>RECORDATORIO URGENTE COCODRILO:</b> revisa <b>{esc_html(tickers_str)}</b> ahora mismo (zona ENTRAR YA).")
+        elif TEST_MODE:
+            send_telegram(
+                f"🛡️ <b>Vigilante Intradía OK</b> ({len(results)} analizadas): ahora mismo no hay ninguna empresa en nivel 🚨 ENTRAR YA."
+            )
+            print("✅ Chequeo intradía OK (sin alertas urgentes).")
+        else:
+            print("😴 Intradía sin nivel ENTRAR YA. Silencio total.")
+        return
+
     counts = {
+        "entrada_ya": len(entradas_ya),
         "gangas": sum(1 for r in results if r["opportunity_tier"] == "GANGA"),
         "muy_buenas": sum(1 for r in results if r["opportunity_tier"] == "MUY_BUENA"),
         "buenas": sum(1 for r in results if r["opportunity_tier"] == "BUENA"),
-        "oportunidades": sum(1 for r in results if r["status"] == "OPORTUNIDAD"),
+        "oportunidades": len(opps_all),
         "vigilar": sum(1 for r in results if r["status"] == "VIGILAR"),
         "calidad_cara": sum(1 for r in results if r["status"] == "CALIDAD_CARA"),
         "descartadas": sum(1 for r in results if r["status"] == "DESCARTADA"),
@@ -1288,6 +1367,11 @@ def main() -> None:
             f"💾 Guardado en {OUT_LATEST_JSON.name} y {target_split.name} "
             f"({len(results)} analizadas, {len(web_companies)} en web, {elapsed_total}s)"
         )
+
+    # Si salta ENTRAR YA en el diario o semanal, dispara primero la sirena independiente
+    if entradas_ya and UNIVERSE_MODE != "custom":
+        send_telegram(build_urgent_telegram_alert(entradas_ya, gap_pts))
+        time.sleep(2)
 
     msg = build_telegram_report(results, failed, ai_status, total_scanned)
     if msg:
