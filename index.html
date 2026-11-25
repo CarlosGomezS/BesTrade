@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cocodrilo">
 <link rel="manifest" href="./manifest.json">
-<title>Radar Cocodrilo Pro v9.1 — Cloud DB</title>
+<title>Radar Cocodrilo Pro v10 — Oráculo</title>
 <style>
 :root{
   --bg:#060a08;--bg2:#0b120e;--glass:rgba(15,24,19,.84);--glass-strong:rgba(10,17,13,.94);
@@ -350,7 +350,7 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
       <div class="logo">🐊</div>
       <div>
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">RADAR BUFFETT · CLOUD v9.1</small>
+        <small id="appSubtitle">RADAR BUFFETT · ORÁCULO v10</small>
       </div>
     </div>
     <div class="appbar-right">
@@ -420,6 +420,7 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
 
     <div class="chips-scroll" id="quickChips">
       <button class="fchip active" data-filter="ALL">Todas</button>
+      <button class="fchip" data-filter="ORO_PURO">👑 Oro Puro</button>
       <button class="fchip" data-filter="TIER:ENTRADA_YA">🚨 Entrar ya</button>
       <button class="fchip" data-filter="TIER:GANGA">🏆 Gangas</button>
       <button class="fchip" data-filter="OPORTUNIDAD">🟢 Oportunidades</button>
@@ -490,6 +491,20 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
   </section>
 
   <section class="view" id="view-favs">
+    <div class="panel" style="border-color:rgba(244,201,107,.35)">
+      <div class="eyebrow">Tu munición para oportunidades de oro (80 €/mes)</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:4px">
+        <h3 style="margin:0">💰 Bote de Pólvora Seca</h3>
+        <b id="cashPotVal" style="font-size:22px;color:var(--gold);font-variant-numeric:tabular-nums">0 €</b>
+      </div>
+      <p id="cashPotMsg" style="margin:4px 0 10px;font-size:12px;color:var(--muted)">Acumula tus 80 €/mes aquí. Se sincroniza con BesTrade-DB y se usa en el plan de 3 tramos.</p>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="btn gold sm" id="add80Btn" style="flex:1">+80 € (Mes)</button>
+        <button class="btn sm" id="editPotBtn">✏️ Editar</button>
+        <button class="btn sm danger" id="spendPotBtn">🎯 Usado (0 €)</button>
+      </div>
+    </div>
+
     <div class="panel">
       <div class="eyebrow">Control de tus compras + Alertas de VENTA</div>
       <h3 style="margin:4px 0 6px">💼 Mi Cartera</h3>
@@ -530,7 +545,7 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
     <div class="panel" id="ghControlPanel">
       <div class="eyebrow">Workflows + Base de Datos Privada en GitHub</div>
       <h3 style="margin:4px 0 6px">☁️ Conexión GitHub (Todo en 1)</h3>
-      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Un solo <b>Fine-grained Token</b> (con permisos <b>Actions: Read &amp; write</b> y <b>Contents: Read &amp; write</b> en tus 2 repos) controla los botones del Radar y guarda tu Cartera, Favoritas y Notas en tu repo privado.</p>
+      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Un solo <b>Fine-grained Token</b> (con permisos <b>Actions: Read &amp; write</b> y <b>Contents: Read &amp; write</b> en tus 2 repos) controla los botones del Radar y guarda tu Cartera, Bote de 80 €, Favoritas y Notas en tu repo privado.</p>
       <label class="flabel">Repo principal de la app (público)</label>
       <input class="finput" id="ghRepoInput" placeholder="CarlosGomezS/BesTrade">
       <label class="flabel">Repo privado para tu Base de Datos</label>
@@ -622,6 +637,7 @@ const STORE = {
   FAVS: 'cocodriloApp.favs.v7',
   NOTES: 'cocodriloApp.notes.v7',
   PORTFOLIO: 'cocodriloApp.portfolio.v9',
+  CASH_POT: 'cocodriloApp.cashPot.v10',
   REMOTE_URL: 'cocodriloApp.remoteUrl.v7',
   CHECKS: 'cocodriloApp.checks.v7',
   SOURCE: 'cocodriloApp.source.v7',
@@ -707,6 +723,7 @@ let visibleLimit = PAGE_SIZE;
 let favs = readJSON(STORE.FAVS, []);
 let notes = readJSON(STORE.NOTES, {});
 let portfolio = readJSON(STORE.PORTFOLIO, []);
+let cashPot = Number(localStorage.getItem(STORE.CASH_POT) || '0');
 let checks = readJSON(STORE.CHECKS, {});
 let localUpdatedAt = Number(localStorage.getItem(STORE.UPDATED_AT) || '0');
 let remoteUrl = localStorage.getItem(STORE.REMOTE_URL) || '';
@@ -767,6 +784,7 @@ function saveLocalUserState(triggerCloud = true){
   localStorage.setItem(STORE.FAVS, JSON.stringify(favs));
   localStorage.setItem(STORE.NOTES, JSON.stringify(notes));
   localStorage.setItem(STORE.PORTFOLIO, JSON.stringify(portfolio));
+  localStorage.setItem(STORE.CASH_POT, String(cashPot));
   localStorage.setItem(STORE.CHECKS, JSON.stringify(checks));
   localStorage.setItem(STORE.UPDATED_AT, String(localUpdatedAt));
   if(triggerCloud && ghToken && ghDbRepo && ghDbRepo.includes('/')){
@@ -812,11 +830,13 @@ async function cloudPull(forceApply = false, showMsg = false){
       favs = Array.isArray(decoded.favs) ? decoded.favs : [];
       notes = (decoded.notes && typeof decoded.notes === 'object') ? decoded.notes : {};
       portfolio = Array.isArray(decoded.portfolio) ? decoded.portfolio : [];
+      if(decoded.cash_pot !== undefined && Number.isFinite(Number(decoded.cash_pot))) cashPot = Number(decoded.cash_pot);
       checks = (decoded.checks && typeof decoded.checks === 'object') ? decoded.checks : {};
       localUpdatedAt = remoteTs || Date.now();
       localStorage.setItem(STORE.FAVS, JSON.stringify(favs));
       localStorage.setItem(STORE.NOTES, JSON.stringify(notes));
       localStorage.setItem(STORE.PORTFOLIO, JSON.stringify(portfolio));
+      localStorage.setItem(STORE.CASH_POT, String(cashPot));
       localStorage.setItem(STORE.CHECKS, JSON.stringify(checks));
       localStorage.setItem(STORE.UPDATED_AT, String(localUpdatedAt));
       renderAll();
@@ -843,6 +863,7 @@ async function cloudPush(showMsg = false, retryCount = 0){
       updated_at: localUpdatedAt || Date.now(),
       favs,
       portfolio,
+      cash_pot: cashPot,
       notes,
       checks
     };
@@ -1081,7 +1102,9 @@ function cardHTML(c, includeNote = false){
         <div class="card-name" title="${esc(c.name)}">${esc(c.name)}</div>
         <div class="card-meta"><span class="tkr">${esc(c.ticker)}</span><span>${esc(c.region)}</span><span>· ${esc(c.sector)}</span></div>
         <div class="pills" style="margin-top:7px">
+          ${c.oro_puro ? '<span class="pill ganga">👑 ORO PURO</span>' : ''}
           ${statusBadge(c)}
+          ${c.sec_verified === true ? '<span class="pill">✅ SEC</span>' : c.sec_verified === false ? '<span class="pill red">🚨 SEC</span>' : ''}
           ${c.below_bear ? '<span class="pill gold">🔥 Bajo Conserv.</span>' : ''}
           ${(c.insider_buys_90d||0) > 0 ? `<span class="pill">👔 Directivos (${c.insider_buys_90d})</span>` : ''}
           ${(c.earnings_days!==null && c.earnings_days!==undefined && c.earnings_days<=10) ? `<span class="pill red">📅 Res. ${c.earnings_days}d</span>` : ''}
@@ -1171,7 +1194,8 @@ function getFiltered(){
   const q = $('searchInput').value.trim().toLowerCase();
   const sort = $('sortSelect').value;
   const out = list.filter(c => {
-    if(activeFilter === 'TIER:ENTRADA_YA'){ if(c.opportunity_tier !== 'ENTRADA_YA') return false; }
+    if(activeFilter === 'ORO_PURO'){ if(!c.oro_puro) return false; }
+    else if(activeFilter === 'TIER:ENTRADA_YA'){ if(c.opportunity_tier !== 'ENTRADA_YA') return false; }
     else if(activeFilter === 'TIER:GANGA'){ if(c.opportunity_tier !== 'GANGA' && c.opportunity_tier !== 'ENTRADA_YA') return false; }
     else if(activeFilter === 'INSIDERS'){ if(!((c.insider_buys_90d||0) > 0)) return false; }
     else if(activeFilter === 'AI_ONLY'){ if(!c.ai_check) return false; }
@@ -1284,7 +1308,7 @@ function renderRadarView(){
   if(lm) lm.onclick = () => { visibleLimit += PAGE_SIZE; renderRadarView(); };
 }
 
-      /* ===========================
+ /* ===========================
    VIEW 2: EXPLORAR (COMPARADOR + MAPA)
    =========================== */
 function renderComparator(){
@@ -1386,6 +1410,13 @@ function renderMapView(){
    VIEW 3: MI CARTERA + FAVORITAS
    =========================== */
 function renderFavsView(){
+  const potEl = $('cashPotVal'), potMsg = $('cashPotMsg');
+  if(potEl){
+    potEl.textContent = `${cashPot.toFixed(0)} €`;
+    potMsg.innerHTML = cashPot >= 400
+      ? `🟢 <b>Munición lista:</b> tienes <b>${cashPot.toFixed(0)} €</b> preparados para entrar cuando salte una señal <b>👑 ORO PURO</b>.`
+      : `🟡 Llevas <b>${cashPot.toFixed(0)} €</b>. Recomendado juntar al menos <b>400–500 €</b> antes de disparar.`;
+  }
   const pHost = $('portfolioHost'), pSum = $('portfolioSummary');
   if(!portfolio.length){
     pSum.innerHTML = '';
@@ -1548,6 +1579,13 @@ function openModal(ticker){
     </div>
 
     ${(c.earnings_days!==null && c.earnings_days!==undefined && c.earnings_days<=10) ? `<div class="notice bad"><b>📅 OJO RESULTADOS PRÓXIMOS:</b> presenta cuentas en <b>${c.earnings_days} días</b> (${esc(c.earnings_date)}). Evita meter todo el capital antes de resultados.</div>` : ''}
+    ${c.oro_puro ? `<div class="notice good"><b>👑 SEÑAL ORO PURO (1-2/AÑO):</b> doble verificación superada (calidad élite + SEC + Piotroski + Tribunal IA favorable).</div>` : ''}
+    ${(c.piotroski_score!==null && c.piotroski_score!==undefined) || (c.sec_note && c.sec_status!=='NO_US') || c.trap_risk_score!==null ? `<div class="notice info"><b>🛡️ Auditoría Oráculo v10:</b><br>` +
+      ((c.piotroski_score!==null && c.piotroski_score!==undefined) ? `• Piotroski F-Score: <b>${c.piotroski_score}/${c.piotroski_max}</b>` + (c.interest_coverage!==null&&c.interest_coverage!==undefined ? ` · Cob. Intereses: <b>${c.interest_coverage}x</b>` : '') + '<br>' : '') +
+      ((c.sec_note && c.sec_status!=='NO_US') ? `• SEC EDGAR: ${c.sec_verified===true?'✅ ':c.sec_verified===false?'🚨 ':'ℹ️ '}${esc(c.sec_note)}<br>` : '') +
+      ((c.trap_risk_score!==null && c.trap_risk_score!==undefined) ? `• Riesgo de trampa IA: <b>${c.trap_risk_score}/10</b><br>` : '') +
+      ((c.oracle_flags && c.oracle_flags.length) ? `• 🚩 ${c.oracle_flags.map(esc).join(' | ')}` : '') +
+    `</div>` : ''}
     ${c.ai_check ? `<div class="notice ${c.ai_verdict==='PERMANENTE'?'bad':c.ai_verdict==='DUDOSO'?'warn':'good'}"><b>🤖 Filtro IA Gemini${c.ai_verdict?' ('+esc(c.ai_verdict)+')':''}:</b><br>${esc(c.ai_check).replace(/\n/g,'<br>')}</div>` : ''}
     ${news.length ? `<div class="notice info"><b>📰 Titulares analizados:</b><ul class="news-list">${news.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
     ${warns.length ? `<div class="notice warn"><b>⚠️ Avisos de datos:</b><br>• ${warns.map(esc).join('<br>• ')}</div>` : ''}
@@ -1586,7 +1624,7 @@ function openModal(ticker){
       <div class="eyebrow">🪜 Plan de entrada escalonada (3 tramos)</div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
         <span style="font-size:12px;color:var(--muted);white-space:nowrap">Capital a invertir (${esc(c.currency)}):</span>
-        <input class="finput" id="planBudget" type="number" min="50" step="50" value="1000" style="height:36px">
+        <input class="finput" id="planBudget" type="number" min="50" step="50" value="${cashPot >= 100 ? Math.round(cashPot) : 1000}" style="height:36px">
       </div>
       <div id="planOut"></div>
     </div>
@@ -1741,6 +1779,19 @@ $('toggleCustomBtn').onclick = () => { const b = $('customScanBox'); b.classList
 $('launchCustomBtn').onclick = () => triggerWorkflow('custom', $('customTickersInput').value);
 $('customTickersInput').onkeydown = e => { if(e.key === 'Enter') triggerWorkflow('custom', $('customTickersInput').value); };
 
+$('add80Btn').onclick = () => { cashPot = Math.round((cashPot + 80) * 100) / 100; saveLocalUserState(true); renderAll(); toast('💰 +80 € añadidos al bote (sincronizando…)'); };
+$('editPotBtn').onclick = () => {
+  const v = prompt('Importe actual en tu bote de pólvora seca (€):', String(cashPot));
+  if(v === null) return;
+  const n = parseFloat(v.replace(',', '.'));
+  if(!Number.isFinite(n) || n < 0){ toast('Importe no válido'); return; }
+  cashPot = Math.round(n * 100) / 100; saveLocalUserState(true); renderAll(); toast(`💰 Bote actualizado a ${cashPot} €`);
+};
+$('spendPotBtn').onclick = () => {
+  if(!confirm('¿Poner el bote a 0 € porque ya has ejecutado la compra?')) return;
+  cashPot = 0; saveLocalUserState(true); renderAll(); toast('🎯 Bote reiniciado a 0 €');
+};
+
 $('addPortBtn').onclick = () => {
   const tkr = $('portTickerIn').value.trim().toUpperCase();
   const pr = parseFloat($('portPriceIn').value), sh = parseFloat($('portSharesIn').value);
@@ -1794,4 +1845,3 @@ if(ghToken) cloudPull(false, false);
 </script>
 </body>
 </html>
-  
