@@ -1,13 +1,13 @@
-"""Radar Cocodrilo Pro v7 Blindado — Escáner Automático (Warren Buffett & Charlie Munger).
+"""Radar Cocodrilo Pro v8 — Escáner Global Paralelo (Warren Buffett & Charlie Munger).
 
-Mejoras de blindaje v7:
-- Normalización de subunidades (GBp/GBX/ZAc/ILA) y conversión FX automática (financialCurrency -> currency -> USD).
-- Ordenación cronológica explícita de estados financieros y FCF normalizado (anti-picos puntuales).
-- Uso de acciones implícitas (MarketCap / Precio) para evitar errores de ratio en ADRs.
-- Protección en sector financiero/REIT (sin DCF estándar por FCF y tope en estado VIGILAR).
-- Alertas de cordura (data_warnings) para ROIC o descuentos DCF extremos.
-- Gemini con titulares reales recientes de Yahoo Finance, reintentos, modelo de respaldo y estado visible en Telegram.
-- Doble salida JSON (daily-scan.json / weekly-scan.json + latest-scan.json) y fallo explícito si 0 empresas válidas.
+Novedades v8:
+- Soporte de sharding paralelo (SHARD_INDEX / SHARD_TOTAL) y fusión (MERGE_DIR) para escanear
+  +2.000 empresas globales en ~8 minutos desde 6 runners simultáneos sin bloqueos de Yahoo Finance.
+- Modo 'rotacion_diaria' (~330 empresas/día, barriendo >2.000 diferentes cada 2 semanas) y
+  modo 'custom' (análisis exprés de 1 o varios tickers lanzados desde la app móvil).
+- Clasificación en 3 niveles en Telegram y web: 🏆 GANGA, 🥇 MUY BUENA, 🥈 BUENA.
+- Gemini 3 (gemini-3.8-flash + respaldos) en modo escéptico Buffett/Munger con titulares reales.
+- JSON ligero en mega-escaneos (mantiene 100% de Oportunidades, Vigilar y Calidad Cara).
 """
 
 from __future__ import annotations
@@ -37,8 +37,9 @@ DATA_DIR = ROOT / "data"
 OUT_LATEST_JSON = DATA_DIR / "latest-scan.json"
 OUT_DAILY_JSON = DATA_DIR / "daily-scan.json"
 OUT_WEEKLY_JSON = DATA_DIR / "weekly-scan.json"
+OUT_CUSTOM_JSON = DATA_DIR / "custom-scan.json"
 
-UNIVERSE_MODE = os.environ.get("UNIVERSE_MODE", "elite200").strip().lower()
+UNIVERSE_MODE = os.environ.get("UNIVERSE_MODE", "rotacion_diaria").strip().lower()
 CUSTOM_TICKERS = os.environ.get("CUSTOM_TICKERS", "").strip()
 TEST_MODE = os.environ.get("TEST_MODE", "false").strip().lower() == "true"
 MIN_QUALITY_SCORE = int(os.environ.get("MIN_QUALITY_SCORE", "75"))
@@ -46,12 +47,17 @@ MARGIN_OF_SAFETY_PCT = float(os.environ.get("MARGIN_OF_SAFETY_PCT", "25"))
 MIN_DRAWDOWN_ALERT = float(os.environ.get("MIN_DRAWDOWN_ALERT", "18"))
 MAX_WORKERS = int(os.environ.get("MAX_WORKERS", "3"))
 MIN_MARKET_CAP_USD = float(os.environ.get("MIN_MARKET_CAP_USD", "1000000000"))  # >= 1B USD
+ROTATION_BATCH_SIZE = int(os.environ.get("ROTATION_BATCH_SIZE", "220"))
+
+SHARD_INDEX = int(os.environ.get("SHARD_INDEX", "0"))
+SHARD_TOTAL = int(os.environ.get("SHARD_TOTAL", "1"))
+MERGE_DIR = os.environ.get("MERGE_DIR", "").strip()
+MAX_DISCARDED_IN_WEB_JSON = int(os.environ.get("MAX_DISCARDED_IN_WEB_JSON", "250"))
 
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
-
 
 SUBUNIT_CURRENCIES: Dict[str, Tuple[str, float]] = {
     "GBp": ("GBP", 100.0),
@@ -408,7 +414,7 @@ def score_company(data: Dict[str, Any]) -> Dict[str, Any]:
             elif opm >= 20:
                 strengths.append(f"Margen operativo alto ({opm:.1f}%)")
 
-    # 3) Consistencia FCF (20 pts — omitido en bancos/REITs donde FCF no es estándar)
+    # 3) Consistencia FCF (20 pts — omitido en bancos/REITs)
     if profile != "financial":
         f_pos, f_tot = data.get("fcf_years_pos"), data.get("fcf_years_total")
         if f_pos is not None and f_tot and f_tot >= 2:
@@ -487,7 +493,6 @@ def analyze_ticker_with_retry(ticker: str, retries: int = 3) -> Optional[Dict[st
             res = analyze_ticker(ticker)
             if res is not None:
                 return res
-            # Si devolvió None sin excepción, no reintentar indefinidamente
             return None
         except Exception as exc:
             msg = str(exc).lower()
@@ -518,7 +523,8 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     if mkt_cap is not None:
         fx_to_usd = get_fx_rate(currency, "USD")
         mkt_cap_usd = (mkt_cap * fx_to_usd) if fx_to_usd else mkt_cap
-        if mkt_cap_usd < MIN_MARKET_CAP_USD:
+        # En modo custom se permite analizar cualquier capitalización solicitada por el usuario
+        if UNIVERSE_MODE != "custom" and mkt_cap_usd < MIN_MARKET_CAP_USD:
             return None
     else:
         mkt_cap_usd = None
@@ -535,7 +541,6 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     low52 = (raw_low52 / price_div) if raw_low52 else None
     drawdown_52w = ((price / high52) - 1.0) * 100.0 if (high52 and high52 > 0) else None
 
-    # Acciones implícitas (mkt_cap / price) evitan descuadres en ADRs (ej. 1 ADR = 5 acciones ordinarias)
     shares = (mkt_cap / price) if (mkt_cap and price > 0) else safe_float(info.get("sharesOutstanding"))
     if shares is None or shares <= 0:
         shares = safe_float(info.get("sharesOutstanding"))
@@ -544,7 +549,6 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     rev_g = safe_float(info.get("revenueGrowth"))
     earn_g = safe_float(info.get("earningsGrowth"))
 
-    # Rentabilidad por dividendo sin ambigüedad de escala
     div_y = safe_float(info.get("trailingAnnualDividendYield"))
     if div_y is not None:
         div_y = div_y * 100.0
@@ -556,7 +560,6 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     stm = compute_roic_and_statements(t, info)
     data_warnings: List[str] = []
 
-    # Conversión de FCF y Caja Neta desde divisa financiera a divisa de cotización
     fx_fin_to_trade = get_fx_rate(fin_currency, currency)
     fx_ok = fx_fin_to_trade is not None and fx_fin_to_trade > 0
 
@@ -630,7 +633,6 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     q = score_company(record)
     record.update(q)
 
-    # Descuento vs Valor Intrínseco Base (positivo = barata)
     discount_pct = None
     upside_base = None
     in_dcf_zone = False
@@ -662,7 +664,6 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     else:
         status = "DESCARTADA"
 
-    # Eliminar campo auxiliar crudo para mantener JSON ligero
     record.pop("fcf_latest", None)
     record["discount_vs_base_pct"] = discount_pct
     record["upside_base_pct"] = upside_base
@@ -670,6 +671,7 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     record["below_bear"] = below_bear
     record["status"] = status
     record["ai_check"] = None
+    record["ai_verdict"] = None
     return record
 
 
@@ -719,7 +721,7 @@ def clean_ai_text(text: str) -> str:
 
 
 def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
-    """Consulta a Gemini inyectando métricas + titulares recientes. Devuelve (texto, error)."""
+    """Consulta a Gemini 3 en modo escéptico inyectando métricas + titulares recientes."""
     if not GEMINI_API_KEY:
         return None, "GEMINI_API_KEY no configurada"
 
@@ -731,23 +733,28 @@ def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], O
     dcf_info = f"{dcf.get('intrinsic_base')} {rec['currency']} (obj -25%: {dcf.get('target_price')})" if dcf else "N/A"
 
     prompt = (
-        f"Eres un analista estricto estilo Warren Buffett y Charlie Munger. Sin rodeos ni texto de relleno.\n"
+        "Eres un analista ESCÉPTICO estilo Charlie Munger buscando razones para NO comprar (evitar trampas de valor).\n"
+        "No regales el veredicto TEMPORAL: si hay riesgo estructural de disrupción (IA, pérdida de clientes, márgenes cayendo) "
+        "o faltan noticias claras que expliquen la caída, sé duro y clasifícala como DUDOSO o PERMANENTE.\n"
         f"Empresa: {rec['name']} ({rec['ticker']}), Sector: {rec['sector']} / {rec['industry']}.\n"
         f"Datos: Precio {rec['price']} {rec['currency']} (caída 52s: {rec['drawdown_52w_pct']}%), "
         f"Calidad: {rec['quality_score']}/100, ROIC: {rec['roic_pct']}%, Margen op: {rec['operating_margin_pct']}%, "
         f"Deuda/EBITDA: {rec['net_debt_ebitda']}x, P/FCF: {rec['p_fcf']}x, PER futuro: {rec['forward_pe']}x, DCF base: {dcf_info}.\n"
         f"Alertas de datos: {warnings_block}.\n"
-        f"Titulares recientes:\n{news_block}\n\n"
-        "Responde en español directo en máximo 4 líneas cortas (sin usar asteriscos ni negritas):\n"
-        "1) Por qué cae: resume el motivo según los titulares (o indica si no hay catalizador claro en noticias).\n"
-        "2) Foso competitivo: ¿sigue intacto o se erosiona?\n"
-        "3) Mayor riesgo real para no comprarla.\n"
-        "4) Veredicto Cocodrilo: TEMPORAL (oportunidad), DUDOSO (esperar resultados) o PERMANENTE (posible trampa de valor)."
+        f"Titulares recientes (ignora noticias genéricas que no hablen de esta empresa):\n{news_block}\n\n"
+        "Responde en español directo en máximo 4 líneas cortas (sin asteriscos ni negritas):\n"
+        "1) Por qué cae: motivo concreto según titulares (o indica si no hay catalizador claro).\n"
+        "2) Foso competitivo: ¿sigue intacto o hay señales de erosión real?\n"
+        "3) Mayor riesgo real para perder dinero aquí.\n"
+        "4) Veredicto Cocodrilo: TEMPORAL, DUDOSO o PERMANENTE."
     )
 
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 320},
+        "generationConfig": {
+            "maxOutputTokens": 1200,
+            "thinkingConfig": {"thinkingLevel": "LOW"},
+        },
     }).encode("utf-8")
 
     last_err = None
@@ -759,7 +766,10 @@ def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], O
                 with urllib.request.urlopen(req, timeout=25) as resp:
                     body = json.loads(resp.read().decode("utf-8"))
                 parts = body["candidates"][0]["content"]["parts"]
-                text = "".join(p.get("text", "") for p in parts)
+                text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+                if not text.strip():
+                    last_err = f"{model}: respuesta vacía"
+                    continue
                 return clean_ai_text(text), None
             except urllib.error.HTTPError as exc:
                 err_body = ""
@@ -826,7 +836,6 @@ def send_telegram(html_text: str) -> None:
 
 
 def extract_ai_verdict(ai_text: Optional[str]) -> Optional[str]:
-    """Extrae el veredicto final (TEMPORAL / DUDOSO / PERMANENTE) evitando falsos positivos."""
     if not ai_text:
         return None
     m = re.search(r"veredicto[^\n:]*[:\-]?\s*([^\n]+)", ai_text, flags=re.IGNORECASE)
@@ -852,7 +861,6 @@ def has_severe_warning(rec: Dict[str, Any]) -> bool:
 
 
 def compute_conviction_score(rec: Dict[str, Any]) -> float:
-    """Puntuación interna para ordenar oportunidades de mejor a peor convicción."""
     score = float(rec.get("quality_score") or 0)
     disc = rec.get("discount_vs_base_pct")
     if disc is not None:
@@ -898,7 +906,6 @@ def compute_conviction_score(rec: Dict[str, Any]) -> float:
 
 
 def classify_opportunity_tier(rec: Dict[str, Any]) -> Optional[str]:
-    """Clasifica las OPORTUNIDADES en GANGA, MUY_BUENA o BUENA."""
     if rec.get("status") != "OPORTUNIDAD":
         return None
 
@@ -912,10 +919,8 @@ def classify_opportunity_tier(rec: Dict[str, Any]) -> Optional[str]:
     severe_warn = has_severe_warning(rec)
     verdict = rec.get("ai_verdict")
 
-    # Múltiplo coherente (evita falsos chollos por FCF inflado en fintech/ciclo)
     multiple_sane = (fpe is not None and fpe <= 20.0) or (fpe is None and pfcf is not None and pfcf <= 16.0)
 
-    # NIVEL 1: GANGA EXCEPCIONAL (filtro ultra exigente)
     if (
         q >= 90
         and in_dcf
@@ -927,7 +932,6 @@ def classify_opportunity_tier(rec: Dict[str, Any]) -> Optional[str]:
     ):
         return "GANGA"
 
-    # NIVEL 2: MUY BUENA
     if (
         q >= 85
         and (in_dcf or (disc >= 20.0 and dd <= -18.0))
@@ -936,7 +940,6 @@ def classify_opportunity_tier(rec: Dict[str, Any]) -> Optional[str]:
     ):
         return "MUY_BUENA"
 
-    # NIVEL 3: BUENA (o con matices / alerta de IA)
     return "BUENA"
 
 
@@ -962,6 +965,8 @@ def format_detailed_opp(r: Dict[str, Any], header_line: str) -> str:
         )
     if r.get("strengths"):
         block.append(f"• Claves: {esc_html(' · '.join(r['strengths'][:3]))}")
+    if r.get("hard_fails"):
+        block.append(f"• ❌ <i>Fallos críticos:</i> {esc_html(' · '.join(r['hard_fails']))}")
     if r.get("data_warnings"):
         block.append(f"• ⚠️ <i>Aviso:</i> {esc_html(' | '.join(r['data_warnings']))}")
     if r.get("ai_check"):
@@ -974,7 +979,22 @@ def build_telegram_report(
     results: List[Dict[str, Any]],
     failed_count: int,
     ai_status: Dict[str, Any],
+    total_scanned: int,
 ) -> Optional[str]:
+    date_str = datetime.now(timezone.utc).strftime("%d/%m/%Y")
+
+    # Reporte especial para análisis rápido de tickers personalizados desde la app
+    if UNIVERSE_MODE == "custom":
+        lines = [
+            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO — {date_str}</b>",
+            f"<i>Tickers analizados: {len(results)}/{total_scanned}</i>",
+        ]
+        for r in results[:10]:
+            st = r.get("opportunity_tier") or r["status"]
+            hdr = f"\n📌 <b>{esc_html(r['name'])} ({esc_html(r['ticker'])})</b> · <i>{esc_html(st)} · {esc_html(r['region'])}</i>"
+            lines.append(format_detailed_opp(r, hdr))
+        return "\n".join(lines)
+
     opps = [r for r in results if r["status"] == "OPORTUNIDAD"]
     watch = [r for r in results if r["status"] == "VIGILAR"]
 
@@ -989,14 +1009,12 @@ def build_telegram_report(
     if not opps and not watch and not TEST_MODE:
         return None
 
-    date_str = datetime.now(timezone.utc).strftime("%d/%m/%Y")
     tier_summary = f"🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
-        f"🐊 <b>RADAR COCODRILO PRO v7 — {date_str}</b>",
-        f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas · {tier_summary}</i>",
+        f"🐊 <b>RADAR COCODRILO PRO v8 — {date_str}</b>",
+        f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
 
-    # 1) SOLO SI EXISTE UNA AUTÉNTICA GANGA
     if gangas:
         lines.append("\n━━━━━━━━━━━━━━━━━━━\n🚨🏆 <b>GANGA EXCEPCIONAL (MÁXIMA CONVICCIÓN)</b> 🏆🚨\n━━━━━━━━━━━━━━━━━━━")
         for idx, r in enumerate(gangas[:3], start=1):
@@ -1004,7 +1022,6 @@ def build_telegram_report(
             hdr = f"\n{crown}{esc_html(r['name'])} ({esc_html(r['ticker'])})</b> · <i>{esc_html(r['region'])}</i>"
             lines.append(format_detailed_opp(r, hdr))
 
-    # 2) MUY BUENAS
     if muy_buenas:
         lines.append("\n━━━━━━━━━━━━━━━━━━━\n🥇 <b>MUY BUENAS (Alta calidad + buen margen)</b>\n━━━━━━━━━━━━━━━━━━━")
         for r in muy_buenas[:5]:
@@ -1013,7 +1030,6 @@ def build_telegram_report(
         if len(muy_buenas) > 5:
             lines.append(f"\n<i>…y {len(muy_buenas) - 5} muy buenas más en el panel web.</i>")
 
-    # 3) BUENAS (formato compacto para no tapar las mejores)
     if buenas:
         lines.append("\n━━━━━━━━━━━━━━━━━━━\n🥈 <b>BUENAS (Interesantes / con matices)</b>\n━━━━━━━━━━━━━━━━━━━")
         for r in buenas[:6]:
@@ -1039,7 +1055,6 @@ def build_telegram_report(
     if not opps:
         lines.append("\n😴 <b>Hoy no hay ninguna empresa de calidad en zona clara de compra.</b> El cocodrilo espera.")
 
-    # 4) VIGILANCIA
     if watch:
         lines.append("\n━━━━━━━━━━━━━━━━━━━\n🟡 <b>EN VIGILANCIA (Acercándose)</b>\n━━━━━━━━━━━━━━━━━━━")
         for r in watch[:6]:
@@ -1071,11 +1086,8 @@ def build_telegram_report(
     return "\n".join(lines)
 
 
-def main() -> None:
-    tickers = get_universe(UNIVERSE_MODE, CUSTOM_TICKERS)
+def run_scan_batch(tickers: List[str]) -> Tuple[List[Dict[str, Any]], int]:
     t0 = time.time()
-    print(f"🐊 Escáner Cocodrilo Pro v7 Blindado | Modo: {UNIVERSE_MODE} | Empresas: {len(tickers)} | Hilos: {MAX_WORKERS}")
-
     results: List[Dict[str, Any]] = []
     failed = 0
     done = 0
@@ -1097,11 +1109,93 @@ def main() -> None:
                 elapsed = time.time() - t0
                 with _print_lock:
                     print(f"  Progreso: {done}/{len(tickers)} | OK: {len(results)} | Omitidas: {failed} | {elapsed:.0f}s")
+    return results, failed
+
+
+def load_merged_shards(merge_dir: Path) -> Tuple[List[Dict[str, Any]], int, int, int]:
+    shard_files = sorted(merge_dir.rglob("shard-*.json"))
+    if not shard_files:
+        raise RuntimeError(f"No se encontraron archivos shard-*.json en {merge_dir}")
+
+    by_ticker: Dict[str, Dict[str, Any]] = {}
+    total_scanned = 0
+    total_failed = 0
+    max_elapsed = 0
+
+    for sf in shard_files:
+        try:
+            data = json.loads(sf.read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"⚠️ Error leyendo {sf}: {exc}")
+            continue
+        total_scanned += int(data.get("total_scanned") or 0)
+        total_failed += int(data.get("total_failed") or 0)
+        max_elapsed = max(max_elapsed, int(data.get("elapsed_sec") or 0))
+        for rec in data.get("companies") or []:
+            tkr = rec.get("ticker")
+            if tkr and tkr not in by_ticker:
+                by_ticker[tkr] = rec
+
+    print(f"🧩 Fusionados {len(shard_files)} bloques: {len(by_ticker)} empresas válidas (de {total_scanned} escaneadas).")
+    return list(by_ticker.values()), total_scanned, total_failed, max_elapsed
+
+
+def trim_for_mobile_web(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """En escaneos masivos (>600 empresas), conserva el 100% de las buenas y recorta descartadas."""
+    if len(results) <= 600:
+        return results
+    keep_good = [r for r in results if r["status"] != "DESCARTADA"]
+    discarded = [r for r in results if r["status"] == "DESCARTADA"]
+    discarded.sort(key=lambda r: -(r.get("quality_score") or 0))
+    return keep_good + discarded[:MAX_DISCARDED_IN_WEB_JSON]
+
+
+def main() -> None:
+    t0 = time.time()
+
+    # MODO A: FUSIÓN DE SHARDS PARALELOS
+    if MERGE_DIR:
+        print(f"🧩 Cocodrilo Pro v8 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
+        results, total_scanned, failed, shard_elapsed = load_merged_shards(Path(MERGE_DIR))
+        elapsed_total = max(shard_elapsed, round(time.time() - t0))
+
+    # MODO B: ESCANEO DIRECTO O SHARD INDIVIDUAL
+    else:
+        all_tickers = get_universe(UNIVERSE_MODE, CUSTOM_TICKERS, rotation_batch_size=ROTATION_BATCH_SIZE)
+        if SHARD_TOTAL > 1:
+            tickers = [sym for idx, sym in enumerate(all_tickers) if idx % SHARD_TOTAL == SHARD_INDEX]
+            print(
+                f"🐊 Cocodrilo Pro v8 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
+                f"| Empresas: {len(tickers)} (total universo: {len(all_tickers)})"
+            )
+            results, failed = run_scan_batch(tickers)
+            shard_out_dir = DATA_DIR / "shards"
+            shard_out_dir.mkdir(parents=True, exist_ok=True)
+            shard_file = shard_out_dir / f"shard-{SHARD_INDEX}.json"
+            shard_payload = {
+                "shard_index": SHARD_INDEX,
+                "shard_total": SHARD_TOTAL,
+                "universe_mode": UNIVERSE_MODE,
+                "total_scanned": len(tickers),
+                "total_ok": len(results),
+                "total_failed": failed,
+                "elapsed_sec": round(time.time() - t0),
+                "companies": results,
+            }
+            shard_file.write_text(json.dumps(shard_payload, ensure_ascii=False), encoding="utf-8")
+            print(f"💾 Shard guardado en {shard_file} ({len(results)} OK en {shard_payload['elapsed_sec']}s)")
+            if len(results) == 0:
+                raise RuntimeError(f"Shard {SHARD_INDEX} devolvió 0 empresas válidas.")
+            return
+
+        print(f"🐊 Escáner Cocodrilo Pro v8 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
+        total_scanned = len(all_tickers)
+        results, failed = run_scan_batch(all_tickers)
+        elapsed_total = round(time.time() - t0)
 
     if len(results) == 0:
         raise RuntimeError("0 empresas válidas analizadas. Abortando para no sobrescribir datos buenos en el panel.")
 
-    # Primera ordenación por convicción para que Gemini analice siempre las mejores candidatas
     status_order = {"OPORTUNIDAD": 0, "VIGILAR": 1, "CALIDAD_CARA": 2, "DESCARTADA": 3}
     for r in results:
         r["ai_verdict"] = None
@@ -1117,12 +1211,17 @@ def main() -> None:
     }
 
     if GEMINI_API_KEY:
-        targets = [r for r in results if r["status"] == "OPORTUNIDAD"][:6]
-        if not targets:
-            targets = [r for r in results if r["status"] == "VIGILAR"][:2]
+        if UNIVERSE_MODE == "custom":
+            targets = results[:8]
+        else:
+            max_ai = 8 if UNIVERSE_MODE in ("global_mega", "global_1000") else 6
+            targets = [r for r in results if r["status"] == "OPORTUNIDAD"][:max_ai]
+            if not targets:
+                targets = [r for r in results if r["status"] == "VIGILAR"][:2]
+
         for r in targets:
             ai_status["attempted"] += 1
-            print(f"🤖 Consultando Gemini + titulares recientes para {r['ticker']}...")
+            print(f"🤖 Consultando Gemini 3 + titulares recientes para {r['ticker']}...")
             ai_text, ai_err = optional_gemini_buffett_check(r)
             if ai_text:
                 r["ai_check"] = ai_text
@@ -1133,7 +1232,6 @@ def main() -> None:
                 ai_status["last_error"] = ai_err
             time.sleep(2.5)
 
-    # Clasificación definitiva en 3 niveles (GANGA / MUY_BUENA / BUENA) ya con el veredicto de Gemini
     tier_order = {"GANGA": 0, "MUY_BUENA": 1, "BUENA": 2, None: 9}
     for r in results:
         r["conviction_score"] = compute_conviction_score(r)
@@ -1147,35 +1245,48 @@ def main() -> None:
         )
     )
 
+    counts = {
+        "gangas": sum(1 for r in results if r["opportunity_tier"] == "GANGA"),
+        "muy_buenas": sum(1 for r in results if r["opportunity_tier"] == "MUY_BUENA"),
+        "buenas": sum(1 for r in results if r["opportunity_tier"] == "BUENA"),
+        "oportunidades": sum(1 for r in results if r["status"] == "OPORTUNIDAD"),
+        "vigilar": sum(1 for r in results if r["status"] == "VIGILAR"),
+        "calidad_cara": sum(1 for r in results if r["status"] == "CALIDAD_CARA"),
+        "descartadas": sum(1 for r in results if r["status"] == "DESCARTADA"),
+    }
+
+    web_companies = trim_for_mobile_web(results)
+
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
-        "scanner_version": "v7-blindado",
+        "scanner_version": "v8-global",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe_mode": UNIVERSE_MODE,
-        "total_scanned": len(tickers),
+        "total_scanned": total_scanned,
         "total_ok": len(results),
+        "web_stored": len(web_companies),
         "total_failed": failed,
-        "elapsed_sec": round(time.time() - t0),
+        "elapsed_sec": elapsed_total,
         "ai_status": ai_status,
-        "counts": {
-            "gangas": sum(1 for r in results if r["opportunity_tier"] == "GANGA"),
-            "muy_buenas": sum(1 for r in results if r["opportunity_tier"] == "MUY_BUENA"),
-            "buenas": sum(1 for r in results if r["opportunity_tier"] == "BUENA"),
-            "oportunidades": sum(1 for r in results if r["status"] == "OPORTUNIDAD"),
-            "vigilar": sum(1 for r in results if r["status"] == "VIGILAR"),
-            "calidad_cara": sum(1 for r in results if r["status"] == "CALIDAD_CARA"),
-            "descartadas": sum(1 for r in results if r["status"] == "DESCARTADA"),
-        },
-        "companies": results,
+        "counts": counts,
+        "companies": web_companies,
     }
     json_payload = json.dumps(summary, indent=2, ensure_ascii=False)
 
-    OUT_LATEST_JSON.write_text(json_payload, encoding="utf-8")
-    target_split = OUT_WEEKLY_JSON if UNIVERSE_MODE == "global_1000" else OUT_DAILY_JSON
-    target_split.write_text(json_payload, encoding="utf-8")
-    print(f"💾 Guardado en {OUT_LATEST_JSON.name} y {target_split.name} ({len(results)} empresas en {summary['elapsed_sec']}s)")
+    if UNIVERSE_MODE == "custom":
+        OUT_CUSTOM_JSON.write_text(json_payload, encoding="utf-8")
+        print(f"💾 Análisis exprés guardado en {OUT_CUSTOM_JSON.name} (sin tocar daily/weekly).")
+    else:
+        OUT_LATEST_JSON.write_text(json_payload, encoding="utf-8")
+        is_weekly = UNIVERSE_MODE in ("global_1000", "global_mega")
+        target_split = OUT_WEEKLY_JSON if is_weekly else OUT_DAILY_JSON
+        target_split.write_text(json_payload, encoding="utf-8")
+        print(
+            f"💾 Guardado en {OUT_LATEST_JSON.name} y {target_split.name} "
+            f"({len(results)} analizadas, {len(web_companies)} en web, {elapsed_total}s)"
+        )
 
-    msg = build_telegram_report(results, failed, ai_status)
+    msg = build_telegram_report(results, failed, ai_status, total_scanned)
     if msg:
         send_telegram(msg)
         print("✅ Alerta enviada a Telegram.")
