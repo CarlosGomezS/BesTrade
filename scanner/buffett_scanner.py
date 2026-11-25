@@ -32,6 +32,7 @@ import pandas as pd
 import yfinance as yf
 
 from universe import detect_region, get_universe, parse_custom_tickers
+from oracle_v10 import compute_oracle_checks, is_oro_puro, run_tribunal_ia, verify_with_sec_edgar
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
@@ -826,6 +827,9 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     record["status"] = status
     record["ai_check"] = None
     record["ai_verdict"] = None
+    record["trap_risk_score"] = None
+    record["oro_puro"] = False
+    record.update(compute_oracle_checks(t, info, record))
     return record
 def check_insider_buying(ticker: str) -> int:
     """Cuenta compras reales de directivos en mercado abierto durante los últimos 90 días."""
@@ -1182,6 +1186,16 @@ def format_detailed_opp(r: Dict[str, Any], header_line: str) -> str:
         block.append(f"• Claves: {esc_html(' · '.join(r['strengths'][:3]))}")
     if r.get("hard_fails"):
         block.append(f"• ❌ <i>Fallos críticos:</i> {esc_html(' · '.join(r['hard_fails']))}")
+    if r.get("piotroski_score") is not None:
+        cov_txt = f" | Cob.Int: {r['interest_coverage']}x" if r.get("interest_coverage") is not None else ""
+        block.append(f"• 🛡️ Oráculo: Piotroski <b>{r['piotroski_score']}/{r['piotroski_max']}</b>{cov_txt}")
+    if r.get("sec_note") and r.get("sec_status") not in (None, "NO_US"):
+        sec_ic = "✅" if r.get("sec_verified") is True else "🚨" if r.get("sec_verified") is False else "ℹ️"
+        block.append(f"• {sec_ic} <i>SEC EDGAR:</i> {esc_html(r['sec_note'])}")
+    if r.get("oro_puro"):
+        block.append("• 👑 <b>SEÑAL ORO PURO (1-2/AÑO):</b> doble verificación superada + riesgo trampa bajo.")
+    if r.get("oracle_flags"):
+        block.append(f"• 🚩 <i>Anti-Trampas:</i> {esc_html(' | '.join(r['oracle_flags']))}")
     if r.get("data_warnings"):
         block.append(f"• ⚠️ <i>Aviso:</i> {esc_html(' | '.join(r['data_warnings']))}")
     if r.get("ai_check"):
@@ -1529,6 +1543,10 @@ def main() -> None:
         r["insider_buys_90d"] = buys
         if buys > 0:
             r["strengths"] = ([f"Directivos comprando acciones ({buys} op. 90d)"] + (r.get("strengths") or []))[:4]
+        sec_info = verify_with_sec_edgar(r)
+        r.update(sec_info)
+        if sec_info.get("sec_verified") is False:
+            r["data_warnings"] = (r.get("data_warnings") or []) + [sec_info["sec_note"]]
 
     ai_status: Dict[str, Any] = {
         "enabled": bool(GEMINI_API_KEY),
@@ -1547,10 +1565,17 @@ def main() -> None:
             if not targets and not URGENT_ONLY:
                 targets = [r for r in results if r["status"] == "VIGILAR"][:2]
 
-        for r in targets:
+        for idx_t, r in enumerate(targets):
             ai_status["attempted"] += 1
-            print(f"🤖 Consultando Gemini 3 + titulares recientes para {r['ticker']}...")
-            ai_text, ai_err = optional_gemini_buffett_check(r)
+            r["recent_news"] = extract_recent_news(r["ticker"], limit=5)
+            use_tribunal = (idx_t < 3) or (UNIVERSE_MODE == "custom")
+            if use_tribunal:
+                print(f"⚖️ Tribunal IA (Fiscal vs Abogado) para {r['ticker']}...")
+                ai_text, trap_risk, ai_err = run_tribunal_ia(r, GEMINI_API_KEY, GEMINI_MODELS)
+                r["trap_risk_score"] = trap_risk
+            else:
+                print(f"🤖 Consultando Gemini 3 + titulares recientes para {r['ticker']}...")
+                ai_text, ai_err = optional_gemini_buffett_check(r)
             if ai_text:
                 r["ai_check"] = ai_text
                 r["ai_verdict"] = extract_ai_verdict(ai_text)
@@ -1563,7 +1588,11 @@ def main() -> None:
     tier_order = {"ENTRADA_YA": 0, "GANGA": 1, "MUY_BUENA": 2, "BUENA": 3, None: 9}
     for r in results:
         r["conviction_score"] = compute_conviction_score(r)
-        r["opportunity_tier"] = classify_opportunity_tier(r)
+        tier = classify_opportunity_tier(r)
+        if tier == "ENTRADA_YA" and (r.get("sec_verified") is False or r.get("is_cyclical_risk") or not r.get("forward_ok", True)):
+            tier = "MUY_BUENA"
+        r["opportunity_tier"] = tier
+        r["oro_puro"] = is_oro_puro(r)
 
     results.sort(
         key=lambda r: (
