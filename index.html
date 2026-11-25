@@ -99,7 +99,7 @@ a{color:var(--emerald);text-decoration:none}
 .source-switch{
   display:grid;grid-template-columns:1fr 1fr;gap:6px;
   background:rgba(8,14,10,.85);border:1px solid var(--line2);
-  border-radius:16px;padding:4px;margin-bottom:12px;
+  border-radius:16px;padding:4px;margin-bottom:10px;
 }
 .src-btn{
   border:0;background:transparent;color:var(--muted);
@@ -116,6 +116,42 @@ a{color:var(--emerald);text-decoration:none}
 }
 .src-btn.missing{opacity:.55}
 
+/* WORKFLOW LAUNCHER BAR */
+.run-bar{
+  background:rgba(10,18,13,.88);border:1px solid var(--line);
+  border-radius:16px;padding:10px 12px;margin-bottom:12px;
+}
+.run-top{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+  margin-bottom:8px;font-size:11px;color:var(--muted);
+}
+.run-status{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.run-status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.run-dot{width:7px;height:7px;border-radius:50%;background:#64748b;flex-shrink:0}
+.run-dot.ok{background:var(--emerald)}
+.run-dot.running{background:var(--gold);box-shadow:0 0 8px var(--gold);animation:pulse 1.2s infinite}
+.run-dot.fail{background:var(--red)}
+.run-btns{display:grid;grid-template-columns:1fr 1fr auto;gap:6px}
+.run-btn{
+  border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text);
+  border-radius:11px;padding:8px 10px;font-size:11.5px;font-weight:800;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:all .15s;
+}
+.run-btn:active{transform:scale(.96)}
+.run-btn:disabled{opacity:.48;cursor:not-allowed}
+.run-btn.go{background:rgba(34,197,94,.16);border-color:rgba(74,222,128,.38);color:#bbf7d0}
+.run-btn.mega{background:rgba(244,201,107,.14);border-color:rgba(244,201,107,.38);color:#fef08a}
+.custom-scan-box{
+  display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
+  gap:6px;align-items:center;
+}
+.custom-scan-box.show{display:flex}
+.custom-scan-box input{
+  flex:1;height:36px;border-radius:10px;border:1px solid var(--line2);
+  background:#070e0a;color:var(--text);padding:0 10px;font:inherit;font-size:12.5px;outline:none;
+}
+.custom-scan-box input:focus{border-color:var(--emerald)}
+
 /* BUTTONS */
 .btn{
   border:1px solid var(--line2);background:rgba(255,255,255,.05);color:var(--text);
@@ -125,6 +161,7 @@ a{color:var(--emerald);text-decoration:none}
 .btn:active{transform:scale(.97)}
 .btn.primary{background:linear-gradient(135deg,#4ade80,#22c55e);color:#04170a;border-color:transparent;box-shadow:0 6px 18px rgba(34,197,94,.26)}
 .btn.gold{background:linear-gradient(135deg,#f6d583,#d9a441);color:#1d1404;border-color:transparent}
+.btn.danger{background:var(--redBg);color:#fecaca;border-color:rgba(248,113,113,.35)}
 .btn.sm{padding:8px 11px;font-size:12px;border-radius:10px;min-height:36px}
 .btn.full{width:100%}
 
@@ -212,6 +249,14 @@ a{color:var(--emerald);text-decoration:none}
   content:"";position:absolute;top:0;left:0;right:0;height:3px;
   background:linear-gradient(90deg,#4ade80,#f4c96b,#4ade80);
 }
+.stock-card.ganga{
+  border-color:rgba(244,201,107,.65);
+  box-shadow:0 10px 32px rgba(244,201,107,.16), 0 0 0 1px rgba(74,222,128,.22);
+}
+.stock-card.ganga::after{
+  content:"";position:absolute;top:0;left:0;right:0;height:4px;
+  background:linear-gradient(90deg,#f6d583,#4ade80,#f6d583);
+}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .card-id{min-width:0;flex:1}
 .card-name{font-size:16px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -240,6 +285,10 @@ a{color:var(--emerald);text-decoration:none}
   display:inline-flex;align-items:center;gap:4px;border-radius:99px;
   padding:4px 9px;font-size:10px;font-weight:850;letter-spacing:.03em;
   background:var(--emeraldBg);color:var(--emerald);border:1px solid rgba(74,222,128,.3);
+}
+.pill.ganga{
+  background:linear-gradient(135deg,rgba(244,201,107,.28),rgba(74,222,128,.22));
+  color:#fef08a;border:1px solid rgba(244,201,107,.55);
 }
 .pill.gold{background:var(--goldBg);color:var(--gold);border-color:rgba(244,201,107,.35)}
 .pill.red{background:var(--redBg);color:var(--red);border-color:rgba(248,113,113,.35)}
@@ -272,7 +321,7 @@ a{color:var(--emerald);text-decoration:none}
 .card-actions{display:flex;gap:8px;margin-top:auto}
 .load-more-wrap{margin-top:14px;text-align:center}
 
-/* PANELS (MAPA, FAVORITAS, AJUSTES) */
+/* PANELS */
 .panel{
   background:var(--glass);border:1px solid var(--line);border-radius:20px;
   padding:16px;margin-bottom:14px;
@@ -293,13 +342,11 @@ a{color:var(--emerald);text-decoration:none}
 .sbar-track{height:7px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
 .sbar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#22c55e,#86efac)}
 
-/* FAVORITES NOTE */
 .fav-note{
   width:100%;border:1px solid var(--line);background:#08100b;color:var(--text);
   border-radius:10px;padding:8px 10px;font:inherit;font-size:12.5px;resize:vertical;min-height:42px;
 }
 
-/* CHECKLIST BUFFETT */
 .check-card{
   display:flex;gap:11px;align-items:flex-start;padding:12px;border-radius:14px;
   background:rgba(255,255,255,.03);border:1px solid var(--line);margin-bottom:8px;cursor:pointer;
@@ -311,7 +358,6 @@ a{color:var(--emerald);text-decoration:none}
 }
 .check-card.checked .check-box{background:var(--emerald);border-color:var(--emerald);color:#04160a}
 
-/* INPUTS */
 label.flabel{display:block;font-size:12px;font-weight:700;color:#bdd0c2;margin:10px 0 5px}
 input.finput{
   width:100%;height:42px;border-radius:12px;border:1px solid var(--line2);
@@ -327,7 +373,7 @@ input.finput{
 .news-list li{margin-bottom:4px}
 .empty{border:1px dashed var(--line2);border-radius:18px;padding:30px 18px;text-align:center;color:var(--muted)}
 
-/* BOTTOM NAVIGATION BAR (NATIVE APP STYLE) */
+/* BOTTOM NAVIGATION BAR */
 .bottom-nav{
   position:fixed;bottom:0;left:0;right:0;z-index:40;
   background:var(--glass-strong);
@@ -411,7 +457,7 @@ input.finput{
       <div class="logo">🐊</div>
       <div>
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">RADAR BUFFETT · BLINDADO v7</small>
+        <small id="appSubtitle">RADAR BUFFETT · GLOBAL v8</small>
       </div>
     </div>
     <div class="appbar-right">
@@ -427,20 +473,40 @@ input.finput{
   <!-- VIEW 1: RADAR (HOME) -->
   <section class="view active" id="view-radar">
     <div class="demo-bar" id="demoBar">
-      <span>✨ <b>Vista previa:</b> ejecuta un escaneo en GitHub Actions o conecta tu URL en <b>Método</b>.</span>
-      <button class="btn sm gold" id="goConfigBtn">Conectar</button>
+      <span>✨ <b>Vista previa:</b> lanza un escaneo con los botones de abajo o conecta tu repo en <b>Método</b>.</span>
+      <button class="btn sm gold" id="goConfigBtn">Configurar</button>
     </div>
 
     <!-- SELECTOR DIARIO vs SEMANAL -->
     <div class="source-switch" id="sourceSwitch">
       <button class="src-btn active" data-src="daily" id="srcDailyBtn">
-        <strong>📅 Diario Élite</strong>
+        <strong>📅 Diario Rotativo</strong>
         <small id="srcDailyMeta">Comprobando…</small>
       </button>
       <button class="src-btn" data-src="weekly" id="srcWeeklyBtn">
-        <strong>🌎 Semanal +1.000</strong>
+        <strong>🌎 Mega +2.000</strong>
         <small id="srcWeeklyMeta">Comprobando…</small>
       </button>
+    </div>
+
+    <!-- BOTONES PARA LANZAR WORKFLOWS DESDE LA APP -->
+    <div class="run-bar">
+      <div class="run-top">
+        <div class="run-status">
+          <i class="run-dot" id="ghRunDot"></i>
+          <span id="ghRunText">GitHub Actions: comprobando estado…</span>
+        </div>
+        <a id="ghRunLink" href="#" target="_blank" rel="noopener" style="font-weight:750;white-space:nowrap;display:none">Ver log ↗</a>
+      </div>
+      <div class="run-btns">
+        <button class="run-btn go" id="launchDailyBtn">▶ Diario (Rotación)</button>
+        <button class="run-btn mega" id="launchWeeklyBtn">▶ Mega +2.000</button>
+        <button class="run-btn" id="toggleCustomBtn" title="Analizar tickers concretos en ~20s">🔎 Ticker</button>
+      </div>
+      <div class="custom-scan-box" id="customScanBox">
+        <input id="customTickersInput" placeholder="Ej: DECK, NVO, ASML.AS, MELI">
+        <button class="btn sm primary" id="launchCustomBtn">Analizar</button>
+      </div>
     </div>
 
     <div class="hero-card">
@@ -468,11 +534,14 @@ input.finput{
 
     <div class="chips-scroll" id="quickChips">
       <button class="fchip active" data-filter="ALL">Todas</button>
+      <button class="fchip" data-filter="TIER:GANGA">🏆 Gangas</button>
       <button class="fchip" data-filter="OPORTUNIDAD">🟢 Oportunidades</button>
       <button class="fchip" data-filter="VIGILAR">🟡 En vigilancia</button>
       <button class="fchip" data-filter="AI_ONLY">🤖 Con IA</button>
       <button class="fchip" data-filter="REG:Europa">🇪🇺 Europa</button>
       <button class="fchip" data-filter="REG:EE. UU.">🇺🇸 EE. UU.</button>
+      <button class="fchip" data-filter="REG:Asia-Pacífico">🌏 Asia-Pac.</button>
+      <button class="fchip" data-filter="REG:Canadá">🇨🇦 Canadá</button>
       <button class="fchip" data-filter="CALIDAD_CARA">🔵 Calidad cara</button>
       <button class="fchip" data-filter="DESCARTADA">🔴 Descartadas</button>
     </div>
@@ -503,6 +572,7 @@ input.finput{
       </div>
       <svg class="radar-svg" id="radarSvg" viewBox="0 0 460 265" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="chart-legend">
+        <span><i style="background:#fef08a"></i>Ganga</span>
         <span><i style="background:#4ade80"></i>Oportunidad</span>
         <span><i style="background:#f4c96b"></i>Vigilar</span>
         <span><i style="background:#60a5fa"></i>Calidad cara</span>
@@ -527,13 +597,38 @@ input.finput{
     <div class="panel">
       <div class="eyebrow">Tu lista personal de vigilancia</div>
       <h3 style="margin:4px 0 4px">⭐ Empresas favoritas</h3>
-      <p style="margin:0;font-size:12.5px;color:var(--muted)">Combina tus estrellas del escaneo Diario y del Semanal +1.000 para no perder ninguna al cambiar de pestaña.</p>
+      <p style="margin:0;font-size:12.5px;color:var(--muted)">Combina tus estrellas del escaneo Diario y del Mega +2.000 para no perder ninguna al cambiar de pestaña.</p>
     </div>
     <div id="favsHost"></div>
   </section>
 
   <!-- VIEW 4: APP / MÉTODO BUFFETT -->
   <section class="view" id="view-app">
+
+    <div class="panel" id="ghControlPanel">
+      <div class="eyebrow">Lanzar workflows desde el móvil</div>
+      <h3 style="margin:4px 0 6px">🚀 Control Remoto GitHub Actions</h3>
+      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Para activar los botones <b>▶ Diario</b>, <b>▶ Mega +2.000</b> y <b>🔎 Ticker</b>, guarda aquí un <b>Fine-grained Token</b> con permiso solo de <b>Actions (Read and write)</b> en tu repo. Se guarda únicamente en tu móvil (nunca en GitHub).</p>
+
+      <label class="flabel">Repositorio (usuario/repo)</label>
+      <input class="finput" id="ghRepoInput" placeholder="CarlosGomezS/BesTrade">
+
+      <label class="flabel">Token personal de GitHub (Fine-grained PAT)</label>
+      <input class="finput" id="ghTokenInput" type="password" autocomplete="off" placeholder="github_pat_...">
+
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn primary sm" id="saveGhBtn" style="flex:1">Guardar y comprobar</button>
+        <button class="btn danger sm" id="clearGhBtn">Borrar token</button>
+      </div>
+      <div class="notice" id="ghTokenStatus" style="margin-top:10px">Sin token guardado todavía.</div>
+      <div class="notice info" style="font-size:11.5px">
+        <b>Cómo crear el token en 30 segundos:</b><br>
+        1) GitHub → foto de perfil → <b>Settings</b> → <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → <b>Generate new token</b>.<br>
+        2) Repository access: <b>Only select repositories</b> → elige <b>BesTrade</b>.<br>
+        3) Permissions → Repository permissions → <b>Actions: Read and write</b> → Generate y pégalo arriba.
+      </div>
+    </div>
+
     <div class="panel">
       <div class="eyebrow">Checklist obligatorio antes de poner 1 €</div>
       <h3 style="margin:4px 0 6px">🐊 Los 4 filtros de Warren Buffett</h3>
@@ -547,7 +642,7 @@ input.finput{
     <div class="panel">
       <div class="eyebrow">Conexión y estado del blindaje</div>
       <h3 style="margin:4px 0 6px">📡 Fuente de datos automáticos</h3>
-      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Si usas GitHub Pages ya funciona solo leyendo <code>daily-scan.json</code> y <code>weekly-scan.json</code>. Si compilas una APK local, pega aquí la URL de tu carpeta <code>data/latest-scan.json</code>.</p>
+      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Si usas GitHub Pages ya funciona solo leyendo <code>daily-scan.json</code> y <code>weekly-scan.json</code>. Si compilas una APK local, pega aquí la URL de tu <code>data/latest-scan.json</code>.</p>
       <label class="flabel">URL remota opcional (para APK local)</label>
       <input class="finput" id="remoteUrlInput" placeholder="https://carlosgomezs.github.io/BesTrade/data/latest-scan.json">
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -556,13 +651,6 @@ input.finput{
         <input type="file" id="jsonFileInput" accept=".json" style="display:none">
       </div>
       <div class="notice" id="syncStatusBox" style="margin-top:10px">Estado: comprobando fuentes de datos…</div>
-    </div>
-
-    <div class="panel">
-      <div class="eyebrow">Puesta en marcha</div>
-      <h3 style="margin:4px 0 8px">📲 Cómo tenerla como App en tu móvil</h3>
-      <div class="notice good"><b>Opción A (PWA — recomendada):</b> Abre tu URL de GitHub Pages en Chrome y toca <b>⋮ → Añadir a pantalla de inicio / Instalar aplicación</b>. Se actualiza sola cada día y cada sábado.</div>
-      <div class="notice"><b>Opción B (APK WebView):</b> Apunta el generador WebView directamente a tu URL de GitHub Pages para que herede automáticamente todos los escaneos diarios y semanales.</div>
     </div>
   </section>
 
@@ -617,7 +705,14 @@ const STORE = {
   NOTES: 'cocodriloApp.notes.v7',
   REMOTE_URL: 'cocodriloApp.remoteUrl.v7',
   CHECKS: 'cocodriloApp.checks.v7',
-  SOURCE: 'cocodriloApp.source.v7'
+  SOURCE: 'cocodriloApp.source.v7',
+  GH_REPO: 'cocodriloApp.ghRepo.v8',
+  GH_TOKEN: 'cocodriloApp.ghToken.v8'
+};
+
+const WORKFLOWS = {
+  daily: 'cocodrilo-diario.yml',
+  weekly: 'cocodrilo-semanal-1000.yml'
 };
 
 const PAGE_SIZE = 40;
@@ -626,37 +721,40 @@ const DEMO_PAYLOAD = {
   is_demo: true,
   generated_at: new Date().toISOString(),
   universe_mode: "demo (ejemplo)",
-  total_scanned: 1024,
-  total_ok: 8,
-  counts: { oportunidades: 3, vigilar: 2, calidad_cara: 2, descartadas: 1 },
+  total_scanned: 2150,
+  total_ok: 3,
+  counts: { gangas: 1, muy_buenas: 1, buenas: 1, oportunidades: 3, vigilar: 0, calidad_cara: 0, descartadas: 0 },
   companies: [
     {
       ticker:"UNH", name:"UnitedHealth Group", region:"EE. UU.", currency:"USD", sector:"Healthcare", industry:"Healthcare Plans", sector_profile:"general",
       market_cap_b:315, price:342.0, high_52w:606.0, low_52w:310.0, drawdown_52w_pct:-43.6, trailing_pe:14.2, forward_pe:13.4, p_fcf:12.8,
       roic_pct:19.4, operating_margin_pct:8.7, revenue_growth_pct:9.2, eps_cagr_pct:11.5, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:1.35, ebitda_negative:false, share_change_pct:-3.2, dividend_yield_pct:2.4,
-      quality_score:88, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", discount_vs_base_pct:34.2, upside_base_pct:52.0, below_bear:true,
+      quality_score:91, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", opportunity_tier:"GANGA", conviction_score:152.0, ai_verdict:"TEMPORAL",
+      discount_vs_base_pct:34.2, upside_base_pct:52.0, below_bear:true,
       score_breakdown:{ roic:100, margin:73, fcf:100, debt:80, growth:100, shareholder:100 },
       strengths:["ROIC excelente (19.4%)", "Genera caja real todos los años (4/4)", "Recompra acciones netas (-3.2%)"],
       hard_fails:[], data_warnings:[], recent_news:[],
       dcf:{ fcf_per_share:26.7, net_cash_per_share:-38.0, assumed_growth_pct:9.5, intrinsic_bear:375.0, intrinsic_base:520.0, intrinsic_bull:615.0, target_price:390.0, margin_safety_pct:25 },
-      ai_check:"1) Ventaja competitiva: escala nacional masiva y poder de negociación con hospitales intactos.\n2) Riesgo: presión temporal de costes médicos y tarifas públicas.\n3) Veredicto: apunta a bache TEMPORAL mientras actualizan pólizas."
+      ai_check:"1) Ventaja competitiva: escala nacional masiva y poder de negociación con hospitales intactos.\n2) Riesgo: presión temporal de costes médicos y tarifas públicas.\n3) Veredicto: TEMPORAL."
     },
     {
       ticker:"ASML.AS", name:"ASML Holding N.V.", region:"Europa", currency:"EUR", sector:"Technology", industry:"Semiconductors", sector_profile:"tech",
       market_cap_b:270, price:648.0, high_52w:985.0, low_52w:612.0, drawdown_52w_pct:-34.2, trailing_pe:28.1, forward_pe:22.4, p_fcf:24.5,
       roic_pct:31.2, operating_margin_pct:32.8, revenue_growth_pct:14.0, eps_cagr_pct:16.2, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:-0.15, ebitda_negative:false, share_change_pct:-2.8, dividend_yield_pct:1.05,
-      quality_score:96, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", discount_vs_base_pct:27.6, upside_base_pct:38.1, below_bear:false,
+      quality_score:96, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", opportunity_tier:"MUY_BUENA", conviction_score:134.5, ai_verdict:"TEMPORAL",
+      discount_vs_base_pct:27.6, upside_base_pct:38.1, below_bear:false,
       score_breakdown:{ roic:100, margin:100, fcf:100, debt:100, growth:100, shareholder:100 },
       strengths:["ROIC excelente (31.2%)", "Márgenes operativos muy altos (32.8%)", "Más caja que deuda (Caja Neta)"],
       hard_fails:[], data_warnings:[], recent_news:[],
       dcf:{ fcf_per_share:26.5, net_cash_per_share:4.2, assumed_growth_pct:13.0, intrinsic_bear:625.0, intrinsic_base:895.0, intrinsic_bull:1060.0, target_price:671.0, margin_safety_pct:25 },
-      ai_check:"1) Ventaja competitiva: monopolio absoluto mundial en litografía EUV.\n2) Riesgo: ciclicidad de pedidos de semiconductores y restricciones a China.\n3) Veredicto: problema de ciclo TEMPORAL en una de las mejores empresas de Europa."
+      ai_check:"1) Ventaja competitiva: monopolio absoluto mundial en litografía EUV.\n2) Riesgo: ciclicidad de pedidos de semiconductores y restricciones a China.\n3) Veredicto: TEMPORAL."
     },
     {
       ticker:"ADBE", name:"Adobe Inc.", region:"EE. UU.", currency:"USD", sector:"Technology", industry:"Software", sector_profile:"tech",
       market_cap_b:165, price:368.0, high_52w:587.0, low_52w:351.0, drawdown_52w_pct:-37.3, trailing_pe:24.0, forward_pe:17.5, p_fcf:18.4,
       roic_pct:27.5, operating_margin_pct:36.2, revenue_growth_pct:10.4, eps_cagr_pct:13.1, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:-0.25, ebitda_negative:false, share_change_pct:-4.5, dividend_yield_pct:0,
-      quality_score:94, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", discount_vs_base_pct:29.9, upside_base_pct:42.7, below_bear:true,
+      quality_score:94, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", opportunity_tier:"BUENA", conviction_score:118.0, ai_verdict:"DUDOSO",
+      discount_vs_base_pct:29.9, upside_base_pct:42.7, below_bear:true,
       score_breakdown:{ roic:100, margin:100, fcf:100, debt:100, growth:100, shareholder:100 },
       strengths:["ROIC excelente (27.5%)", "Márgenes operativos muy altos (36.2%)", "Recompra acciones netas (-4.5%)"],
       hard_fails:[], data_warnings:[], recent_news:[],
@@ -673,8 +771,21 @@ const CHECKLIST_ITEMS = [
   { id:'c4', title:'4. Problema TEMPORAL, no permanente', desc:'¿Has comprobado en noticias por qué bajó y ves claro que es un bache pasajero?' }
 ];
 
+function detectDefaultRepo(){
+  const saved = localStorage.getItem(STORE.GH_REPO);
+  if(saved) return saved;
+  try {
+    const h = window.location.hostname || '';
+    const p = (window.location.pathname || '').split('/').filter(Boolean);
+    if(h.endsWith('.github.io') && p.length >= 1){
+      return `${h.replace('.github.io', '')}/${p[0]}`;
+    }
+  } catch(e){}
+  return 'CarlosGomezS/BesTrade';
+}
+
 let datasets = { daily: null, weekly: null, latest: null, manual: null };
-let activeSource = localStorage.getItem(STORE.SOURCE) || 'daily'; // 'daily' | 'weekly'
+let activeSource = localStorage.getItem(STORE.SOURCE) || 'daily';
 let payload = DEMO_PAYLOAD;
 let activeView = 'radar';
 let activeFilter = 'ALL';
@@ -684,6 +795,10 @@ let favs = readJSON(STORE.FAVS, []);
 let notes = readJSON(STORE.NOTES, {});
 let checks = readJSON(STORE.CHECKS, {});
 let remoteUrl = localStorage.getItem(STORE.REMOTE_URL) || '';
+let ghRepo = detectDefaultRepo();
+let ghToken = localStorage.getItem(STORE.GH_TOKEN) || '';
+let pollTimer = null;
+let wasRunning = false;
 
 const $ = id => document.getElementById(id);
 
@@ -699,7 +814,7 @@ function fmtShortDate(iso){
 }
 function toast(msg){
   const t = $('toast'); t.textContent = msg; t.style.display = 'block';
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 3200);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 3600);
 }
 
 function findCompany(ticker){
@@ -727,12 +842,29 @@ function toggleFav(ticker){
   renderAll();
 }
 
-function statusBadge(st){
-  if(st==='OPORTUNIDAD') return '<span class="pill">🟢 OPORTUNIDAD</span>';
+function statusBadge(c){
+  const st = typeof c === 'string' ? c : c.status;
+  const tier = typeof c === 'object' ? c.opportunity_tier : null;
+  if(st==='OPORTUNIDAD'){
+    if(tier==='GANGA') return '<span class="pill ganga">🏆 GANGA</span>';
+    if(tier==='MUY_BUENA') return '<span class="pill">🥇 MUY BUENA</span>';
+    if(tier==='BUENA') return '<span class="pill blue">🥈 BUENA</span>';
+    return '<span class="pill">🟢 OPORTUNIDAD</span>';
+  }
   if(st==='VIGILAR') return '<span class="pill gold">🟡 VIGILAR</span>';
   if(st==='CALIDAD_CARA') return '<span class="pill blue">🔵 CALIDAD</span>';
   return '<span class="pill red">🔴 DESCARTADA</span>';
 }
+
+function aiBadge(c){
+  if(!c.ai_check) return '';
+  const v = c.ai_verdict;
+  if(v === 'TEMPORAL') return '<span class="pill">🤖 IA: TEMPORAL</span>';
+  if(v === 'DUDOSO') return '<span class="pill gold">🤖 IA: DUDOSO</span>';
+  if(v === 'PERMANENTE') return '<span class="pill red">⚠️ IA: TRAMPA</span>';
+  return '<span class="pill blue">🤖 IA</span>';
+}
+
 function statusColor(st){
   if(st==='OPORTUNIDAD') return '#4ade80';
   if(st==='VIGILAR') return '#f4c96b';
@@ -796,6 +928,148 @@ function copyPrompt(ticker){
 }
 
 /* ===========================
+   CONTROL REMOTO GITHUB ACTIONS
+   =========================== */
+function ghHeaders(withAuth = true){
+  const h = {
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
+  if(withAuth && ghToken) h['Authorization'] = `Bearer ${ghToken}`;
+  return h;
+}
+
+async function refreshWorkflowStatus(silent = true){
+  if(!ghRepo || !ghRepo.includes('/')) return;
+  const dot = $('ghRunDot'), txt = $('ghRunText'), lnk = $('ghRunLink');
+  try {
+    const r = await fetch(`https://api.github.com/repos/${ghRepo}/actions/runs?per_page=4`, {
+      headers: ghHeaders(true),
+      cache: 'no-store'
+    });
+    if(!r.ok){
+      dot.className = 'run-dot';
+      txt.textContent = ghToken ? `GitHub HTTP ${r.status} (revisa repo/token)` : 'Pulsa un botón o configura token en Método';
+      lnk.style.display = 'none';
+      return;
+    }
+    const data = await r.json();
+    const runs = (data.workflow_runs || []).filter(w => !(w.name || '').toLowerCase().includes('pages build'));
+    const latest = runs[0];
+    if(!latest){
+      dot.className = 'run-dot ok';
+      txt.textContent = 'GitHub Actions listo';
+      lnk.style.display = 'none';
+      return;
+    }
+
+    lnk.href = latest.html_url;
+    lnk.style.display = 'inline';
+
+    if(latest.status === 'in_progress' || latest.status === 'queued' || latest.status === 'waiting'){
+      wasRunning = true;
+      dot.className = 'run-dot running';
+      const stLabel = latest.status === 'queued' ? 'En cola' : 'Escaneando';
+      txt.textContent = `${stLabel}: ${latest.name}…`;
+      scheduleStatusPoll();
+    } else if(latest.conclusion === 'success'){
+      dot.className = 'run-dot ok';
+      txt.textContent = `OK: ${latest.name} · ${fmtShortDate(latest.updated_at)}`;
+      stopStatusPoll();
+      if(wasRunning){
+        wasRunning = false;
+        toast('✅ Escáner terminado. Actualizando datos en breve…');
+        setTimeout(() => fetchData(true), 12000);
+      }
+    } else {
+      wasRunning = false;
+      dot.className = 'run-dot fail';
+      txt.textContent = `Incidencia (${latest.conclusion || latest.status}): ${latest.name}`;
+      stopStatusPoll();
+    }
+  } catch(e){
+    if(!silent) toast('No se pudo consultar GitHub Actions');
+  }
+}
+
+function scheduleStatusPoll(){
+  if(pollTimer) return;
+  pollTimer = setInterval(() => refreshWorkflowStatus(true), 15000);
+}
+function stopStatusPoll(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+}
+
+async function triggerWorkflow(kind, customTickers = ''){
+  if(!ghToken){
+    toast('Primero pega tu Fine-grained Token en la pestaña Método.');
+    switchView('app');
+    setTimeout(() => $('ghTokenInput')?.focus(), 180);
+    return;
+  }
+  if(!ghRepo || !ghRepo.includes('/')){
+    toast('Configura el repositorio (ej. CarlosGomezS/BesTrade) en Método.');
+    switchView('app');
+    return;
+  }
+
+  const wfFile = kind === 'weekly' ? WORKFLOWS.weekly : WORKFLOWS.daily;
+  const bodyObj = { ref: 'main' };
+  if(kind === 'daily'){
+    bodyObj.inputs = { universe: 'rotacion_diaria', test_mode: 'true', custom_tickers: '' };
+  } else if(kind === 'custom'){
+    const cleaned = customTickers.trim().toUpperCase();
+    if(!cleaned){
+      toast('Escribe al menos un ticker (ej. DECK, NVO, ASML.AS)');
+      return;
+    }
+    bodyObj.inputs = { universe: 'custom', test_mode: 'true', custom_tickers: cleaned };
+  }
+
+  const btns = [$('launchDailyBtn'), $('launchWeeklyBtn'), $('launchCustomBtn')];
+  btns.forEach(b => { if(b) b.disabled = true; });
+
+  try {
+    const url = `https://api.github.com/repos/${ghRepo}/actions/workflows/${wfFile}/dispatches`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { ...ghHeaders(true), 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyObj)
+    });
+
+    if(r.status === 204){
+      wasRunning = true;
+      const label = kind === 'weekly' ? 'Mega +2.000 (6 bloques paralelos)'
+        : kind === 'custom' ? `Análisis exprés (${customTickers.toUpperCase()})`
+        : 'Escáner Diario Rotativo';
+      toast(`🚀 Lanzado: ${label}. Te avisará por Telegram.`);
+      $('ghRunDot').className = 'run-dot running';
+      $('ghRunText').textContent = `Iniciando ${label}…`;
+      if(kind === 'custom'){
+        $('customTickersInput').value = '';
+        $('customScanBox').classList.remove('show');
+      }
+      setTimeout(() => refreshWorkflowStatus(true), 4500);
+      scheduleStatusPoll();
+    } else {
+      let msg = `HTTP ${r.status}`;
+      try { const j = await r.json(); if(j.message) msg += `: ${j.message}`; } catch(e){}
+      if(r.status === 401 || r.status === 403){
+        toast(`Token sin permiso Actions (Read & Write). ${msg}`);
+      } else if(r.status === 404){
+        toast(`No se encontró ${wfFile} en ${ghRepo}. Revisa el nombre.`);
+      } else {
+        toast(`Error al lanzar: ${msg}`);
+      }
+    }
+  } catch(e){
+    toast('Error de red al conectar con GitHub.');
+  } finally {
+    btns.forEach(b => { if(b) b.disabled = false; });
+  }
+}
+
+/* ===========================
    RENDER CARDS
    =========================== */
 function cardHTML(c, includeNote = false){
@@ -803,7 +1077,8 @@ function cardHTML(c, includeNote = false){
   const fav = isFav(c.ticker);
   const warns = c.data_warnings || [];
   const ddColor = (c.drawdown_52w_pct||0) <= -20 ? '#4ade80' : (c.drawdown_52w_pct||0) <= -10 ? '#f4c96b' : '#8fa898';
-  return `<article class="stock-card ${c.status==='OPORTUNIDAD' ? 'opp' : ''}">
+  const cardCls = c.opportunity_tier === 'GANGA' ? 'opp ganga' : (c.status==='OPORTUNIDAD' ? 'opp' : '');
+  return `<article class="stock-card ${cardCls}">
     <div class="card-top">
       <div class="card-id">
         <div class="card-name" title="${esc(c.name)}">${esc(c.name)}</div>
@@ -813,9 +1088,9 @@ function cardHTML(c, includeNote = false){
           <span>· ${esc(c.sector)}</span>
         </div>
         <div class="pills" style="margin-top:7px">
-          ${statusBadge(c.status)}
+          ${statusBadge(c)}
           ${c.below_bear ? '<span class="pill gold">🔥 Bajo Conserv.</span>' : ''}
-          ${c.ai_check ? '<span class="pill blue">🤖 IA</span>' : ''}
+          ${aiBadge(c)}
           ${warns.length ? '<span class="pill gold">⚠️ Aviso</span>' : ''}
         </div>
       </div>
@@ -890,10 +1165,10 @@ function updateSourceSwitchUI(){
   wBtn.classList.toggle('missing', !w);
 
   $('srcDailyMeta').textContent = d
-    ? `${d.companies.length} emp. · ${fmtShortDate(d.generated_at)}`
+    ? `${d.total_ok || d.companies.length} emp. · ${fmtShortDate(d.generated_at)}`
     : 'Pendiente de escaneo';
   $('srcWeeklyMeta').textContent = w
-    ? `${w.companies.length} emp. · ${fmtShortDate(w.generated_at)}`
+    ? `${w.total_ok || w.companies.length} emp. · ${fmtShortDate(w.generated_at)}`
     : 'Pendiente (sábado)';
 }
 
@@ -921,11 +1196,11 @@ function selectActivePayload(){
 
 function switchSource(src){
   if(src === 'daily' && !datasets.daily){
-    toast('Aún no se ha generado daily-scan.json. Lanza el escáner diario.');
+    toast('Aún no existe daily-scan.json. Pulsa ▶ Diario para generarlo.');
     return;
   }
   if(src === 'weekly' && !datasets.weekly){
-    toast('Aún no se ha generado weekly-scan.json. Lanza el mega-escáner semanal.');
+    toast('Aún no existe weekly-scan.json. Pulsa ▶ Mega +2.000 para generarlo.');
     return;
   }
   datasets.manual = null;
@@ -945,7 +1220,9 @@ function getFiltered(){
   const sort = $('sortSelect').value;
 
   const out = list.filter(c => {
-    if(activeFilter === 'AI_ONLY'){
+    if(activeFilter === 'TIER:GANGA'){
+      if(c.opportunity_tier !== 'GANGA') return false;
+    } else if(activeFilter === 'AI_ONLY'){
       if(!c.ai_check) return false;
     } else if(activeFilter.startsWith('REG:')){
       if(c.region !== activeFilter.slice(4)) return false;
@@ -959,12 +1236,17 @@ function getFiltered(){
   });
 
   const order = { OPORTUNIDAD:0, VIGILAR:1, CALIDAD_CARA:2, DESCARTADA:3 };
+  const tierOrder = { GANGA:0, MUY_BUENA:1, BUENA:2 };
   out.sort((a,b) => {
     if(sort==='score') return (b.quality_score||0)-(a.quality_score||0);
     if(sort==='discount') return (b.discount_vs_base_pct??-999)-(a.discount_vs_base_pct??-999);
     if(sort==='drawdown') return (a.drawdown_52w_pct??999)-(b.drawdown_52w_pct??999);
     if(sort==='pfcf') return (a.p_fcf??9999)-(b.p_fcf??9999);
-    return (order[a.status]??9)-(order[b.status]??9) || (b.quality_score||0)-(a.quality_score||0) || (b.discount_vs_base_pct??-999)-(a.discount_vs_base_pct??-999);
+    return (order[a.status]??9)-(order[b.status]??9)
+      || (tierOrder[a.opportunity_tier]??9)-(tierOrder[b.opportunity_tier]??9)
+      || (b.conviction_score??-999)-(a.conviction_score??-999)
+      || (b.quality_score||0)-(a.quality_score||0)
+      || (b.discount_vs_base_pct??-999)-(a.discount_vs_base_pct??-999);
   });
   return out;
 }
@@ -972,12 +1254,14 @@ function getFiltered(){
 function renderRadarView(){
   updateSourceSwitchUI();
   const all = payload.companies || [];
+  const gangaN = all.filter(x => x.opportunity_tier === 'GANGA').length;
   const oppN = all.filter(x => x.status === 'OPORTUNIDAD').length;
   const watchN = all.filter(x => x.status === 'VIGILAR').length;
+  const totalAnalyzed = payload.total_ok || all.length;
 
   $('kOpp').textContent = oppN;
   $('kWatch').textContent = watchN;
-  $('kTotal').textContent = all.length;
+  $('kTotal').textContent = totalAnalyzed;
 
   const bOpp = $('badgeOpp');
   bOpp.textContent = oppN;
@@ -1018,12 +1302,16 @@ function renderRadarView(){
 
   const dt = fmtShortDate(payload.generated_at) || 'Sin fecha';
   $('heroEyebrow').textContent = `${dt} · ${(payload.universe_mode||'global').toUpperCase()}`;
-  $('heroTitle').textContent = oppN > 0
-    ? `${oppN} empresa${oppN===1?'':'s'} en Zona Cocodrilo`
-    : 'El cocodrilo espera: hoy sin gangas claras';
-  $('heroSub').textContent = oppN > 0
-    ? 'Alta calidad financiera + caída fuerte. Comprueba siempre si el motivo es temporal.'
-    : 'Ninguna empresa de alta calidad cumple hoy el margen de seguridad exigido.';
+  if(gangaN > 0){
+    $('heroTitle').textContent = `🏆 ${gangaN} ganga${gangaN===1?'':'s'} excepcional${gangaN===1?'':'es'} (${oppN} oport.)`;
+    $('heroSub').textContent = 'Calidad ≥ 90, fuerte descuento DCF y filtro IA favorable. Revisa siempre cuentas y noticias antes de entrar.';
+  } else if(oppN > 0){
+    $('heroTitle').textContent = `${oppN} empresa${oppN===1?'':'s'} en Zona Cocodrilo`;
+    $('heroSub').textContent = 'Alta calidad financiera + caída fuerte. Comprueba siempre si el motivo es temporal.';
+  } else {
+    $('heroTitle').textContent = 'El cocodrilo espera: hoy sin gangas claras';
+    $('heroSub').textContent = 'Ninguna empresa de alta calidad cumple hoy el margen de seguridad exigido.';
+  }
 
   document.querySelectorAll('#quickChips .fchip').forEach(ch => {
     ch.classList.toggle('active', ch.dataset.filter === activeFilter);
@@ -1082,12 +1370,12 @@ function renderMapView(){
   pts.forEach(c => {
     const cx = xMap(c.discount_vs_base_pct).toFixed(1);
     const cy = yMap(c.quality_score).toFixed(1);
-    const col = statusColor(c.status);
-    const r = c.status==='OPORTUNIDAD' ? 7 : c.status==='VIGILAR' ? 5.2 : 4;
+    const col = c.opportunity_tier === 'GANGA' ? '#fef08a' : statusColor(c.status);
+    const r = c.opportunity_tier === 'GANGA' ? 7.8 : c.status==='OPORTUNIDAD' ? 6.6 : c.status==='VIGILAR' ? 5.2 : 4;
     html += `<circle data-dot="${esc(c.ticker)}" cx="${cx}" cy="${cy}" r="${r}" fill="${col}" fill-opacity="${c.status==='DESCARTADA'?.45:.95}" stroke="#060a08" stroke-width="1.2" style="cursor:pointer">
       <title>${esc(c.name)} (${esc(c.ticker)}) · Score ${c.quality_score} · Descuento ${c.discount_vs_base_pct}%</title>
     </circle>`;
-    if(c.status==='OPORTUNIDAD' && pts.length <= 50){
+    if((c.opportunity_tier==='GANGA' || (c.status==='OPORTUNIDAD' && pts.length <= 50))){
       html += `<text x="${cx}" y="${Number(cy)-9}" text-anchor="middle" fill="#e9f9ee" font-size="8.5" font-weight="800" pointer-events="none">${esc(c.ticker)}</text>`;
     }
   });
@@ -1139,7 +1427,7 @@ function renderMapView(){
 }
 
 /* ===========================
-   VIEW 3: FAVORITAS (CRUZADA DIARIO + SEMANAL)
+   VIEW 3: FAVORITAS
    =========================== */
 function renderFavsView(){
   const favList = favs.map(tkr => findCompany(tkr)).filter(Boolean);
@@ -1160,6 +1448,13 @@ function renderFavsView(){
    VIEW 4: MÉTODO & CONFIG APP
    =========================== */
 function renderAppView(){
+  $('ghRepoInput').value = ghRepo;
+  $('ghTokenInput').value = ghToken;
+  $('ghTokenStatus').className = ghToken ? 'notice good' : 'notice warn';
+  $('ghTokenStatus').innerHTML = ghToken
+    ? `✅ <b>Token guardado solo en este dispositivo</b> para <code>${esc(ghRepo)}</code>. Ya puedes usar los botones del Radar.`
+    : `⚠️ <b>Sin token:</b> los botones de lanzar workflows te pedirán pegar aquí tu Fine-grained Token de GitHub.`;
+
   const host = $('checklistHost');
   host.innerHTML = CHECKLIST_ITEMS.map(item => {
     const on = !!checks[item.id];
@@ -1184,20 +1479,20 @@ function renderAppView(){
     : `<div class="notice warn">Llevas <b>${doneCount}/4</b> filtros confirmados. Si dudas en el punto 4 (temporal vs permanente), mejor esperar.</div>`;
 
   $('remoteUrlInput').value = remoteUrl;
-  const dTxt = datasets.daily ? `${datasets.daily.companies.length} emp. (${fmtShortDate(datasets.daily.generated_at)})` : 'Pendiente';
-  const wTxt = datasets.weekly ? `${datasets.weekly.companies.length} emp. (${fmtShortDate(datasets.weekly.generated_at)})` : 'Pendiente';
+  const dTxt = datasets.daily ? `${datasets.daily.total_ok || datasets.daily.companies.length} emp. (${fmtShortDate(datasets.daily.generated_at)})` : 'Pendiente';
+  const wTxt = datasets.weekly ? `${datasets.weekly.total_ok || datasets.weekly.companies.length} emp. (${fmtShortDate(datasets.weekly.generated_at)})` : 'Pendiente';
   const ai = payload.ai_status;
   const aiTxt = ai
     ? (ai.enabled ? (ai.errors ? `Con incidencias (${ai.ok}/${ai.attempted} · ${esc(ai.last_error||'')})` : `Activa (${ai.ok}/${ai.attempted} OK)`) : 'Desactivada')
-    : 'Sin reporte v7 aún';
+    : 'Sin reporte v8 aún';
 
   $('syncStatusBox').innerHTML = payload.is_demo
     ? `Estado: <b>Vista Previa (Demo)</b>. Ejecuta tus flujos de GitHub Actions para ver datos reales.`
-    : `<b>Diario:</b> ${dTxt}<br><b>Semanal:</b> ${wTxt}<br><b>IA Gemini:</b> ${aiTxt}`;
+    : `<b>Diario:</b> ${dTxt}<br><b>Mega semanal:</b> ${wTxt}<br><b>IA Gemini:</b> ${aiTxt}`;
 }
 
 /* ===========================
-   MODAL DETALLE (BOTTOM SHEET)
+   MODAL DETALLE
    =========================== */
 function openModal(ticker){
   const c = findCompany(ticker);
@@ -1226,9 +1521,9 @@ function openModal(ticker){
   $('mBody').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
       <div class="pills">
-        ${statusBadge(c.status)}
+        ${statusBadge(c)}
         ${c.below_bear ? '<span class="pill gold">🔥 Bajo Conservador</span>' : ''}
-        ${c.ai_check ? '<span class="pill blue">🤖 IA + Noticias</span>' : ''}
+        ${aiBadge(c)}
       </div>
       <div class="right-tools">
         <button class="star-btn ${fav ? 'fav' : ''}" id="mFavBtn">${fav ? '★' : '☆'}</button>
@@ -1236,7 +1531,7 @@ function openModal(ticker){
       </div>
     </div>
 
-    ${c.ai_check ? `<div class="notice good"><b>🤖 Filtro IA Gemini (Temporal vs Permanente):</b><br>${esc(c.ai_check).replace(/\n/g,'<br>')}</div>` : ''}
+    ${c.ai_check ? `<div class="notice ${c.ai_verdict==='PERMANENTE' ? 'bad' : c.ai_verdict==='DUDOSO' ? 'warn' : 'good'}"><b>🤖 Filtro IA Gemini${c.ai_verdict ? ' (' + esc(c.ai_verdict) + ')' : ''}:</b><br>${esc(c.ai_check).replace(/\n/g,'<br>')}</div>` : ''}
     ${news.length ? `<div class="notice info"><b>📰 Titulares recientes analizados:</b><ul class="news-list">${news.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
     ${warns.length ? `<div class="notice warn"><b>⚠️ Avisos de datos / Modelo:</b><br>• ${warns.map(esc).join('<br>• ')}</div>` : ''}
     ${(c.hard_fails||[]).length ? `<div class="notice bad"><b>Alertas críticas:</b><br>• ${c.hard_fails.map(esc).join('<br>• ')}</div>` : ''}
@@ -1340,12 +1635,16 @@ async function fetchData(showToast = false){
   datasets.latest = latest;
   datasets.manual = null;
 
-  // Compatibilidad mientras solo exista latest-scan.json antes de ejecutar ambos flujos v7
   if(latest){
-    if(!datasets.weekly && (latest.universe_mode === 'global_1000' || latest.companies.length > 400)){
-      datasets.weekly = latest;
-    } else if(!datasets.daily){
-      datasets.daily = latest;
+    const isWeeklyLatest = (
+      latest.universe_mode === 'global_1000'
+      || latest.universe_mode === 'global_mega'
+      || (latest.total_ok || latest.companies.length) > 450
+    );
+    if(isWeeklyLatest){
+      if(!datasets.weekly) datasets.weekly = latest;
+    } else {
+      if(!datasets.daily) datasets.daily = latest;
     }
   }
 
@@ -1355,7 +1654,7 @@ async function fetchData(showToast = false){
   if(showToast){
     toast(payload.is_demo
       ? 'Sin datos remotos aún (mostrando Demo)'
-      : `Sincronizado (${payload.companies.length} empresas reales)`);
+      : `Sincronizado (${payload.total_ok || payload.companies.length} empresas reales)`);
   }
 }
 
@@ -1374,10 +1673,48 @@ document.querySelectorAll('[data-quick]').forEach(el => el.onclick = () => {
 });
 $('searchInput').oninput = () => { visibleLimit = PAGE_SIZE; renderRadarView(); };
 $('sortSelect').onchange = () => { visibleLimit = PAGE_SIZE; renderRadarView(); };
-$('refreshBtn').onclick = () => fetchData(true);
+$('refreshBtn').onclick = () => { fetchData(true); refreshWorkflowStatus(true); };
 $('goConfigBtn').onclick = () => switchView('app');
 $('closeModalBtn').onclick = () => $('detailModal').classList.remove('show');
 $('detailModal').onclick = e => { if(e.target.id === 'detailModal') $('detailModal').classList.remove('show'); };
+
+// Launcher buttons
+$('launchDailyBtn').onclick = () => triggerWorkflow('daily');
+$('launchWeeklyBtn').onclick = () => triggerWorkflow('weekly');
+$('toggleCustomBtn').onclick = () => {
+  const box = $('customScanBox');
+  box.classList.toggle('show');
+  if(box.classList.contains('show')) $('customTickersInput').focus();
+};
+$('launchCustomBtn').onclick = () => triggerWorkflow('custom', $('customTickersInput').value);
+$('customTickersInput').onkeydown = e => {
+  if(e.key === 'Enter') triggerWorkflow('custom', $('customTickersInput').value);
+};
+
+// GitHub token config
+$('saveGhBtn').onclick = () => {
+  const repoVal = $('ghRepoInput').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
+  const tokVal = $('ghTokenInput').value.trim();
+  if(!repoVal.includes('/')){
+    toast('El formato del repo debe ser usuario/repositorio');
+    return;
+  }
+  ghRepo = repoVal;
+  ghToken = tokVal;
+  localStorage.setItem(STORE.GH_REPO, ghRepo);
+  if(ghToken) localStorage.setItem(STORE.GH_TOKEN, ghToken);
+  else localStorage.removeItem(STORE.GH_TOKEN);
+  renderAppView();
+  refreshWorkflowStatus(false);
+  toast(ghToken ? 'Token guardado en este dispositivo. Botones activados.' : 'Repositorio guardado (sin token).');
+};
+
+$('clearGhBtn').onclick = () => {
+  ghToken = '';
+  localStorage.removeItem(STORE.GH_TOKEN);
+  renderAppView();
+  toast('Token eliminado del dispositivo.');
+};
 
 $('resetChecklistBtn').onclick = () => {
   checks = {};
@@ -1414,6 +1751,7 @@ $('jsonFileInput').onchange = e => {
 };
 
 fetchData(false);
+refreshWorkflowStatus(true);
 })();
 </script>
 </body>
