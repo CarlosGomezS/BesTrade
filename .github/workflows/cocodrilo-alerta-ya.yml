@@ -1,0 +1,49 @@
+name: Vigilante Intradia ENTRAR YA
+
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"
+    - cron: "0 15 * * 1-5"
+    - cron: "30 18 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "Avisar por Telegram aunque no haya ninguna ENTRAR YA"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+concurrency:
+  group: cocodrilo-intradia
+  cancel-in-progress: false
+
+jobs:
+  watch-urgent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Buscar anomalias ENTRAR YA
+        env:
+          UNIVERSE_MODE: "elite200"
+          URGENT_ONLY: "true"
+          URGENT_DOUBLE_PING: "true"
+          TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}
+          MAX_WORKERS: "3"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scanner/buffett_scanner.py
