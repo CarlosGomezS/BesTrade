@@ -825,6 +825,151 @@ def send_telegram(html_text: str) -> None:
             raise last_exc
 
 
+def extract_ai_verdict(ai_text: Optional[str]) -> Optional[str]:
+    """Extrae el veredicto final (TEMPORAL / DUDOSO / PERMANENTE) evitando falsos positivos."""
+    if not ai_text:
+        return None
+    m = re.search(r"veredicto[^\n:]*[:\-]?\s*([^\n]+)", ai_text, flags=re.IGNORECASE)
+    target = m.group(1) if m else ai_text.strip().splitlines()[-1]
+    up = target.upper()
+    for label in ("PERMANENTE", "DUDOSO", "TEMPORAL"):
+        if label in up:
+            return label
+    full_up = ai_text.upper()
+    for label in ("PERMANENTE", "DUDOSO", "TEMPORAL"):
+        if label in full_up:
+            return label
+    return None
+
+
+def has_severe_warning(rec: Dict[str, Any]) -> bool:
+    warns = rec.get("data_warnings") or []
+    return any(
+        k in w.lower()
+        for w in warns
+        for k in ("extremo", "sin tipo de cambio", "financiero")
+    )
+
+
+def compute_conviction_score(rec: Dict[str, Any]) -> float:
+    """Puntuación interna para ordenar oportunidades de mejor a peor convicción."""
+    score = float(rec.get("quality_score") or 0)
+    disc = rec.get("discount_vs_base_pct")
+    if disc is not None:
+        score += min(max(disc, -20.0), 60.0) * 0.75
+    if rec.get("below_bear"):
+        score += 14.0
+    elif rec.get("in_dcf_zone"):
+        score += 6.0
+
+    fpe = rec.get("forward_pe")
+    pfcf = rec.get("p_fcf")
+    if fpe is not None:
+        if fpe <= 14:
+            score += 10.0
+        elif fpe <= 19:
+            score += 5.0
+        elif fpe > 26:
+            score -= 8.0
+    elif pfcf is not None and pfcf <= 14:
+        score += 6.0
+
+    nde = rec.get("net_debt_ebitda")
+    if nde is not None:
+        if nde <= 0:
+            score += 6.0
+        elif nde <= 1.2:
+            score += 3.0
+
+    if has_severe_warning(rec):
+        score -= 18.0
+    elif rec.get("data_warnings"):
+        score -= 4.0
+
+    verdict = rec.get("ai_verdict") or extract_ai_verdict(rec.get("ai_check"))
+    if verdict == "TEMPORAL":
+        score += 8.0
+    elif verdict == "DUDOSO":
+        score -= 10.0
+    elif verdict == "PERMANENTE":
+        score -= 35.0
+
+    return round(score, 1)
+
+
+def classify_opportunity_tier(rec: Dict[str, Any]) -> Optional[str]:
+    """Clasifica las OPORTUNIDADES en GANGA, MUY_BUENA o BUENA."""
+    if rec.get("status") != "OPORTUNIDAD":
+        return None
+
+    q = rec.get("quality_score") or 0
+    disc = rec.get("discount_vs_base_pct") or -999.0
+    dd = rec.get("drawdown_52w_pct") if rec.get("drawdown_52w_pct") is not None else 0.0
+    fpe = rec.get("forward_pe")
+    pfcf = rec.get("p_fcf")
+    in_dcf = bool(rec.get("in_dcf_zone"))
+    below_bear = bool(rec.get("below_bear"))
+    severe_warn = has_severe_warning(rec)
+    verdict = rec.get("ai_verdict")
+
+    # Múltiplo coherente (evita falsos chollos por FCF inflado en fintech/ciclo)
+    multiple_sane = (fpe is not None and fpe <= 20.0) or (fpe is None and pfcf is not None and pfcf <= 16.0)
+
+    # NIVEL 1: GANGA EXCEPCIONAL (filtro ultra exigente)
+    if (
+        q >= 90
+        and in_dcf
+        and (below_bear or disc >= 35.0)
+        and dd <= -20.0
+        and multiple_sane
+        and not severe_warn
+        and verdict not in ("DUDOSO", "PERMANENTE")
+    ):
+        return "GANGA"
+
+    # NIVEL 2: MUY BUENA
+    if (
+        q >= 85
+        and (in_dcf or (disc >= 20.0 and dd <= -18.0))
+        and not severe_warn
+        and verdict != "PERMANENTE"
+    ):
+        return "MUY_BUENA"
+
+    # NIVEL 3: BUENA (o con matices / alerta de IA)
+    return "BUENA"
+
+
+def format_detailed_opp(r: Dict[str, Any], header_line: str) -> str:
+    dcf = r.get("dcf") or {}
+    cur = r["currency"]
+    dd = f"{r['drawdown_52w_pct']}%" if r["drawdown_52w_pct"] is not None else "—"
+    pfcf = f"{r['p_fcf']}x" if r["p_fcf"] is not None else "—"
+    fpe = f"{r['forward_pe']}x" if r["forward_pe"] is not None else "—"
+    nde = f"{r['net_debt_ebitda']}x" if r["net_debt_ebitda"] is not None else "—"
+    disc = f" (+{r['discount_vs_base_pct']}% desc.)" if (r.get("discount_vs_base_pct") is not None and r["discount_vs_base_pct"] > 0) else ""
+    bear_tag = " 🔥 Bajo conservador" if r.get("below_bear") else ""
+
+    block = [
+        header_line,
+        f"• Precio: <b>{r['price']} {cur}</b> (52s: <b>{dd}</b>){bear_tag}",
+        f"• Calidad: <b>{r['quality_score']}/100</b> | ROIC: {r['roic_pct']}% | Deuda: {nde}",
+        f"• Múltiplos: P/FCF <b>{pfcf}</b> | PER Futuro: <b>{fpe}</b>",
+    ]
+    if dcf:
+        block.append(
+            f"• DCF Base: <b>{dcf['intrinsic_base']} {cur}</b> | Obj (-{int(MARGIN_OF_SAFETY_PCT)}%): <b>{dcf['target_price']} {cur}</b>{disc}"
+        )
+    if r.get("strengths"):
+        block.append(f"• Claves: {esc_html(' · '.join(r['strengths'][:3]))}")
+    if r.get("data_warnings"):
+        block.append(f"• ⚠️ <i>Aviso:</i> {esc_html(' | '.join(r['data_warnings']))}")
+    if r.get("ai_check"):
+        v_tag = f" ({r['ai_verdict']})" if r.get("ai_verdict") else ""
+        block.append(f"• 🤖 <i>IA + Noticias{v_tag}:</i>\n{esc_html(r['ai_check'])}")
+    return "\n".join(block)
+
+
 def build_telegram_report(
     results: List[Dict[str, Any]],
     failed_count: int,
@@ -833,60 +978,77 @@ def build_telegram_report(
     opps = [r for r in results if r["status"] == "OPORTUNIDAD"]
     watch = [r for r in results if r["status"] == "VIGILAR"]
 
-    opps.sort(key=lambda r: (-(r["upside_base_pct"] or -999), -r["quality_score"]))
+    gangas = [r for r in opps if r.get("opportunity_tier") == "GANGA"]
+    muy_buenas = [r for r in opps if r.get("opportunity_tier") == "MUY_BUENA"]
+    buenas = [r for r in opps if r.get("opportunity_tier") == "BUENA"]
+
+    for group in (gangas, muy_buenas, buenas):
+        group.sort(key=lambda r: -(r.get("conviction_score") or 0))
     watch.sort(key=lambda r: (r["drawdown_52w_pct"] if r["drawdown_52w_pct"] is not None else 0, -r["quality_score"]))
 
     if not opps and not watch and not TEST_MODE:
         return None
 
     date_str = datetime.now(timezone.utc).strftime("%d/%m/%Y")
+    tier_summary = f"🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
         f"🐊 <b>RADAR COCODRILO PRO v7 — {date_str}</b>",
-        f"<i>Universo: {esc_html(UNIVERSE_MODE.upper())} · Analizadas: {len(results)} · 🟢 Oportunidades: {len(opps)} · 🟡 Vigilancia: {len(watch)}</i>",
+        f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas · {tier_summary}</i>",
     ]
 
-    if opps:
-        lines.append("\n<b>🟢 TOP OPORTUNIDADES (Calidad Alta + Precio Castigado)</b>")
-        for r in opps[:10]:
-            dcf = r.get("dcf") or {}
-            cur = r["currency"]
+    # 1) SOLO SI EXISTE UNA AUTÉNTICA GANGA
+    if gangas:
+        lines.append("\n━━━━━━━━━━━━━━━━━━━\n🚨🏆 <b>GANGA EXCEPCIONAL (MÁXIMA CONVICCIÓN)</b> 🏆🚨\n━━━━━━━━━━━━━━━━━━━")
+        for idx, r in enumerate(gangas[:3], start=1):
+            crown = "👑 <b>#1 TOP GANGA DEL DÍA — " if idx == 1 else f"🏆 <b>#{idx} GANGA — "
+            hdr = f"\n{crown}{esc_html(r['name'])} ({esc_html(r['ticker'])})</b> · <i>{esc_html(r['region'])}</i>"
+            lines.append(format_detailed_opp(r, hdr))
+
+    # 2) MUY BUENAS
+    if muy_buenas:
+        lines.append("\n━━━━━━━━━━━━━━━━━━━\n🥇 <b>MUY BUENAS (Alta calidad + buen margen)</b>\n━━━━━━━━━━━━━━━━━━━")
+        for r in muy_buenas[:5]:
+            hdr = f"\n🥇 <b>{esc_html(r['name'])} ({esc_html(r['ticker'])})</b> · <i>{esc_html(r['region'])}</i>"
+            lines.append(format_detailed_opp(r, hdr))
+        if len(muy_buenas) > 5:
+            lines.append(f"\n<i>…y {len(muy_buenas) - 5} muy buenas más en el panel web.</i>")
+
+    # 3) BUENAS (formato compacto para no tapar las mejores)
+    if buenas:
+        lines.append("\n━━━━━━━━━━━━━━━━━━━\n🥈 <b>BUENAS (Interesantes / con matices)</b>\n━━━━━━━━━━━━━━━━━━━")
+        for r in buenas[:6]:
             dd = f"{r['drawdown_52w_pct']}%" if r["drawdown_52w_pct"] is not None else "—"
             pfcf = f"{r['p_fcf']}x" if r["p_fcf"] is not None else "—"
             fpe = f"{r['forward_pe']}x" if r["forward_pe"] is not None else "—"
-            nde = f"{r['net_debt_ebitda']}x" if r["net_debt_ebitda"] is not None else "—"
-            block = [
-                f"\n🎯 <b>{esc_html(r['name'])} ({esc_html(r['ticker'])})</b> · <i>{esc_html(r['region'])}</i>",
-                f"• Precio: <b>{r['price']} {cur}</b> (desde máx. 52s: <b>{dd}</b>)",
-                f"• Calidad Buffett: <b>{r['quality_score']}/100</b> | ROIC: {r['roic_pct']}% | Deuda/EBITDA: {nde}",
-                f"• Múltiplos: P/FCF <b>{pfcf}</b> | PER Futuro: <b>{fpe}</b>",
-            ]
-            if dcf:
-                tag = " 🔥 (bajo escenario conservador)" if r["below_bear"] else ""
-                block.append(
-                    f"• Valor DCF Base: <b>{dcf['intrinsic_base']} {cur}</b> | Objetivo (-{int(MARGIN_OF_SAFETY_PCT)}%): <b>{dcf['target_price']} {cur}</b>{tag}"
-                )
-            if r["strengths"]:
-                block.append(f"• Puntos fuertes: {esc_html(' · '.join(r['strengths'][:3]))}")
-            if r.get("data_warnings"):
-                block.append(f"• ⚠️ <i>Aviso datos:</i> {esc_html(' | '.join(r['data_warnings']))}")
-            if r.get("ai_check"):
-                block.append(f"• 🤖 <i>Filtro IA + Noticias:</i>\n{esc_html(r['ai_check'])}")
-            lines.append("\n".join(block))
-        if len(opps) > 10:
-            lines.append(f"\n<i>…y {len(opps) - 10} oportunidades más disponibles en el panel web visual.</i>")
-    else:
+            obj = f"{r['dcf']['target_price']} {r['currency']}" if r.get("dcf") else "—"
+            ai_tag = ""
+            if r.get("ai_verdict") == "PERMANENTE":
+                ai_tag = " · ⚠️ IA: POSIBLE TRAMPA"
+            elif r.get("ai_verdict"):
+                ai_tag = f" · 🤖 IA: {r['ai_verdict']}"
+            warn_tag = " · ⚠️ Revisar datos" if r.get("data_warnings") else ""
+            lines.append(
+                f"• <b>{esc_html(r['ticker'])}</b> ({esc_html(r['name'][:22])}): <b>{r['price']} {r['currency']}</b> "
+                f"(52s: {dd}) | Score <b>{r['quality_score']}</b> | P/FCF {pfcf} | PER {fpe} | Obj: {obj}{ai_tag}{warn_tag}"
+            )
+            if r.get("ai_check") and not gangas and not muy_buenas:
+                lines.append(f"  <i>{esc_html(r['ai_check'])}</i>")
+        if len(buenas) > 6:
+            lines.append(f"<i>…y {len(buenas) - 6} buenas más en la app.</i>")
+
+    if not opps:
         lines.append("\n😴 <b>Hoy no hay ninguna empresa de calidad en zona clara de compra.</b> El cocodrilo espera.")
 
+    # 4) VIGILANCIA
     if watch:
-        lines.append("\n<b>🟡 EN VIGILANCIA (Acercándose a zona de compra)</b>")
-        for r in watch[:8]:
+        lines.append("\n━━━━━━━━━━━━━━━━━━━\n🟡 <b>EN VIGILANCIA (Acercándose)</b>\n━━━━━━━━━━━━━━━━━━━")
+        for r in watch[:6]:
             dd = f"{r['drawdown_52w_pct']}%" if r["drawdown_52w_pct"] is not None else "—"
             obj = f"{r['dcf']['target_price']} {r['currency']}" if r.get("dcf") else "—"
-            line = (
+            lines.append(
                 f"• <b>{esc_html(r['ticker'])}</b> ({esc_html(r['name'][:20])}): {r['price']} {r['currency']} "
                 f"| 52s: {dd} | Score {r['quality_score']} | Obj: {obj}"
             )
-            lines.append(line)
             if not opps and r.get("ai_check"):
                 lines.append(f"  🤖 <i>IA ({esc_html(r['ticker'])}):</i> {esc_html(r['ai_check'])}")
 
@@ -904,7 +1066,7 @@ def build_telegram_report(
         lines.append(f"<i>ℹ️ {failed_count} tickers omitidos por falta de datos o capitalización &lt; 1B USD.</i>")
 
     lines.append(
-        "\n⚠️ <b>Antes de invertir:</b> contrasta las cuentas oficiales y confirma si la caída es <i>TEMPORAL o PERMANENTE</i>."
+        "\n⚠️ <b>Regla de oro:</b> ni siquiera una 🏆 Ganga se compra sin 5 minutos de contraste de cuentas y noticias."
     )
     return "\n".join(lines)
 
@@ -936,12 +1098,15 @@ def main() -> None:
                 with _print_lock:
                     print(f"  Progreso: {done}/{len(tickers)} | OK: {len(results)} | Omitidas: {failed} | {elapsed:.0f}s")
 
-    # Protección anti-sobrescritura: si Yahoo Finance bloqueó toda la tanda, abortar y disparar alerta de fallo
     if len(results) == 0:
         raise RuntimeError("0 empresas válidas analizadas. Abortando para no sobrescribir datos buenos en el panel.")
 
-    order = {"OPORTUNIDAD": 0, "VIGILAR": 1, "CALIDAD_CARA": 2, "DESCARTADA": 3}
-    results.sort(key=lambda r: (order.get(r["status"], 9), -r["quality_score"], -(r["upside_base_pct"] or -999)))
+    # Primera ordenación por convicción para que Gemini analice siempre las mejores candidatas
+    status_order = {"OPORTUNIDAD": 0, "VIGILAR": 1, "CALIDAD_CARA": 2, "DESCARTADA": 3}
+    for r in results:
+        r["ai_verdict"] = None
+        r["conviction_score"] = compute_conviction_score(r)
+    results.sort(key=lambda r: (status_order.get(r["status"], 9), -(r["conviction_score"] or 0)))
 
     ai_status: Dict[str, Any] = {
         "enabled": bool(GEMINI_API_KEY),
@@ -961,11 +1126,26 @@ def main() -> None:
             ai_text, ai_err = optional_gemini_buffett_check(r)
             if ai_text:
                 r["ai_check"] = ai_text
+                r["ai_verdict"] = extract_ai_verdict(ai_text)
                 ai_status["ok"] += 1
             else:
                 ai_status["errors"] += 1
                 ai_status["last_error"] = ai_err
             time.sleep(2.5)
+
+    # Clasificación definitiva en 3 niveles (GANGA / MUY_BUENA / BUENA) ya con el veredicto de Gemini
+    tier_order = {"GANGA": 0, "MUY_BUENA": 1, "BUENA": 2, None: 9}
+    for r in results:
+        r["conviction_score"] = compute_conviction_score(r)
+        r["opportunity_tier"] = classify_opportunity_tier(r)
+
+    results.sort(
+        key=lambda r: (
+            status_order.get(r["status"], 9),
+            tier_order.get(r["opportunity_tier"], 9),
+            -(r["conviction_score"] or 0),
+        )
+    )
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
@@ -978,6 +1158,9 @@ def main() -> None:
         "elapsed_sec": round(time.time() - t0),
         "ai_status": ai_status,
         "counts": {
+            "gangas": sum(1 for r in results if r["opportunity_tier"] == "GANGA"),
+            "muy_buenas": sum(1 for r in results if r["opportunity_tier"] == "MUY_BUENA"),
+            "buenas": sum(1 for r in results if r["opportunity_tier"] == "BUENA"),
             "oportunidades": sum(1 for r in results if r["status"] == "OPORTUNIDAD"),
             "vigilar": sum(1 for r in results if r["status"] == "VIGILAR"),
             "calidad_cara": sum(1 for r in results if r["status"] == "CALIDAD_CARA"),
@@ -987,7 +1170,6 @@ def main() -> None:
     }
     json_payload = json.dumps(summary, indent=2, ensure_ascii=False)
 
-    # Mantiene latest-scan.json por compatibilidad y guarda además su archivo separado (diario vs semanal)
     OUT_LATEST_JSON.write_text(json_payload, encoding="utf-8")
     target_split = OUT_WEEKLY_JSON if UNIVERSE_MODE == "global_1000" else OUT_DAILY_JSON
     target_split.write_text(json_payload, encoding="utf-8")
