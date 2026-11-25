@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cocodrilo">
 <link rel="manifest" href="./manifest.json">
-<title>Radar Cocodrilo Pro v9 — App Buffett</title>
+<title>Radar Cocodrilo Pro v9.1 — Cloud DB</title>
 <style>
 :root{
   --bg:#060a08;--bg2:#0b120e;--glass:rgba(15,24,19,.84);--glass-strong:rgba(10,17,13,.94);
@@ -35,26 +35,34 @@ a{color:var(--emerald);text-decoration:none}
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--line);
   display:flex;align-items:center;justify-content:center;
 }
-.appbar-inner{width:100%;max-width:960px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.appbar-inner{width:100%;max-width:960px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
 .logo{
-  width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:20px;flex-shrink:0;
+  width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:19px;flex-shrink:0;
   background:linear-gradient(145deg,#6ee7b7,#15803d);
   box-shadow:0 4px 18px rgba(34,197,94,.32),inset 0 1px 0 rgba(255,255,255,.35);
 }
-.brand h1{margin:0;font-size:15.5px;letter-spacing:.06em;font-weight:900;white-space:nowrap}
-.brand small{display:block;font-size:9.5px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
-.appbar-right{display:flex;align-items:center;gap:8px}
+.brand h1{margin:0;font-size:15px;letter-spacing:.06em;font-weight:900;white-space:nowrap}
+.brand small{display:block;font-size:9px;letter-spacing:.09em;color:var(--muted);text-transform:uppercase}
+.appbar-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .live-pill{
-  display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;
-  font-size:11px;font-weight:800;background:var(--emeraldBg);color:var(--emerald);
+  display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:99px;
+  font-size:10.5px;font-weight:800;background:var(--emeraldBg);color:var(--emerald);
   border:1px solid rgba(74,222,128,.3);white-space:nowrap;
 }
 .live-pill.demo{background:var(--goldBg);color:var(--gold);border-color:rgba(244,201,107,.35)}
+.cloud-pill{
+  display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:99px;
+  font-size:10.5px;font-weight:800;background:rgba(255,255,255,.05);color:var(--muted);
+  border:1px solid var(--line2);cursor:pointer;white-space:nowrap;
+}
+.cloud-pill.ok{background:var(--blueBg);color:#93c5fd;border-color:rgba(96,165,250,.35)}
+.cloud-pill.saving{background:var(--goldBg);color:var(--gold);border-color:rgba(244,201,107,.4)}
+.cloud-pill.err{background:var(--redBg);color:var(--red);border-color:rgba(248,113,113,.4)}
 .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
 .icon-btn{
-  width:38px;height:38px;border-radius:11px;border:1px solid var(--line2);
+  width:36px;height:36px;border-radius:10px;border:1px solid var(--line2);
   background:rgba(255,255,255,.04);color:var(--text);display:grid;place-items:center;cursor:pointer;font-size:16px;
 }
 .icon-btn:active{transform:scale(.94);background:rgba(255,255,255,.1)}
@@ -63,7 +71,6 @@ a{color:var(--emerald);text-decoration:none}
 .view.active{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-/* MARKET THERMOMETER */
 .mkt-bar{
   display:none;margin-bottom:10px;padding:9px 12px;border-radius:14px;
   background:rgba(10,18,13,.9);border:1px solid var(--line);
@@ -75,7 +82,6 @@ a{color:var(--emerald);text-decoration:none}
 .mkt-pills{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .mkt-chip{padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-weight:750;font-size:11px;font-variant-numeric:tabular-nums}
 
-/* SOURCE SWITCHER & WORKFLOW LAUNCHER */
 .source-switch{
   display:grid;grid-template-columns:1fr 1fr;gap:6px;background:rgba(8,14,10,.85);
   border:1px solid var(--line2);border-radius:16px;padding:4px;margin-bottom:10px;
@@ -115,7 +121,6 @@ a{color:var(--emerald);text-decoration:none}
 }
 .custom-scan-box input:focus{border-color:var(--emerald)}
 
-/* BUTTONS */
 .btn{
   border:1px solid var(--line2);background:rgba(255,255,255,.05);color:var(--text);
   padding:10px 14px;border-radius:12px;font-weight:750;font-size:13px;cursor:pointer;
@@ -128,7 +133,6 @@ a{color:var(--emerald);text-decoration:none}
 .btn.sm{padding:8px 11px;font-size:12px;border-radius:10px;min-height:36px}
 .btn.full{width:100%}
 
-/* HERO */
 .hero-card{
   background:linear-gradient(145deg,rgba(24,44,32,.88),rgba(12,20,15,.94));
   border:1px solid rgba(74,222,128,.26);border-radius:22px;padding:16px;margin-bottom:14px;position:relative;overflow:hidden;
@@ -147,7 +151,6 @@ a{color:var(--emerald);text-decoration:none}
 .kpi strong{display:block;font-size:20px;font-weight:900;margin-top:1px;font-variant-numeric:tabular-nums}
 .kpi.g strong{color:var(--emerald)}
 .kpi.y strong{color:var(--gold)}
-.kpi.r strong{color:var(--red)}
 
 .demo-bar{
   display:none;margin-bottom:12px;padding:10px 13px;border-radius:14px;
@@ -177,7 +180,6 @@ a{color:var(--emerald);text-decoration:none}
   color:var(--text);padding:0 10px;font:inherit;font-size:12.5px;font-weight:650;max-width:148px;
 }
 
-/* CARDS */
 .cards-grid{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:740px){.cards-grid{grid-template-columns:1fr 1fr}}
 .stock-card{
@@ -236,7 +238,6 @@ a{color:var(--emerald);text-decoration:none}
 .card-actions{display:flex;gap:8px;margin-top:auto}
 .load-more-wrap{margin-top:14px;text-align:center}
 
-/* PANELS, COMPARATOR, PORTFOLIO, SIMULATOR, HISTORY */
 .panel{background:var(--glass);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:14px}
 .panel h3{margin:0 0 10px;font-size:15.5px;font-weight:850}
 .radar-svg{width:100%;height:265px;display:block;border-radius:14px;background:rgba(5,10,7,.78);border:1px solid var(--line)}
@@ -274,7 +275,6 @@ input[type="range"]{width:100%;accent-color:#4ade80;cursor:pointer}
 .tcard{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:9px;text-align:center}
 .tcard span{display:block;font-size:10px;color:var(--muted)}
 .tcard b{display:block;font-size:14.5px;margin:2px 0}
-
 .hist-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
 .hist-row:last-child{border-bottom:0}
 
@@ -293,7 +293,6 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
 .news-list li{margin-bottom:4px}
 .empty{border:1px dashed var(--line2);border-radius:18px;padding:26px 16px;text-align:center;color:var(--muted)}
 
-/* BOTTOM NAV (5 TABS) */
 .bottom-nav{
   position:fixed;bottom:0;left:0;right:0;z-index:40;background:var(--glass-strong);
   backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border-top:1px solid var(--line2);
@@ -315,7 +314,6 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
 .nav-badge.red{background:var(--red);color:#fff}
 .nav-badge.show{display:flex}
 
-/* MODAL */
 .modal{position:fixed;inset:0;background:rgba(2,5,3,.78);backdrop-filter:blur(8px);display:none;align-items:flex-end;justify-content:center;z-index:60}
 .modal.show{display:flex}
 .sheet{
@@ -352,10 +350,11 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
       <div class="logo">🐊</div>
       <div>
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">RADAR BUFFETT · EXPERTO v9</small>
+        <small id="appSubtitle">RADAR BUFFETT · CLOUD v9.1</small>
       </div>
     </div>
     <div class="appbar-right">
+      <button class="cloud-pill" id="cloudPill" title="Estado de sincronización con BesTrade-DB">☁️ Local</button>
       <span class="live-pill" id="modeBadge"><i class="dot"></i> Demo</span>
       <button class="icon-btn" id="refreshBtn" title="Actualizar datos">↻</button>
     </div>
@@ -364,14 +363,12 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
 
 <main class="main">
 
-  <!-- VIEW 1: RADAR -->
   <section class="view active" id="view-radar">
     <div class="demo-bar" id="demoBar">
       <span>✨ <b>Vista previa:</b> lanza un escaneo con los botones o conecta tu repo en <b>Método</b>.</span>
       <button class="btn sm gold" id="goConfigBtn">Configurar</button>
     </div>
 
-    <!-- TERMÓMETRO DE MERCADO -->
     <div class="mkt-bar" id="marketBar">
       <div><b id="mktRegime">🌡️ Clima NORMAL</b> <span id="mktSummary" style="color:var(--muted)"></span></div>
       <div class="mkt-pills" id="mktPills"></div>
@@ -454,7 +451,6 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
     <div id="radarList"></div>
   </section>
 
-  <!-- VIEW 2: EXPLORAR (COMPARADOR 1 VS 1 + MAPA + SECTORES) -->
   <section class="view" id="view-map">
     <div class="panel">
       <div class="eyebrow">Decide cuando solo puedes comprar una</div>
@@ -493,12 +489,11 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
     </div>
   </section>
 
-  <!-- VIEW 3: MI CARTERA (ALERTAS DE VENTA) + FAVORITAS -->
   <section class="view" id="view-favs">
     <div class="panel">
       <div class="eyebrow">Control de tus compras + Alertas de VENTA</div>
       <h3 style="margin:4px 0 6px">💼 Mi Cartera</h3>
-      <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">Apunta lo que compras (solo se guarda en tu móvil). Te avisa en rojo si la <b>tesis se rompe</b> o en dorado si ya está <b>cara para recoger beneficios</b>.</p>
+      <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">Se sincroniza automáticamente con tu repo privado <code>BesTrade-DB</code>. Te avisa en rojo si la <b>tesis se rompe</b> o en dorado si conviene <b>recoger beneficios</b>.</p>
       <div class="port-form">
         <input class="finput" id="portTickerIn" placeholder="Ticker (ej. ADBE)">
         <input class="finput" id="portPriceIn" type="number" step="0.01" placeholder="Precio compra">
@@ -510,19 +505,18 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
     </div>
 
     <div class="panel">
-      <div class="eyebrow">Seguimiento Diario + Mega +2.000</div>
+      <div class="eyebrow">Sincronizado con la nube privada</div>
       <h3 style="margin:4px 0 4px">⭐ Empresas favoritas</h3>
       <p style="margin:0;font-size:12px;color:var(--muted)">Toca la estrella en cualquier empresa para vigilarla y guardar tus notas.</p>
     </div>
     <div id="favsHost"></div>
   </section>
 
-  <!-- VIEW 4: DIARIO DE ACIERTOS (TRACK RECORD) -->
   <section class="view" id="view-hist">
     <div class="panel">
       <div class="eyebrow">Auditoría real del escáner</div>
       <h3 style="margin:4px 0 6px">📈 Diario de Aciertos</h3>
-      <p style="margin:0 0 10px;font-size:12.5px;color:var(--muted)">Cada vez que salta una <b>🚨 ENTRAR YA</b> o <b>🏆 GANGA</b>, el bot guarda su fecha y precio en <code>data/history.json</code> y mide su rentabilidad real con el paso de los meses.</p>
+      <p style="margin:0 0 10px;font-size:12.5px;color:var(--muted)">Cada vez que salta una <b>🚨 ENTRAR YA</b> o <b>🏆 GANGA</b>, el bot guarda su fecha y precio en <code>data/history.json</code> y mide su rentabilidad real.</p>
       <div class="kpi-row" id="histKpis">
         <div class="kpi"><span>Alertas top</span><strong id="hCount">0</strong></div>
         <div class="kpi g"><span>En positivo</span><strong id="hWinRate">—</strong></div>
@@ -532,19 +526,24 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
     <div class="panel" id="histListHost"></div>
   </section>
 
-  <!-- VIEW 5: MÉTODO & CONFIG -->
   <section class="view" id="view-app">
     <div class="panel" id="ghControlPanel">
-      <div class="eyebrow">Lanzar workflows desde el móvil</div>
-      <h3 style="margin:4px 0 6px">🚀 Control Remoto GitHub Actions</h3>
-      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Guarda aquí tu <b>Fine-grained Token</b> (solo permiso <b>Actions: Read and write</b> en tu repo). Se guarda únicamente en tu móvil.</p>
-      <label class="flabel">Repositorio (usuario/repo)</label>
+      <div class="eyebrow">Workflows + Base de Datos Privada en GitHub</div>
+      <h3 style="margin:4px 0 6px">☁️ Conexión GitHub (Todo en 1)</h3>
+      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Un solo <b>Fine-grained Token</b> (con permisos <b>Actions: Read &amp; write</b> y <b>Contents: Read &amp; write</b> en tus 2 repos) controla los botones del Radar y guarda tu Cartera, Favoritas y Notas en tu repo privado.</p>
+      <label class="flabel">Repo principal de la app (público)</label>
       <input class="finput" id="ghRepoInput" placeholder="CarlosGomezS/BesTrade">
+      <label class="flabel">Repo privado para tu Base de Datos</label>
+      <input class="finput" id="ghDbRepoInput" placeholder="CarlosGomezS/BesTrade-DB">
       <label class="flabel">Token personal de GitHub (Fine-grained PAT)</label>
       <input class="finput" id="ghTokenInput" type="password" autocomplete="off" placeholder="github_pat_...">
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn primary sm" id="saveGhBtn" style="flex:1">Guardar y comprobar</button>
+        <button class="btn primary sm" id="saveGhBtn" style="flex:1">Guardar y sincronizar</button>
         <button class="btn danger sm" id="clearGhBtn">Borrar token</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn sm" id="cloudPullBtn" style="flex:1">⬇️ Traer de GitHub</button>
+        <button class="btn sm" id="cloudPushBtn" style="flex:1">⬆️ Subir a GitHub</button>
       </div>
       <div class="notice" id="ghTokenStatus" style="margin-top:10px">Sin token guardado todavía.</div>
     </div>
@@ -627,8 +626,11 @@ const STORE = {
   CHECKS: 'cocodriloApp.checks.v7',
   SOURCE: 'cocodriloApp.source.v7',
   GH_REPO: 'cocodriloApp.ghRepo.v8',
-  GH_TOKEN: 'cocodriloApp.ghToken.v8'
+  GH_DB_REPO: 'cocodriloApp.ghDbRepo.v9',
+  GH_TOKEN: 'cocodriloApp.ghToken.v8',
+  UPDATED_AT: 'cocodriloApp.updatedAt.v9'
 };
+const DB_FILE = 'user-db.json';
 const WORKFLOWS = { daily: 'cocodrilo-diario.yml', weekly: 'cocodrilo-semanal-1000.yml' };
 const PAGE_SIZE = 40;
 
@@ -665,19 +667,6 @@ const DEMO_PAYLOAD = {
       hard_fails:[], data_warnings:[], recent_news:[],
       dcf:{ fcf_per_share:26.5, net_cash_per_share:4.2, assumed_growth_pct:13.0, intrinsic_bear:625.0, intrinsic_base:895.0, intrinsic_bull:1060.0, target_price:671.0, margin_safety_pct:25 },
       ai_check:"1) Ventaja competitiva: monopolio EUV.\n2) Riesgo: ciclo de semiconductores.\n3) Veredicto: TEMPORAL."
-    },
-    {
-      ticker:"ADBE", name:"Adobe Inc.", region:"EE. UU.", currency:"USD", sector:"Technology", industry:"Software", sector_profile:"tech",
-      market_cap_b:165, price:368.0, high_52w:587.0, low_52w:351.0, drawdown_52w_pct:-37.3, trailing_pe:24.0, forward_pe:17.5, p_fcf:18.4,
-      roic_pct:27.5, operating_margin_pct:36.2, revenue_growth_pct:10.4, eps_cagr_pct:13.1, fcf_years_pos:4, fcf_years_total:4, net_debt_ebitda:-0.25, ebitda_negative:false, share_change_pct:-4.5, dividend_yield_pct:0,
-      earnings_date:null, earnings_days:null, insider_buys_90d:0, owner_earnings_adjusted:true, sbc_pct_of_fcf:22.0,
-      quality_score:94, data_coverage_pct:100, passes_quality:true, status:"OPORTUNIDAD", opportunity_tier:"BUENA", conviction_score:118.0, ai_verdict:"DUDOSO",
-      discount_vs_base_pct:29.9, upside_base_pct:42.7, below_bear:true,
-      score_breakdown:{ roic:100, margin:100, fcf:100, debt:100, growth:100, shareholder:100 },
-      strengths:["ROIC excelente (27.5%)", "Márgenes operativos muy altos (36.2%)", "Recompra acciones netas (-4.5%)"],
-      hard_fails:[], data_warnings:["Pago en acciones a empleados alto (22% del FCF): DCF descontado a caja real"], recent_news:[],
-      dcf:{ fcf_per_share:20.0, net_cash_per_share:5.8, assumed_growth_pct:10.0, intrinsic_bear:392.0, intrinsic_base:525.0, intrinsic_bull:620.0, target_price:394.0, margin_safety_pct:25 },
-      ai_check:"1) Ventaja competitiva: estándar creativo.\n2) Riesgo: competencia de IA generativa.\n3) Veredicto: DUDOSO."
     }
   ]
 };
@@ -700,6 +689,13 @@ function detectDefaultRepo(){
   return 'CarlosGomezS/BesTrade';
 }
 
+function detectDefaultDbRepo(mainRepo){
+  const saved = localStorage.getItem(STORE.GH_DB_REPO);
+  if(saved) return saved;
+  const owner = (mainRepo || 'CarlosGomezS/BesTrade').split('/')[0];
+  return `${owner}/BesTrade-DB`;
+}
+
 let datasets = { daily: null, weekly: null, latest: null, manual: null };
 let historyData = null;
 let activeSource = localStorage.getItem(STORE.SOURCE) || 'daily';
@@ -712,11 +708,17 @@ let favs = readJSON(STORE.FAVS, []);
 let notes = readJSON(STORE.NOTES, {});
 let portfolio = readJSON(STORE.PORTFOLIO, []);
 let checks = readJSON(STORE.CHECKS, {});
+let localUpdatedAt = Number(localStorage.getItem(STORE.UPDATED_AT) || '0');
 let remoteUrl = localStorage.getItem(STORE.REMOTE_URL) || '';
 let ghRepo = detectDefaultRepo();
+let ghDbRepo = detectDefaultDbRepo(ghRepo);
 let ghToken = localStorage.getItem(STORE.GH_TOKEN) || '';
+
 let pollTimer = null;
 let wasRunning = false;
+let cloudSha = null;
+let cloudSaveTimer = null;
+let cloudState = { status: 'local', msg: 'Solo en este dispositivo' };
 
 const $ = id => document.getElementById(id);
 function readJSON(k, def){ try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : def; } catch(e){ return def; } }
@@ -730,6 +732,158 @@ function fmtShortDate(iso){
 function toast(msg){
   const t = $('toast'); t.textContent = msg; t.style.display = 'block';
   clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 3600);
+}
+function toBase64Utf8(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+function fromBase64Utf8(b64){
+  const bin = atob(b64.replace(/\s/g, ''));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+/* ===========================
+   GITHUB CLOUD DB (BesTrade-DB)
+   =========================== */
+function ghHeaders(withAuth = true){
+  const h = { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  if(withAuth && ghToken) h['Authorization'] = `Bearer ${ghToken}`;
+  return h;
+}
+
+function setCloudUI(status, text, detail){
+  cloudState = { status, msg: detail || text };
+  const pill = $('cloudPill');
+  if(!pill) return;
+  pill.className = `cloud-pill ${status === 'ok' ? 'ok' : status === 'saving' ? 'saving' : status === 'err' ? 'err' : ''}`;
+  pill.textContent = text;
+}
+
+function saveLocalUserState(triggerCloud = true){
+  localUpdatedAt = Date.now();
+  localStorage.setItem(STORE.FAVS, JSON.stringify(favs));
+  localStorage.setItem(STORE.NOTES, JSON.stringify(notes));
+  localStorage.setItem(STORE.PORTFOLIO, JSON.stringify(portfolio));
+  localStorage.setItem(STORE.CHECKS, JSON.stringify(checks));
+  localStorage.setItem(STORE.UPDATED_AT, String(localUpdatedAt));
+  if(triggerCloud && ghToken && ghDbRepo && ghDbRepo.includes('/')){
+    setCloudUI('saving', '☁️ Guardando…', 'Sincronizando cambios con GitHub…');
+    clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = setTimeout(() => cloudPush(false), 1400);
+  }
+}
+
+async function cloudPull(forceApply = false, showMsg = false){
+  if(!ghToken || !ghDbRepo || !ghDbRepo.includes('/')){
+    setCloudUI('local', '☁️ Local', 'Configura tu token y BesTrade-DB en Método');
+    return;
+  }
+  setCloudUI('saving', '☁️ Sync…', 'Leyendo base de datos desde GitHub…');
+  try {
+    const r = await fetch(`https://api.github.com/repos/${ghDbRepo}/contents/${DB_FILE}?t=${Date.now()}`, {
+      headers: ghHeaders(true), cache: 'no-store'
+    });
+    if(r.status === 404){
+      cloudSha = null;
+      const hasLocal = favs.length > 0 || portfolio.length > 0 || Object.keys(notes).length > 0;
+      if(hasLocal){
+        await cloudPush(showMsg);
+      } else {
+        setCloudUI('ok', '☁️ Lista', `Conectado a ${ghDbRepo} (aún sin registros)`);
+        if(showMsg) toast('Conectado a tu BD privada. Se creará al guardar tu primer dato.');
+      }
+      return;
+    }
+    if(!r.ok){
+      const errTxt = r.status === 401 || r.status === 403 ? 'Token sin permiso Contents (Read & write)' : `HTTP ${r.status}`;
+      setCloudUI('err', '☁️ Error', `${errTxt} en ${ghDbRepo}`);
+      if(showMsg) toast(`Error BD GitHub: ${errTxt}`);
+      return;
+    }
+    const meta = await r.json();
+    cloudSha = meta.sha || null;
+    const decoded = JSON.parse(fromBase64Utf8(meta.content || ''));
+    const remoteTs = Number(decoded.updated_at || 0);
+
+    if(forceApply || remoteTs >= localUpdatedAt){
+      favs = Array.isArray(decoded.favs) ? decoded.favs : [];
+      notes = (decoded.notes && typeof decoded.notes === 'object') ? decoded.notes : {};
+      portfolio = Array.isArray(decoded.portfolio) ? decoded.portfolio : [];
+      checks = (decoded.checks && typeof decoded.checks === 'object') ? decoded.checks : {};
+      localUpdatedAt = remoteTs || Date.now();
+      localStorage.setItem(STORE.FAVS, JSON.stringify(favs));
+      localStorage.setItem(STORE.NOTES, JSON.stringify(notes));
+      localStorage.setItem(STORE.PORTFOLIO, JSON.stringify(portfolio));
+      localStorage.setItem(STORE.CHECKS, JSON.stringify(checks));
+      localStorage.setItem(STORE.UPDATED_AT, String(localUpdatedAt));
+      renderAll();
+      setCloudUI('ok', '☁️ OK', `Sincronizado con ${ghDbRepo}`);
+      if(showMsg) toast('☁️ Datos descargados desde GitHub.');
+    } else {
+      await cloudPush(showMsg);
+    }
+  } catch(e){
+    setCloudUI('err', '☁️ Offline', 'Sin conexión con GitHub DB');
+    if(showMsg) toast('Error de red al leer la BD de GitHub.');
+  }
+}
+
+async function cloudPush(showMsg = false, retryCount = 0){
+  if(!ghToken || !ghDbRepo || !ghDbRepo.includes('/')){
+    if(showMsg) toast('Configura tu token y BesTrade-DB primero.');
+    return;
+  }
+  setCloudUI('saving', '☁️ Subiendo…', 'Guardando en GitHub…');
+  try {
+    const dbObj = {
+      version: 1,
+      updated_at: localUpdatedAt || Date.now(),
+      favs,
+      portfolio,
+      notes,
+      checks
+    };
+    const body = {
+      message: 'Sync Cocodrilo user-db',
+      content: toBase64Utf8(JSON.stringify(dbObj, null, 2))
+    };
+    if(cloudSha) body.sha = cloudSha;
+
+    const r = await fetch(`https://api.github.com/repos/${ghDbRepo}/contents/${DB_FILE}`, {
+      method: 'PUT',
+      headers: { ...ghHeaders(true), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if(r.status === 409 && retryCount < 1){
+      const latest = await fetch(`https://api.github.com/repos/${ghDbRepo}/contents/${DB_FILE}?t=${Date.now()}`, {
+        headers: ghHeaders(true), cache: 'no-store'
+      });
+      if(latest.ok){
+        const j = await latest.json();
+        cloudSha = j.sha || null;
+        return cloudPush(showMsg, retryCount + 1);
+      }
+    }
+
+    if(r.ok){
+      const res = await r.json();
+      cloudSha = res.content?.sha || cloudSha;
+      setCloudUI('ok', '☁️ OK', `Guardado en ${ghDbRepo} · ${fmtShortDate(new Date().toISOString())}`);
+      if(showMsg) toast('☁️ Guardado en tu BD privada de GitHub.');
+      if(activeView === 'app') renderAppView();
+    } else {
+      const errTxt = r.status === 404 ? `No existe el repo ${ghDbRepo}` : (r.status === 403 || r.status === 401) ? 'Falta permiso Contents (Read & write)' : `HTTP ${r.status}`;
+      setCloudUI('err', '☁️ Error', errTxt);
+      if(showMsg) toast(`Error al guardar en GitHub: ${errTxt}`);
+    }
+  } catch(e){
+    setCloudUI('err', '☁️ Offline', 'No se pudo subir (guardado en local)');
+    if(showMsg) toast('Sin red: guardado en local.');
+  }
 }
 
 function findCompany(ticker){
@@ -748,7 +902,7 @@ function isFav(t){ return favs.includes(t); }
 function toggleFav(t){
   if(isFav(t)){ favs = favs.filter(x => x !== t); toast(`${t} quitada de Favoritas`); }
   else { favs.push(t); toast(`⭐ ${t} guardada en Favoritas`); }
-  localStorage.setItem(STORE.FAVS, JSON.stringify(favs));
+  saveLocalUserState(true);
   renderAll();
 }
 
@@ -844,12 +998,6 @@ function copyPrompt(ticker){
 /* ===========================
    CONTROL REMOTO GITHUB ACTIONS
    =========================== */
-function ghHeaders(withAuth = true){
-  const h = { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
-  if(withAuth && ghToken) h['Authorization'] = `Bearer ${ghToken}`;
-  return h;
-}
-
 async function refreshWorkflowStatus(silent = true){
   if(!ghRepo || !ghRepo.includes('/')) return;
   const dot = $('ghRunDot'), txt = $('ghRunText'), lnk = $('ghRunLink');
@@ -918,7 +1066,7 @@ async function triggerWorkflow(kind, customRaw = ''){
 }
 
 /* ===========================
-   CARDS
+   CARDS & VIEW 1: RADAR
    =========================== */
 function cardHTML(c, includeNote = false){
   const dcf = c.dcf || null;
@@ -987,13 +1135,10 @@ function bindCardEvents(container){
   container.querySelectorAll('[data-fav]').forEach(b => b.onclick = () => toggleFav(b.dataset.fav));
   container.querySelectorAll('[data-note]').forEach(ta => ta.oninput = () => {
     notes[ta.dataset.note] = ta.value;
-    localStorage.setItem(STORE.NOTES, JSON.stringify(notes));
+    saveLocalUserState(true);
   });
 }
 
-/* ===========================
-   VIEW 1: RADAR
-   =========================== */
 function updateSourceSwitchUI(){
   const dBtn = $('srcDailyBtn'), wBtn = $('srcWeeklyBtn');
   const d = datasets.daily, w = datasets.weekly;
@@ -1072,9 +1217,7 @@ function renderRadarView(){
   const oppN = all.filter(x => x.status === 'OPORTUNIDAD').length;
   const watchN = all.filter(x => x.status === 'VIGILAR').length;
 
-  // Market thermometer
-  const mBar = $('marketBar');
-  const mc = payload.market_context;
+  const mBar = $('marketBar'), mc = payload.market_context;
   if(mc && (mc.vix !== null || mc.us10y_pct !== null)){
     mBar.className = `mkt-bar show ${mc.regime || 'NORMAL'}`;
     const icon = mc.regime === 'PANICO' ? '🔥' : mc.regime === 'CAUTELA' ? '⚠️' : mc.regime === 'EUFORIA' ? '🎈' : '🌡️';
@@ -1090,7 +1233,6 @@ function renderRadarView(){
   $('kOpp').textContent = oppN; $('kWatch').textContent = watchN; $('kTotal').textContent = payload.total_ok || all.length;
   const bOpp = $('badgeOpp'); bOpp.textContent = oppN; bOpp.classList.toggle('show', oppN > 0);
 
-  // Badge de Cartera (alerta roja si hay señal de venta/tesis rota)
   let sellAlerts = 0;
   portfolio.forEach(p => {
     const sig = evaluatePortfolioSignal(p, findCompany(p.ticker));
@@ -1141,15 +1283,15 @@ function renderRadarView(){
   const lm = $('loadMoreBtn');
   if(lm) lm.onclick = () => { visibleLimit += PAGE_SIZE; renderRadarView(); };
 }
-/* ===========================
+
+      /* ===========================
    VIEW 2: EXPLORAR (COMPARADOR + MAPA)
    =========================== */
 function renderComparator(){
   const list = (payload.companies || []).slice(0, 200);
   const sA = $('cmpA'), sB = $('cmpB'), host = $('cmpTableHost');
   if(list.length < 2){ host.innerHTML = '<div class="empty">Se necesitan al menos 2 empresas para comparar.</div>'; return; }
-  const prevA = sA.value || list[0].ticker;
-  const prevB = sB.value || list[1].ticker;
+  const prevA = sA.value || list[0].ticker, prevB = sB.value || list[1].ticker;
   const opts = list.map(c => `<option value="${esc(c.ticker)}">${esc(c.ticker)} — ${esc(c.name.slice(0,22))}</option>`).join('');
   sA.innerHTML = opts; sB.innerHTML = opts;
   sA.value = list.some(x => x.ticker === prevA) ? prevA : list[0].ticker;
@@ -1253,8 +1395,7 @@ function renderFavsView(){
     pHost.innerHTML = portfolio.map((pos, idx) => {
       const c = findCompany(pos.ticker);
       const curPrice = c ? c.price : pos.avgPrice;
-      const cost = pos.avgPrice * pos.shares;
-      const val = curPrice * pos.shares;
+      const cost = pos.avgPrice * pos.shares, val = curPrice * pos.shares;
       const pnlPct = pos.avgPrice > 0 ? ((curPrice / pos.avgPrice) - 1) * 100 : 0;
       totalCost += cost; totalVal += val;
       const sig = evaluatePortfolioSignal(pos, c);
@@ -1283,7 +1424,7 @@ function renderFavsView(){
     pHost.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openModal(b.dataset.open));
     pHost.querySelectorAll('[data-delport]').forEach(b => b.onclick = () => {
       portfolio.splice(Number(b.dataset.delport), 1);
-      localStorage.setItem(STORE.PORTFOLIO, JSON.stringify(portfolio));
+      saveLocalUserState(true);
       renderAll(); toast('Posición eliminada');
     });
   }
@@ -1308,7 +1449,7 @@ function renderHistoryView(){
   $('hCount').textContent = entries.length;
   if(!entries.length){
     $('hWinRate').textContent = '—'; $('hAvgRet').textContent = '—';
-    host.innerHTML = `<div class="empty">El diario se empezará a rellenar automáticamente en el próximo escaneo v9 cuando salte una <b>🚨 ENTRAR YA</b> o <b>🏆 GANGA</b>.</div>`;
+    host.innerHTML = `<div class="empty">El diario se empezará a rellenar automáticamente cuando salte una <b>🚨 ENTRAR YA</b> o <b>🏆 GANGA</b>.</div>`;
     return;
   }
   const rets = entries.map(e => Number(e.return_pct)).filter(Number.isFinite);
@@ -1338,11 +1479,13 @@ function renderHistoryView(){
    VIEW 5: MÉTODO & CONFIG
    =========================== */
 function renderAppView(){
-  $('ghRepoInput').value = ghRepo; $('ghTokenInput').value = ghToken;
-  $('ghTokenStatus').className = ghToken ? 'notice good' : 'notice warn';
+  $('ghRepoInput').value = ghRepo;
+  $('ghDbRepoInput').value = ghDbRepo;
+  $('ghTokenInput').value = ghToken;
+  $('ghTokenStatus').className = ghToken ? (cloudState.status === 'err' ? 'notice bad' : 'notice good') : 'notice warn';
   $('ghTokenStatus').innerHTML = ghToken
-    ? `✅ <b>Token guardado solo en este dispositivo</b> para <code>${esc(ghRepo)}</code>.`
-    : `⚠️ <b>Sin token:</b> pega tu Fine-grained Token (Actions: Read & write) para usar los botones del Radar.`;
+    ? `<b>Estado Nube:</b> ${esc(cloudState.msg)}<br><small>App: <code>${esc(ghRepo)}</code> · BD privada: <code>${esc(ghDbRepo)}</code></small>`
+    : `⚠️ <b>Sin token:</b> pega tu Fine-grained Token (Actions + Contents: Read &amp; write) para activar los botones y la sincronización en la nube.`;
 
   const host = $('checklistHost');
   host.innerHTML = CHECKLIST_ITEMS.map(item => {
@@ -1354,7 +1497,8 @@ function renderAppView(){
   }).join('');
   host.querySelectorAll('[data-chk]').forEach(el => el.onclick = () => {
     checks[el.dataset.chk] = !checks[el.dataset.chk];
-    localStorage.setItem(STORE.CHECKS, JSON.stringify(checks)); renderAppView();
+    saveLocalUserState(true);
+    renderAppView();
   });
   const doneN = CHECKLIST_ITEMS.filter(i => checks[i.id]).length;
   $('checklistStatus').innerHTML = doneN === 4
@@ -1424,7 +1568,6 @@ function openModal(ticker){
         <div class="dcf-card"><span>Optimista</span><b>${fmtMoney(dcf.intrinsic_bull, c.currency)}</b></div>
       </div>
 
-      <!-- SIMULADOR DCF INTERACTIVO -->
       <div class="tool-box">
         <div class="eyebrow">🎛️ Simulador DCF (Ponlo en modo pesimista)</div>
         <div class="slider-row">
@@ -1439,7 +1582,6 @@ function openModal(ticker){
       </div>
     ` : `<div class="notice warn">DCF estándar por FCF no aplicable a este negocio.</div>`}
 
-    <!-- CALCULADORA DE COMPRA ESCALONADA EN 3 TRAMOS -->
     <div class="tool-box">
       <div class="eyebrow">🪜 Plan de entrada escalonada (3 tramos)</div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
@@ -1463,7 +1605,6 @@ function openModal(ticker){
     </div>
   `;
 
-  // Simulador DCF en vivo
   if(dcf){
     const updateSim = () => {
       const g = parseFloat($('simG').value), r = parseFloat($('simR').value);
@@ -1472,9 +1613,7 @@ function openModal(ticker){
       const val = calcDcfJs(dcf.fcf_per_share, dcf.net_cash_per_share || 0, g, r);
       const out = $('simOut');
       if(!val || val <= 0){ out.className = 'notice bad'; out.innerHTML = 'Con esos supuestos no sale valor positivo.'; return; }
-      const obj = val * 0.75;
-      const disc = ((1 - (c.price / val)) * 100);
-      const ok = c.price <= obj;
+      const obj = val * 0.75, disc = ((1 - (c.price / val)) * 100), ok = c.price <= obj;
       out.className = ok ? 'notice good' : c.price <= val ? 'notice warn' : 'notice bad';
       out.innerHTML = `Valor justo: <b>${fmtMoney(val, c.currency)}</b> · Obj (-25%): <b>${fmtMoney(obj, c.currency)}</b><br>` +
         (ok ? `✅ Sigue barata con <b>+${disc.toFixed(1)}%</b> de descuento incluso con estos supuestos.`
@@ -1484,7 +1623,6 @@ function openModal(ticker){
     $('simG').oninput = updateSim; $('simR').oninput = updateSim; updateSim();
   }
 
-  // Plan de compra en 3 tramos
   const updatePlan = () => {
     const budget = Math.max(50, parseFloat($('planBudget').value) || 1000);
     const p1 = c.price;
@@ -1591,7 +1729,8 @@ document.querySelectorAll('#quickChips .fchip').forEach(ch => ch.onclick = () =>
 document.querySelectorAll('[data-quick]').forEach(el => el.onclick = () => { activeFilter = el.dataset.quick; visibleLimit = PAGE_SIZE; renderRadarView(); });
 $('searchInput').oninput = () => { visibleLimit = PAGE_SIZE; renderRadarView(); };
 $('sortSelect').onchange = () => { visibleLimit = PAGE_SIZE; renderRadarView(); };
-$('refreshBtn').onclick = () => { fetchData(true); refreshWorkflowStatus(true); };
+$('refreshBtn').onclick = () => { fetchData(true); refreshWorkflowStatus(true); cloudPull(false, false); };
+$('cloudPill').onclick = () => { if(ghToken) cloudPull(true, true); else switchView('app'); };
 $('goConfigBtn').onclick = () => switchView('app');
 $('closeModalBtn').onclick = () => $('detailModal').classList.remove('show');
 $('detailModal').onclick = e => { if(e.target.id === 'detailModal') $('detailModal').classList.remove('show'); };
@@ -1610,23 +1749,28 @@ $('addPortBtn').onclick = () => {
   }
   const ex = portfolio.find(x => x.ticker === tkr);
   if(ex){ ex.avgPrice = pr; ex.shares = sh; } else portfolio.push({ ticker: tkr, avgPrice: pr, shares: sh });
-  localStorage.setItem(STORE.PORTFOLIO, JSON.stringify(portfolio));
+  saveLocalUserState(true);
   $('portTickerIn').value = ''; $('portPriceIn').value = ''; $('portSharesIn').value = '';
-  renderAll(); toast(`💼 ${tkr} guardada en Mi Cartera`);
+  renderAll(); toast(`💼 ${tkr} guardada y sincronizando…`);
 };
 
 $('saveGhBtn').onclick = () => {
   const repoVal = $('ghRepoInput').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
+  const dbVal = $('ghDbRepoInput').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
   const tokVal = $('ghTokenInput').value.trim();
-  if(!repoVal.includes('/')){ toast('Formato requerido: usuario/repositorio'); return; }
-  ghRepo = repoVal; ghToken = tokVal;
+  if(!repoVal.includes('/') || !dbVal.includes('/')){ toast('Formato requerido: usuario/repositorio'); return; }
+  ghRepo = repoVal; ghDbRepo = dbVal; ghToken = tokVal; cloudSha = null;
   localStorage.setItem(STORE.GH_REPO, ghRepo);
+  localStorage.setItem(STORE.GH_DB_REPO, ghDbRepo);
   if(ghToken) localStorage.setItem(STORE.GH_TOKEN, ghToken); else localStorage.removeItem(STORE.GH_TOKEN);
   renderAppView(); refreshWorkflowStatus(false);
-  toast(ghToken ? 'Token guardado en este dispositivo.' : 'Repositorio guardado.');
+  if(ghToken) cloudPull(false, true);
+  else toast('Repositorios guardados (sin token).');
 };
-$('clearGhBtn').onclick = () => { ghToken = ''; localStorage.removeItem(STORE.GH_TOKEN); renderAppView(); toast('Token borrado.'); };
-$('resetChecklistBtn').onclick = () => { checks = {}; localStorage.setItem(STORE.CHECKS, '{}'); renderAppView(); toast('Checklist reiniciado'); };
+$('clearGhBtn').onclick = () => { ghToken = ''; cloudSha = null; localStorage.removeItem(STORE.GH_TOKEN); setCloudUI('local', '☁️ Local', 'Token borrado'); renderAppView(); toast('Token borrado.'); };
+$('cloudPullBtn').onclick = () => cloudPull(true, true);
+$('cloudPushBtn').onclick = () => cloudPush(true);
+$('resetChecklistBtn').onclick = () => { checks = {}; saveLocalUserState(true); renderAppView(); toast('Checklist reiniciado'); };
 $('saveRemoteUrlBtn').onclick = () => { remoteUrl = $('remoteUrlInput').value.trim(); localStorage.setItem(STORE.REMOTE_URL, remoteUrl); fetchData(true); };
 $('loadLocalJsonBtn').onclick = () => $('jsonFileInput').click();
 $('jsonFileInput').onchange = e => {
@@ -1645,8 +1789,9 @@ $('jsonFileInput').onchange = e => {
 
 fetchData(false);
 refreshWorkflowStatus(true);
+if(ghToken) cloudPull(false, false);
 })();
 </script>
 </body>
 </html>
- 
+  
