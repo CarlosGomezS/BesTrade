@@ -1,6 +1,48 @@
 {
-  "updated_at": "2026-11-26T08:50:18.448272+00:00",
+  "updated_at": "2026-11-26T08:55:29.406651+00:00",
   "entries": [
+    {
+      "ticker": "GDDY",
+      "name": "GoDaddy Inc.",
+      "currency": "USD",
+      "tier": "GANGA",
+      "alert_date": "2026-11-26",
+      "alert_price": 105.14,
+      "quality_score": 90,
+      "ai_verdict": null,
+      "last_price": 105.14,
+      "return_pct": 0.0,
+      "last_checked": "2026-11-26",
+      "current_status": "GANGA"
+    },
+    {
+      "ticker": "PRDO",
+      "name": "Perdoceo Education Corporation",
+      "currency": "USD",
+      "tier": "GANGA",
+      "alert_date": "2026-11-26",
+      "alert_price": 28.14,
+      "quality_score": 95,
+      "ai_verdict": "TEMPORAL",
+      "last_price": 28.14,
+      "return_pct": 0.0,
+      "last_checked": "2026-11-26",
+      "current_status": "GANGA"
+    },
+    {
+      "ticker": "EXPE",
+      "name": "Expedia Group, Inc.",
+      "currency": "USD",
+      "tier": "ENTRADA_YA",
+      "alert_date": "2026-11-26",
+      "alert_price": 241.27,
+      "quality_score": 96,
+      "ai_verdict": "TEMPORAL",
+      "last_price": 241.27,
+      "return_pct": 0.0,
+      "last_checked": "2026-11-26",
+      "current_status": "ENTRADA_YA"
+    },
     {
       "ticker": "ADBE",
       "name": "Adobe Inc.",
