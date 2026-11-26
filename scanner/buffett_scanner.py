@@ -1,13 +1,9 @@
-"""Radar Cocodrilo Pro v10.3 — Oráculo Blindado (Warren Buffett & Charlie Munger).
+"""Radar Cocodrilo Pro v10.4 — Oráculo Blindado (Warren Buffett & Charlie Munger).
 
-Novedades v9:
-- Owner Earnings reales: descuenta Stock-Based Compensation (SBC) del FCF para evitar trampas en tech.
-- Buscador inteligente por nombre en modo 'custom' (ej. 'Alphabet' -> GOOGL, 'Inditex' -> ITX.MC).
-- Aviso de presentación de resultados próximos (<= 10 días) para no comprar a ciegas antes de earnings.
-- Radar de compras de directivos (Insider Buying últimos 90 días) en candidatas top.
-- Termómetro de mercado (VIX, Bono EE. UU. 10A y distancia S&P 500 a máximos) en Telegram y web.
-- Diario automático de aciertos (data/history.json) con seguimiento de rentabilidad real de alertas.
-- Mantiene Nivel 0 'ENTRADA_YA', sharding paralelo (6 bloques), rotación diaria y Gemini 3 escéptico.
+Novedades v10.4:
+- Integra Piotroski clásico (activos medios y cobertura explícita) junto al adaptado.
+- Clasifica cada empresa en 4 cuadrantes de Calidad vs. Valoración / Margen de Seguridad.
+- Seguimiento prospectivo de alertas preservando siempre fecha y precio originales de las emitidas.
 """
 
 from __future__ import annotations
@@ -32,7 +28,7 @@ import pandas as pd
 import yfinance as yf
 
 from universe import detect_region, get_universe, parse_custom_tickers
-from oracle_v10 import VALID_VERDICTS, compute_oracle_checks, extract_gemini_json, is_oro_puro, run_tribunal_ia, verify_with_sec_edgar
+from oracle_v10 import VALID_VERDICTS, classify_quality_valuation_quadrant, compute_oracle_checks, extract_gemini_json, is_oro_puro, run_tribunal_ia, verify_with_sec_edgar
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
@@ -266,7 +262,6 @@ def classify_sector_profile(sector: str, industry: str) -> str:
 
 
 def extract_next_earnings(info: Dict[str, Any]) -> Tuple[Optional[str], Optional[int]]:
-    """Extrae fecha próxima de resultados y días restantes sin peticiones extra."""
     now = datetime.now(timezone.utc)
     for key in ("earningsTimestampStart", "earningsTimestamp"):
         ts = safe_float(info.get(key))
@@ -308,7 +303,6 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
     except Exception:
         fin = bs = cf = None
 
-    # 1) Free Cash Flow y Stock-Based Compensation (Owner Earnings reales)
     fcf_series = get_row_series(cf, ["Free Cash Flow"])
     if fcf_series is None:
         ocf = get_row_series(cf, ["Operating Cash Flow", "Total Cash From Operating Activities"])
@@ -387,7 +381,6 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
         out["fcf_latest"] = fallback_fcf
         out["fcf_normalized"] = fallback_fcf
 
-    # 2) Crecimiento de Beneficio Neto
     ni_series = get_row_series(fin, ["Net Income", "Net Income Common Stockholders"])
     if ni_series is not None and len(ni_series) >= 3:
         vals = [safe_float(v) for v in ni_series.values]
@@ -395,14 +388,12 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
         if len(vals) >= 3 and vals[0] > 0 and vals[-1] > 0:
             out["eps_cagr_pct"] = ((vals[0] / vals[-1]) ** (1.0 / (len(vals) - 1)) - 1.0) * 100.0
 
-    # 3) Recompras vs Dilución
     sh_series = get_row_series(fin, ["Diluted Average Shares", "Basic Average Shares"])
     if sh_series is not None and len(sh_series) >= 2:
         vals = [safe_float(v) for v in sh_series.values if safe_float(v) and safe_float(v) > 0]
         if len(vals) >= 2:
             out["share_change_pct"] = ((vals[0] / vals[-1]) - 1.0) * 100.0
 
-    # 4) ROIC real = NOPAT / Capital Invertido (mediana)
     ebit_s = get_row_series(fin, ["EBIT", "Operating Income"])
     tax_s = get_row_series(fin, ["Tax Provision"])
     pretax_s = get_row_series(fin, ["Pretax Income"])
@@ -437,7 +428,6 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
         if roe is not None:
             out["roic_pct"] = roe * 100.0
 
-    # 5) Caja Neta y Deuda Neta / EBITDA
     total_debt = safe_float(info.get("totalDebt"))
     total_cash = safe_float(info.get("totalCash"))
     ebitda = safe_float(info.get("ebitda"))
@@ -817,7 +807,7 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
         drawdown_52w is not None
         and drawdown_52w <= -MIN_DRAWDOWN_ALERT
         and ((p_fcf is not None and p_fcf <= 20) or (record["forward_pe"] is not None and record["forward_pe"] <= 18))
-        and (dcf is None or price <= dcf["intrinsic_base"] * 1.05)
+        and (dcf is None or price <= dcf["intrinsic_base"] * 105 / 100.0)
     )
 
     if record["passes_quality"] and (in_dcf_zone or deep_panic_cheap):
@@ -843,10 +833,11 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     record["trap_risk_score"] = None
     record["oro_puro"] = False
     record.update(compute_oracle_checks(t, info, record))
+    record["quality_valuation"] = classify_quality_valuation_quadrant(record)
     return record
 
+
 def check_insider_buying(ticker: str) -> Tuple[Optional[int], str]:
-    """Cuenta compras reales de directivos en 90d distinguiendo 0 real vs ERROR de Yahoo."""
     try:
         df = yf.Ticker(ticker).insider_transactions
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
@@ -880,7 +871,6 @@ def check_insider_buying(ticker: str) -> Tuple[Optional[int], str]:
 
 
 def extract_recent_news(ticker: str, limit: int = 5) -> Tuple[List[str], str]:
-    """Extrae titulares recientes distinguiendo sin noticias vs ERROR de Yahoo."""
     headlines: List[str] = []
     try:
         raw_news = yf.Ticker(ticker).news
@@ -927,7 +917,6 @@ def clean_ai_text(text: str) -> str:
 
 
 def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """Filtro IA escéptico con salida JSON estricta. Devuelve (texto, veredicto_enum, error)."""
     if not GEMINI_API_KEY:
         return None, None, "GEMINI_API_KEY no configurada"
 
@@ -1065,7 +1054,6 @@ def send_telegram(html_text: str) -> None:
 
 
 def extract_ai_verdict(ai_text: Optional[str]) -> Optional[str]:
-    """Fallback estricto: solo acepta un veredicto exacto al final de la línea VEREDICTO."""
     if not ai_text:
         return None
     m = re.search(r"(?im)^\s*(?:\d\)\s*)?veredicto\s*:\s*(TEMPORAL|DUDOSO|PERMANENTE|EVIDENCIA_INSUFICIENTE)\b", ai_text)
@@ -1221,7 +1209,12 @@ def format_detailed_opp(r: Dict[str, Any], header_line: str) -> str:
         block.append(f"• ❌ <i>Fallos críticos:</i> {esc_html(' · '.join(r['hard_fails']))}")
     if r.get("piotroski_score") is not None:
         cov_txt = f" | Cob.Int: {r['interest_coverage']}x" if r.get("interest_coverage") is not None else ""
-        block.append(f"• 🛡️ Oráculo: Piotroski <b>{r['piotroski_score']}/{r['piotroski_max']}</b>{cov_txt}")
+        cls_txt = ""
+        if r.get("piotroski_classic_score") is not None:
+            cls_txt = f" | Clásico: <b>{r['piotroski_classic_score']}/{r['piotroski_classic_max']}</b>"
+        block.append(f"• 🛡️ Oráculo: Piotroski <b>{r['piotroski_score']}/{r['piotroski_max']}</b>{cls_txt}{cov_txt}")
+    if r.get("quality_valuation"):
+        block.append(f"• 🧭 Cuadrante: <b>{esc_html(r['quality_valuation']['quadrant_label'])}</b>")
     if r.get("sec_note") and r.get("sec_status") not in (None, "NO_US"):
         sec_ic = "✅" if r.get("sec_verified") is True else "🚨" if r.get("sec_verified") is False else "ℹ️"
         block.append(f"• {sec_ic} <i>SEC EDGAR:</i> {esc_html(r['sec_note'])}")
@@ -1241,7 +1234,7 @@ def build_urgent_telegram_alert(entradas_ya: List[Dict[str, Any]], gap_pts: Opti
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     lines = [
         "🚨🔥🚨 <b>ALERTA MÁXIMA: ENTRAR YA</b> 🚨🔥🚨",
-        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.3</i>",
+        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.4</i>",
     ]
     if gap_pts is not None and gap_pts >= 12:
         lines.append(f"⚡ <b>MUY DESPLAZADA DEL RESTO:</b> saca <b>+{gap_pts:.0f} pts</b> de ventaja al siguiente valor.")
@@ -1268,7 +1261,7 @@ def build_telegram_report(
 
     if UNIVERSE_MODE == "custom":
         lines = [
-            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.3 — {date_str}</b>",
+            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.4 — {date_str}</b>",
             f"<i>Empresas analizadas: {len(results)}/{total_scanned}</i>",
         ]
         for r in results[:10]:
@@ -1295,7 +1288,7 @@ def build_telegram_report(
     ya_txt = f"🚨 {len(entradas_ya)} ENTRAR YA · " if entradas_ya else ""
     tier_summary = f"{ya_txt}🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
-        f"🐊 <b>RADAR COCODRILO PRO v10.3 — {date_str}</b>",
+        f"🐊 <b>RADAR COCODRILO PRO v10.4 — {date_str}</b>",
         f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
     if market_ctx and (market_ctx.get("vix") is not None or market_ctx.get("us10y_pct") is not None):
@@ -1383,8 +1376,10 @@ def build_telegram_report(
 
 
 def update_alert_history(results: List[Dict[str, Any]]) -> None:
-    """Registra nuevas alertas ENTRADA_YA / GANGA y actualiza la rentabilidad real de las pasadas."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    """Registra nuevas alertas ENTRADA_YA / GANGA / ORO PURO y actualiza seguimiento sin alterar origen."""
+    now_dt = datetime.now(timezone.utc)
+    today = now_dt.strftime("%Y-%m-%d")
+    now_iso = now_dt.isoformat()
     history: List[Dict[str, Any]] = []
     if OUT_HISTORY_JSON.exists():
         try:
@@ -1401,24 +1396,37 @@ def update_alert_history(results: List[Dict[str, Any]]) -> None:
     for entry in history:
         tkr = entry.get("ticker")
         rec = price_map.get(tkr)
-        if rec and rec.get("price") and entry.get("alert_price"):
+        if rec and rec.get("price") is not None and entry.get("alert_price"):
             cur_p = float(rec["price"])
             init_p = float(entry["alert_price"])
             if init_p > 0:
+                ret_pct = round(((cur_p / init_p) - 1.0) * 100.0, 1)
                 entry["last_price"] = round(cur_p, 2)
-                entry["return_pct"] = round(((cur_p / init_p) - 1.0) * 100.0, 1)
+                entry["return_pct"] = ret_pct
                 entry["last_checked"] = today
                 entry["current_status"] = rec.get("opportunity_tier") or rec.get("status")
+                entry.setdefault("milestones_pct", {"d30": None, "d90": None, "d180": None, "d365": None})
+                entry.setdefault("benchmarks", {"msci_world_pct": None, "sp500_pct": None})
+                entry.setdefault("status", "ACTIVA")
+                try:
+                    d0 = datetime.strptime(str(entry.get("alert_date", today))[:10], "%Y-%m-%d")
+                    elapsed_days = (now_dt.date() - d0.date()).days
+                    for horizon, key in ((30, "d30"), (90, "d90"), (180, "d180"), (365, "d365")):
+                        if elapsed_days >= horizon and entry["milestones_pct"].get(key) is None:
+                            entry["milestones_pct"][key] = ret_pct
+                except Exception:
+                    pass
 
     for r in results:
         tier = r.get("opportunity_tier")
-        if tier not in ("ENTRADA_YA", "GANGA"):
+        is_top = tier in ("ENTRADA_YA", "GANGA") or bool(r.get("oro_puro"))
+        if not is_top:
             continue
         recent_dup = False
         for e in history:
             if e.get("ticker") == r["ticker"]:
                 try:
-                    d0 = datetime.strptime(e.get("alert_date", "2000-01-01"), "%Y-%m-%d")
+                    d0 = datetime.strptime(str(e.get("alert_date", "2000-01-01"))[:10], "%Y-%m-%d")
                     d1 = datetime.strptime(today, "%Y-%m-%d")
                     if (d1 - d0).days < 30:
                         recent_dup = True
@@ -1430,11 +1438,25 @@ def update_alert_history(results: List[Dict[str, Any]]) -> None:
                 "ticker": r["ticker"],
                 "name": r["name"],
                 "currency": r["currency"],
-                "tier": tier,
+                "tier": "ORO_PURO" if r.get("oro_puro") else tier,
                 "alert_date": today,
+                "alert_timestamp": now_iso,
                 "alert_price": r["price"],
                 "quality_score": r["quality_score"],
                 "ai_verdict": r.get("ai_verdict"),
+                "fundamentals_snapshot": {
+                    "piotroski_classic_score": r.get("piotroski_classic_score"),
+                    "piotroski_classic_max": r.get("piotroski_classic_max"),
+                    "piotroski_adapted_score": r.get("piotroski_score"),
+                    "piotroski_adapted_max": r.get("piotroski_max"),
+                    "sec_status": r.get("sec_status"),
+                    "net_debt_ebitda": r.get("net_debt_ebitda"),
+                    "fcf_latest_date": r.get("fcf_latest_date"),
+                    "quadrant": (r.get("quality_valuation") or {}).get("quadrant_code"),
+                },
+                "milestones_pct": {"d30": None, "d90": None, "d180": None, "d365": None},
+                "benchmarks": {"msci_world_pct": None, "sp500_pct": None},
+                "status": "ACTIVA",
                 "last_price": r["price"],
                 "return_pct": 0.0,
                 "last_checked": today,
@@ -1443,7 +1465,7 @@ def update_alert_history(results: List[Dict[str, Any]]) -> None:
 
     history = history[:150]
     payload = {
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": now_iso,
         "entries": history,
     }
     OUT_HISTORY_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -1476,7 +1498,6 @@ def run_scan_batch(tickers: List[str]) -> Tuple[List[Dict[str, Any]], int]:
 
 
 def load_merged_shards(merge_dir: Path) -> Tuple[List[Dict[str, Any]], int, int, int]:
-    """Fusiona shards exigiendo integridad completa (rechaza publicaciones parciales salvo override)."""
     shard_files = sorted(merge_dir.rglob("shard-*.json"))
     if not shard_files:
         raise RuntimeError(f"No se encontraron archivos shard-*.json en {merge_dir}")
@@ -1538,7 +1559,6 @@ def load_merged_shards(merge_dir: Path) -> Tuple[List[Dict[str, Any]], int, int,
 
 
 def build_fx_rates_to_eur(results: List[Dict[str, Any]]) -> Dict[str, float]:
-    """Mapa de tipos de cambio hacia EUR para que la web calcule Mi Cartera sin mezclar divisas."""
     currencies = {"EUR", "USD", "GBP", "CHF", "CAD", "JPY"}
     for r in results:
         c = (r.get("currency") or "").upper()
@@ -1567,7 +1587,7 @@ def main() -> None:
     t0 = time.time()
 
     if MERGE_DIR:
-        print(f"🧩 Cocodrilo Pro v10.3 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
+        print(f"🧩 Cocodrilo Pro v10.4 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
         results, total_scanned, failed, shard_elapsed = load_merged_shards(Path(MERGE_DIR))
         elapsed_total = max(shard_elapsed, round(time.time() - t0))
     else:
@@ -1581,7 +1601,7 @@ def main() -> None:
         if SHARD_TOTAL > 1:
             tickers = [sym for idx, sym in enumerate(all_tickers) if idx % SHARD_TOTAL == SHARD_INDEX]
             print(
-                f"🐊 Cocodrilo Pro v10.3 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
+                f"🐊 Cocodrilo Pro v10.4 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
                 f"| Empresas: {len(tickers)} (total universo: {len(all_tickers)})"
             )
             results, failed = run_scan_batch(tickers)
@@ -1604,7 +1624,7 @@ def main() -> None:
                 raise RuntimeError(f"Shard {SHARD_INDEX} devolvió 0 empresas válidas.")
             return
 
-        print(f"🐊 Escáner Cocodrilo Pro v10.3 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
+        print(f"🐊 Escáner Cocodrilo Pro v10.4 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
         total_scanned = len(all_tickers)
         results, failed = run_scan_batch(all_tickers)
         elapsed_total = round(time.time() - t0)
@@ -1620,7 +1640,6 @@ def main() -> None:
         r["conviction_score"] = compute_conviction_score(r)
     results.sort(key=lambda r: (status_order.get(r["status"], 9), -(r["conviction_score"] or 0)))
 
-    # Compras de directivos (Insider Buying) + Auditoría oficial SEC EDGAR en candidatas top
     insider_targets = results[:12] if UNIVERSE_MODE == "custom" else [r for r in results if r["status"] == "OPORTUNIDAD"][:15]
     for r in insider_targets:
         buys, ins_status = check_insider_buying(r["ticker"])
@@ -1681,6 +1700,7 @@ def main() -> None:
             tier = "MUY_BUENA"
         r["opportunity_tier"] = tier
         r["oro_puro"] = is_oro_puro(r)
+        r["quality_valuation"] = classify_quality_valuation_quadrant(r)
 
     results.sort(
         key=lambda r: (
@@ -1731,7 +1751,7 @@ def main() -> None:
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
-        "scanner_version": "v10.3-oraculo",
+        "scanner_version": "v10.4-oraculo",
         "fx_rates_eur": fx_rates_eur,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe_mode": UNIVERSE_MODE,
