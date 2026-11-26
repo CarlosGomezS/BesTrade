@@ -1,4 +1,4 @@
-"""Batería de pruebas automatizadas (unitarias + integración) — Radar Cocodrilo v10.3.
+"""Batería de pruebas automatizadas (unitarias + integración) — Radar Cocodrilo v10.4.
 
 Ejecutar desde la raíz del repo:
     python -m unittest scanner/test_oracle_v10.py -v
@@ -96,7 +96,6 @@ class TestOracleV103(unittest.TestCase):
         o10._sec_cik_map = None
         o10._sec_cik_error = None
 
-    # --- 1) PIOTROSKI SIN REESCALADO ---
     def test_piotroski_no_rescaling_blocks_oro_puro(self):
         chk = o10.compute_oracle_checks(
             DummyTickerPartialPiotroski(),
@@ -119,7 +118,6 @@ class TestOracleV103(unittest.TestCase):
         self.assertIs(chk["forward_ok"], True)
         self.assertEqual(chk["forward_rev_growth_pct"], 8.0)
 
-    # --- 2) FORWARD CHECK REAL (HISTÓRICO VS PREVISIÓN FUTURA) ---
     def test_forward_check_missing_estimates_is_none_and_blocks(self):
         chk = o10.compute_oracle_checks(
             DummyTickerFull(has_rev_est=False),
@@ -154,7 +152,6 @@ class TestOracleV103(unittest.TestCase):
         self.assertIs(chk["forward_ok"], False)
         self.assertEqual(chk["forward_status"], "FAIL")
 
-    # --- 3) SEC EDGAR: CAPEX DEVENGADO, MULTI-ETIQUETA, 53 SEMANAS, 10-K/A Y TOLERANCIAS ---
     @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
     @patch.object(o10, "_read_http_json")
     def test_sec_missing_capex_returns_incomplete(self, mock_http, _mock_cik):
@@ -178,7 +175,6 @@ class TestOracleV103(unittest.TestCase):
     @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
     @patch.object(o10, "_read_http_json")
     def test_sec_unpaid_accrued_capex_is_ignored_and_incomplete(self, mock_http, _mock_cik):
-        """CapitalExpendituresIncurredButNotYetPaid NO debe usarse como CapEx pagado en efectivo."""
         mock_http.return_value = {
             "facts": {
                 "us-gaap": {
@@ -202,7 +198,6 @@ class TestOracleV103(unittest.TestCase):
     @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
     @patch.object(o10, "_read_http_json")
     def test_sec_multiple_capex_tags_across_years(self, mock_http, _mock_cik):
-        """Empresa que usó tag 1 en 2024 y cambió a tag 2 en 2025 debe alinear correctamente 2025."""
         mock_http.return_value = {
             "facts": {
                 "us-gaap": {
@@ -237,7 +232,6 @@ class TestOracleV103(unittest.TestCase):
     @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
     @patch.object(o10, "_read_http_json")
     def test_sec_53_week_fiscal_year_accepted(self, mock_http, _mock_cik):
-        """Ejercicio fiscal de 53 semanas (370-371 días) debe ser aceptado como anual válido."""
         mock_http.return_value = {
             "facts": {
                 "us-gaap": {
@@ -266,7 +260,6 @@ class TestOracleV103(unittest.TestCase):
     @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
     @patch.object(o10, "_read_http_json")
     def test_sec_10ka_restatement_overrides_original_10k(self, mock_http, _mock_cik):
-        """Una enmienda 10-K/A posterior que rebaja la caja debe prevalecer sobre el 10-K original."""
         mock_http.return_value = {
             "facts": {
                 "us-gaap": {
@@ -295,7 +288,6 @@ class TestOracleV103(unittest.TestCase):
     @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
     @patch.object(o10, "_read_http_json")
     def test_sec_acceptable_tolerance_blocks_oro_puro(self, mock_http, _mock_cik):
-        """Desviación entre 15% y 30% se clasifica como ACCEPTABLE y NO puede obtener ORO PURO."""
         mock_http.return_value = {
             "facts": {
                 "us-gaap": {
@@ -321,7 +313,6 @@ class TestOracleV103(unittest.TestCase):
     @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
     @patch.object(o10, "_read_http_json")
     def test_sec_over_30_pct_returns_mismatch(self, mock_http, _mock_cik):
-        """Desviación >30% debe devolver MISMATCH y sec_verified=False."""
         mock_http.return_value = {
             "facts": {
                 "us-gaap": {
@@ -372,7 +363,6 @@ class TestOracleV103(unittest.TestCase):
         self.assertEqual(res["sec_status"], "ERROR")
         self.assertIsNone(res["sec_verified"])
 
-    # --- 4) GEMINI: VALIDACIÓN ESTRICTA DE ENTERO Y CAMPOS OBLIGATORIOS ---
     def test_gemini_decimal_and_incomplete_payload_rejected(self):
         base_ok = {
             "fiscal": "Riesgo real de márgenes a la baja por competencia.",
@@ -399,7 +389,6 @@ class TestOracleV103(unittest.TestCase):
         self.assertEqual(v_ok["veredicto"], "TEMPORAL")
         self.assertEqual(v_ok["riesgo_trampa"], 3)
 
-    # --- 5) ORO PURO TOLERANCIA CERO ---
     def test_oro_puro_strict_gates(self):
         good = _base_oro_record()
         self.assertTrue(o10.is_oro_puro(good))
@@ -413,9 +402,7 @@ class TestOracleV103(unittest.TestCase):
         self.assertFalse(o10.is_oro_puro(dict(good, piotroski_score=6, piotroski_max=6)))
         self.assertFalse(o10.is_oro_puro(dict(good, ai_verdict="EVIDENCIA_INSUFICIENTE")))
 
-    # --- 6) PRUEBA DE INTEGRACIÓN COMPLETA (ESCANEO -> ORÁCULO -> JSON PUBLICADO) ---
     def test_end_to_end_scan_to_published_json(self):
-        """Prueba de integración de principio a fin: analyze_ticker -> main() -> JSONs coherentes v10.3."""
         try:
             import yfinance  # noqa: F401
         except ImportError:
@@ -489,8 +476,7 @@ class TestOracleV103(unittest.TestCase):
             "sec_status": "MATCH",
             "sec_verified": True,
             "sec_fiscal_end": "2025-12-31",
-            "sec_diff_pct": 2.0,
-            "sec_note": "MATCH 10-K SEC 2025-12-31 (desviación 2.0% en caja)",
+            "sec_note": "Verificado 10-K SEC 2025-12-31 (desviación 2% en caja)",
         }
         tribunal_ok = (
             "FISCAL: Competencia creciente.\nABOGADO: Caja neta y márgenes 30%.\n"
@@ -531,19 +517,84 @@ class TestOracleV103(unittest.TestCase):
             self.assertTrue(hist_path.exists())
 
             published = json.loads(latest_path.read_text(encoding="utf-8"))
-            self.assertEqual(published["scanner_version"], "v10.3-oraculo")
+            self.assertEqual(published["scanner_version"], "v10.4-oraculo")
             self.assertIn("fx_rates_eur", published)
             self.assertEqual(len(published["companies"]), 1)
 
             c = published["companies"][0]
             self.assertEqual(c["ticker"], "ACME")
-            self.assertEqual(c["oracle_version"], "v10.3-oraculo")
+            self.assertEqual(c["oracle_version"], "v10.4-oraculo")
             self.assertEqual(c["fcf_latest_date"], "2025-12-31")
             self.assertIs(c["forward_ok"], True)
             self.assertEqual(c["forward_rev_growth_pct"], 9.0)
             self.assertEqual(c["piotroski_score"], 9)
             self.assertEqual(c["piotroski_max"], 9)
+            self.assertIn("quality_valuation", c)
             self.assertTrue(c["oro_puro"])
+
+    def test_piotroski_classic_mean_assets_and_missing_data(self):
+        t_3y = DummyTickerFull()
+        t_3y.balance_sheet = pd.DataFrame({
+            "2025-12-31": [1000.0, 100.0, 400.0, 150.0],
+            "2024-12-31": [1000.0, 120.0, 360.0, 160.0],
+            "2023-12-31": [1000.0, 140.0, 340.0, 170.0],
+        }, index=["Total Assets", "Long Term Debt", "Current Assets", "Current Liabilities"])
+        chk = o10.compute_oracle_checks(
+            t_3y,
+            {"trailingEps": 5.0, "forwardEps": 5.5},
+            {"sector_profile": "general", "status": "OPORTUNIDAD"},
+        )
+        self.assertEqual(chk["piotroski_classic_max"], 9)
+        self.assertEqual(chk["piotroski_classic_score"], 9)
+        self.assertEqual(chk["piotroski_classic_coverage"], "9/9 señales disponibles")
+
+        t_missing = DummyTickerFull()
+        t_missing.balance_sheet = pd.DataFrame({
+            "2025-12-31": [1000.0, 100.0, 400.0],
+            "2024-12-31": [1000.0, 120.0, 360.0],
+            "2023-12-31": [1000.0, 140.0, 340.0],
+        }, index=["Total Assets", "Long Term Debt", "Current Assets"])
+        t_missing.cashflow = pd.DataFrame({
+            "2025-12-31": [140.0],
+            "2024-12-31": [115.0],
+            "2023-12-31": [105.0],
+        }, index=["Operating Cash Flow"])
+        chk_m = o10.compute_oracle_checks(
+            t_missing,
+            {"trailingEps": 5.0, "forwardEps": 5.5},
+            {"sector_profile": "general", "status": "OPORTUNIDAD"},
+        )
+        self.assertEqual(chk_m["piotroski_classic_max"], 8)
+        self.assertEqual(chk_m["piotroski_classic_coverage"], "8/9 señales disponibles")
+
+    def test_quality_valuation_quadrants(self):
+        q1 = o10.classify_quality_valuation_quadrant({
+            "quality_score": 90, "passes_quality": True, "hard_fails": [],
+            "sec_status": "MATCH", "sec_verified": True, "in_dcf_zone": True,
+            "discount_vs_base_pct": 28.0, "forward_pe": 12.0, "p_fcf": 11.0,
+        })
+        self.assertEqual(q1["quadrant_code"], "EXCELENTE_PRECIO_RAZONABLE")
+
+        q2 = o10.classify_quality_valuation_quadrant({
+            "quality_score": 92, "passes_quality": True, "hard_fails": [],
+            "sec_status": "MATCH", "sec_verified": True, "in_dcf_zone": False,
+            "discount_vs_base_pct": -15.0, "forward_pe": 34.0, "p_fcf": 32.0,
+        })
+        self.assertEqual(q2["quadrant_code"], "EXCELENTE_CARA")
+
+        q3 = o10.classify_quality_valuation_quadrant({
+            "quality_score": 65, "passes_quality": False, "hard_fails": [],
+            "sec_status": "MATCH", "sec_verified": True, "in_dcf_zone": True,
+            "discount_vs_base_pct": 40.0, "forward_pe": 8.0, "p_fcf": 7.0,
+        })
+        self.assertEqual(q3["quadrant_code"], "MEDIOCRE_APARENTEMENTE_BARATA")
+
+        q4 = o10.classify_quality_valuation_quadrant({
+            "quality_score": 45, "passes_quality": False, "hard_fails": ["Deuda elevada"],
+            "sec_status": "MISMATCH", "sec_verified": False, "in_dcf_zone": False,
+            "discount_vs_base_pct": 10.0, "forward_pe": 14.0, "p_fcf": 13.0,
+        })
+        self.assertEqual(q4["quadrant_code"], "PROBLEMAS_FUNDAMENTALES")
 
 
 if __name__ == "__main__":
