@@ -1,27 +1,35 @@
-"""Radar Cocodrilo v10.1 — Módulo Francotirador (Oráculo Anti-Trampas Blindado).
+"""Radar Cocodrilo v10.2 — Módulo Francotirador (Oráculo Anti-Trampas Tolerancia Cero).
 
-Mejoras v10.1 tras auditoría:
-1) SEC EDGAR estricto: nunca marca VERIFIED sin cruce real contra Yahoo y solo valida emisores USD.
-2) Tribunal IA con salida JSON estricta (sin regex frágil) + estado EVIDENCIA_INSUFICIENTE.
-3) Validación segura de respuesta Gemini (candidates / promptFeedback / finishReason).
-4) Filtro ORO PURO tolerancia cero: la ausencia de verificación SEC, nota de riesgo o Piotroski BLOQUEA.
+Correcciones v10.2 tras auditoría técnica:
+1) Piotroski sin reescalado: conserva puntos reales obtenidos (f_pts / f_max) y exige f_max >= 7 y f_pts >= 7 para ORO PURO.
+2) CapEx ausente en SEC EDGAR nunca se asume como 0: devuelve INCOMPLETE y bloquea ORO PURO.
+3) Alineación fiscal SEC vs Yahoo: comprueba año fiscal completo (330-385 días), misma fecha entre OCF y CapEx,
+   y desfase <= 45 días frente a la fecha fiscal del FCF de Yahoo (si no coincide, PERIOD_MISMATCH).
+4) Diagnóstico real de índice CIK en SEC EDGAR (distingue fallo de red/HTTP de ticker sin CIK, con reintento y gzip).
+5) Forward Check tri-estado (True / False / None): si faltan estimaciones futuras, devuelve None y BLOQUEA ORO PURO.
+6) Tribunal IA estricto: rechaza respuestas JSON incompletas (exige los 5 campos y riesgo_trampa entero 0-10).
 """
 
 from __future__ import annotations
 
+import gzip
 import json
 import math
 import re
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-SEC_USER_AGENT = "RadarCocodriloPro/10.1 (personal-value-scanner@github.com)"
+ORACLE_VERSION = "v10.2-oraculo"
+SEC_USER_AGENT = "RadarCocodriloPro/10.2 (contact: carlosgomezs.radar@gmail.com)"
 VALID_VERDICTS = ("TEMPORAL", "DUDOSO", "PERMANENTE", "EVIDENCIA_INSUFICIENTE")
+
 _sec_cik_map: Optional[Dict[str, str]] = None
+_sec_cik_error: Optional[str] = None
 
 
 def _sf(val: Any) -> Optional[float]:
@@ -32,6 +40,26 @@ def _sf(val: Any) -> Optional[float]:
         return None if (math.isnan(f) or math.isinf(f)) else f
     except Exception:
         return None
+
+
+def _parse_iso_date(date_str: Optional[str]) -> Optional[datetime]:
+    if not date_str or not isinstance(date_str, str):
+        return None
+    try:
+        return datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _read_http_json(url: str, headers: Dict[str, str], timeout: int = 15) -> Any:
+    req_headers = dict(headers)
+    req_headers.setdefault("Accept-Encoding", "gzip")
+    req = urllib.request.Request(url, headers=req_headers)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read()
+        if resp.headers.get("Content-Encoding", "").lower() == "gzip" or raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+        return json.loads(raw.decode("utf-8"))
 
 
 def _row(df: Optional[pd.DataFrame], names: List[str]) -> Optional[pd.Series]:
@@ -57,14 +85,16 @@ def _row(df: Optional[pd.DataFrame], names: List[str]) -> Optional[pd.Series]:
 
 
 def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> Dict[str, Any]:
-    """Calcula Piotroski F-Score, cobertura de intereses, estabilidad de márgenes y Forward Check."""
+    """Calcula Piotroski (sin reescalar), cobertura de intereses, estabilidad de márgenes y Forward Check tri-estado."""
     out: Dict[str, Any] = {
+        "oracle_version": ORACLE_VERSION,
         "piotroski_score": None,
         "piotroski_max": 0,
         "interest_coverage": None,
         "margin_spread_pct": None,
         "is_cyclical_risk": False,
-        "forward_ok": True,
+        "forward_ok": None,
+        "forward_status": "MISSING",
         "oracle_flags": [],
     }
     flags: List[str] = []
@@ -76,7 +106,7 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
     except Exception:
         fin = bs = cf = None
 
-    # --- 1) PIOTROSKI F-SCORE (0 a 9) ---
+    # --- 1) PIOTROSKI F-SCORE (puntuación bruta real, SIN reescalar) ---
     ni = _row(fin, ["Net Income", "Net Income Common Stockholders"])
     rev = _row(fin, ["Total Revenue", "Operating Revenue"])
     gp = _row(fin, ["Gross Profit"])
@@ -144,14 +174,14 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
         if (r0 / a0) >= (r1 / a1) - 0.01:
             f_pts += 1
 
+    out["piotroski_max"] = f_max
     if f_max >= 5:
         out["piotroski_score"] = f_pts
-        out["piotroski_max"] = f_max
-        scaled_9 = round((f_pts / f_max) * 9)
-        if scaled_9 <= 4:
-            flags.append(f"Piotroski débil ({f_pts}/{f_max}): tendencia financiera deteriorándose")
+        if f_pts <= 4 and (f_max - f_pts) >= 3:
+            flags.append(f"Piotroski débil ({f_pts}/{f_max} señales): tendencia financiera deteriorándose")
+        if f_max < 7:
+            flags.append(f"Piotroski parcial ({f_pts}/{f_max}): cobertura insuficiente para ORO PURO (mín. 7/9)")
     elif f_max > 0:
-        out["piotroski_max"] = f_max
         flags.append(f"Piotroski incompleto ({f_max}/9 señales disponibles)")
 
     # --- 2) COBERTURA DE INTERESES (EBIT / |Intereses|) ---
@@ -178,144 +208,276 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
                 out["is_cyclical_risk"] = True
                 flags.append(f"Márgenes cíclicos/volátiles (oscilación {spread:.1f} pp en {len(margins)}a)")
 
-    # --- 4) FORWARD CHECK (Estimaciones futuras) ---
+    # --- 4) FORWARD CHECK TRI-ESTADO (True solo si hay estimaciones completas y sanas) ---
     tr_eps = _sf(info.get("trailingEps"))
     fw_eps = _sf(info.get("forwardEps"))
     rev_g = _sf(info.get("revenueGrowth"))
 
+    eps_checked = False
+    rev_checked = False
+    forward_failed = False
+
     if tr_eps is not None and fw_eps is not None and tr_eps > 0:
+        eps_checked = True
         eps_chg = ((fw_eps / tr_eps) - 1.0) * 100.0
         if eps_chg < -10.0:
-            out["forward_ok"] = False
+            forward_failed = True
             flags.append(f"BPA futuro previsto a la baja ({eps_chg:.1f}%)")
-    if rev_g is not None and rev_g < -0.05:
+
+    if rev_g is not None:
+        rev_checked = True
+        if rev_g < -0.05:
+            forward_failed = True
+            flags.append(f"Ingresos cayendo ({rev_g * 100:.1f}%)")
+
+    if forward_failed:
         out["forward_ok"] = False
-        flags.append(f"Ingresos cayendo ({rev_g * 100:.1f}%)")
+        out["forward_status"] = "FAIL"
+    elif eps_checked and rev_checked:
+        out["forward_ok"] = True
+        out["forward_status"] = "OK"
+    else:
+        out["forward_ok"] = None
+        out["forward_status"] = "MISSING"
+        flags.append("Estimaciones futuras incompletas (faltan forwardEps/trailingEps o revenueGrowth)")
 
     out["oracle_flags"] = flags
     return out
 
 
-def _load_sec_cik_map() -> Dict[str, str]:
-    global _sec_cik_map
+def _load_sec_cik_map() -> Tuple[Optional[Dict[str, str]], Optional[str]]:
+    """Descarga índice oficial de tickers -> CIK desde sec.gov distinguiendo error de red de ausencia real."""
+    global _sec_cik_map, _sec_cik_error
     if _sec_cik_map is not None:
-        return _sec_cik_map
-    _sec_cik_map = {}
-    try:
-        req = urllib.request.Request(
-            "https://www.sec.gov/files/company_tickers.json",
-            headers={"User-Agent": SEC_USER_AGENT, "Accept": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        for entry in data.values():
-            sym = str(entry.get("ticker") or "").upper().strip()
-            cik = str(entry.get("cik_str") or "").zfill(10)
-            if sym and cik:
-                _sec_cik_map[sym] = cik
-    except Exception as exc:
-        print(f"⚠️ No se pudo descargar índice CIK de SEC EDGAR: {exc}")
-    return _sec_cik_map
+        return _sec_cik_map, None
+    if _sec_cik_error is not None:
+        return None, _sec_cik_error
+
+    headers = {
+        "User-Agent": SEC_USER_AGENT,
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+    }
+    last_err = None
+    for attempt in range(2):
+        try:
+            data = _read_http_json("https://www.sec.gov/files/company_tickers.json", headers=headers, timeout=15)
+            mapping: Dict[str, str] = {}
+            if isinstance(data, dict):
+                for entry in data.values():
+                    if not isinstance(entry, dict):
+                        continue
+                    sym = str(entry.get("ticker") or "").upper().strip()
+                    cik_raw = entry.get("cik_str")
+                    if sym and cik_raw is not None:
+                        mapping[sym] = str(cik_raw).zfill(10)
+            if len(mapping) < 500:
+                raise ValueError(f"Índice CIK sospechosamente corto ({len(mapping)} entradas)")
+            _sec_cik_map = mapping
+            return _sec_cik_map, None
+        except Exception as exc:
+            last_err = str(exc)
+            if attempt == 0:
+                time.sleep(1.5)
+
+    _sec_cik_error = f"Error descargando índice CIK SEC: {last_err[:80]}"
+    print(f"⚠️ {_sec_cik_error}")
+    return None, _sec_cik_error
 
 
-def _latest_10k_value(facts_us_gaap: Dict[str, Any], tags: List[str], unit: str = "USD") -> Optional[float]:
+def _extract_annual_10k_by_end(
+    facts_us_gaap: Dict[str, Any],
+    tags: List[str],
+    unit: str = "USD",
+) -> Dict[str, float]:
+    """Extrae valores de ejercicio fiscal completo (10-K, ~330-385 días) indexados por fecha 'end' (YYYY-MM-DD)."""
+    by_end: Dict[str, Tuple[str, float]] = {}
     for tag in tags:
         node = facts_us_gaap.get(tag)
         if not isinstance(node, dict):
             continue
         arr = (node.get("units") or {}).get(unit) or []
-        annual = [
-            x for x in arr
-            if x.get("form") == "10-K" and x.get("val") is not None
-            and (not x.get("frame") or "Q" not in str(x.get("frame")))
-        ]
-        if not annual:
-            continue
-        annual.sort(key=lambda x: str(x.get("end") or ""), reverse=True)
-        val = _sf(annual[0].get("val"))
-        if val is not None:
-            return val
-    return None
+        for x in arr:
+            if not isinstance(x, dict):
+                continue
+            if x.get("form") != "10-K":
+                continue
+            frame = str(x.get("frame") or "")
+            if frame and "Q" in frame.upper():
+                continue
+            val = _sf(x.get("val"))
+            end_s = str(x.get("end") or "")[:10]
+            start_s = str(x.get("start") or "")[:10]
+            if val is None or len(end_s) != 10:
+                continue
+            if len(start_s) == 10:
+                d_start, d_end = _parse_iso_date(start_s), _parse_iso_date(end_s)
+                if d_start and d_end:
+                    days = (d_end - d_start).days
+                    if days < 330 or days > 385:
+                        continue
+            filed_s = str(x.get("filed") or "")
+            prev = by_end.get(end_s)
+            if prev is None or filed_s > prev[0]:
+                by_end[end_s] = (filed_s, val)
+        if by_end:
+            break
+    return {end_s: pair[1] for end_s, pair in by_end.items()}
 
 
 def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
-    """Cruza FCF oficial 10-K (USD) en SEC EDGAR contra los datos de Yahoo.
-
-    Regla estricta v10.1: solo devuelve sec_verified=True si logra comparar numéricamente
-    el FCF oficial del 10-K contra el FCF de Yahoo con desviación <= 30%.
-    """
+    """Cruza FCF oficial 10-K (USD) en SEC EDGAR contra Yahoo con alineación estricta de ejercicio fiscal."""
     ticker = (rec.get("ticker") or "").upper()
     if "." in ticker or rec.get("region") != "EE. UU.":
-        return {"sec_status": "NO_US", "sec_verified": None, "sec_note": "Empresa no cotizada en SEC (EE. UU.)"}
+        return {"sec_status": "NO_US", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "Empresa no cotizada en SEC (EE. UU.)"}
 
     fin_cur = (rec.get("financial_currency") or rec.get("currency") or "USD").upper()
     if fin_cur != "USD":
-        return {"sec_status": "NON_USD", "sec_verified": None, "sec_note": f"Reporta en {fin_cur} (no comparable en USD US-GAAP)"}
+        return {"sec_status": "NON_USD", "sec_verified": None, "sec_fiscal_end": None, "sec_note": f"Reporta en {fin_cur} (no comparable en USD US-GAAP)"}
 
-    cik_map = _load_sec_cik_map()
-    cik = cik_map.get(ticker) or cik_map.get(ticker.replace("-", "."))
+    cik_map, cik_err = _load_sec_cik_map()
+    if cik_err or cik_map is None:
+        return {"sec_status": "ERROR", "sec_verified": None, "sec_fiscal_end": None, "sec_note": cik_err or "Índice SEC no disponible"}
+
+    cik = cik_map.get(ticker) or cik_map.get(ticker.replace("-", ".")) or cik_map.get(ticker.replace(".", "-"))
     if not cik:
-        return {"sec_status": "NO_CIK", "sec_verified": None, "sec_note": "Ticker sin CIK en SEC"}
+        return {"sec_status": "NO_CIK", "sec_verified": None, "sec_fiscal_end": None, "sec_note": f"Ticker {ticker} sin CIK en índice SEC"}
 
     try:
         time.sleep(0.2)
         url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
-        req = urllib.request.Request(url, headers={"User-Agent": SEC_USER_AGENT, "Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            facts = json.loads(resp.read().decode("utf-8"))
+        headers = {"User-Agent": SEC_USER_AGENT, "Accept": "application/json", "Accept-Encoding": "gzip"}
+        facts = _read_http_json(url, headers=headers, timeout=15)
         us_gaap = (facts.get("facts") or {}).get("us-gaap") or {}
         if not us_gaap:
-            return {"sec_status": "NO_GAAP", "sec_verified": None, "sec_note": "Sin etiquetas US-GAAP 10-K en SEC"}
+            return {"sec_status": "NO_GAAP", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "Sin etiquetas US-GAAP 10-K en SEC"}
 
-        sec_ocf = _latest_10k_value(us_gaap, ["NetCashProvidedByUsedInOperatingActivities"])
-        sec_capex = _latest_10k_value(
+        ocf_map = _extract_annual_10k_by_end(
+            us_gaap,
+            [
+                "NetCashProvidedByUsedInOperatingActivities",
+                "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
+            ],
+        )
+        capex_map = _extract_annual_10k_by_end(
             us_gaap,
             [
                 "PaymentsToAcquirePropertyPlantAndEquipment",
                 "PaymentsToAcquireProductiveAssets",
+                "PaymentsToAcquirePropertyPlantAndEquipmentAndIntangibleAssets",
                 "CapitalExpendituresIncurredButNotYetPaid",
+                "PaymentsForCapitalImprovements",
             ],
         )
-        sec_sbc = _latest_10k_value(us_gaap, ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"]) or 0.0
+        sbc_map = _extract_annual_10k_by_end(
+            us_gaap,
+            ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"],
+        )
 
-        if sec_ocf is None:
-            return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_note": "SEC sin OCF anual 10-K estándar"}
+        if not ocf_map:
+            return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "SEC 10-K sin OCF anual estándar"}
+        if not capex_map:
+            return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "SEC 10-K sin CapEx estándar (no se asume 0)"}
 
-        sec_fcf = sec_ocf - abs(sec_capex or 0.0)
-        sec_owner = sec_fcf - (sec_sbc if rec.get("owner_earnings_adjusted") else 0.0)
+        common_ends = sorted(set(ocf_map.keys()).intersection(capex_map.keys()), reverse=True)
+        if not common_ends:
+            return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "SEC 10-K sin cierre fiscal común entre OCF y CapEx"}
 
-        if sec_fcf <= 0:
-            return {
-                "sec_status": "MISMATCH",
-                "sec_verified": False,
-                "sec_note": f"ALERTA SEC 10-K: FCF oficial negativo ({sec_fcf / 1e9:.2f}B USD) frente a datos positivos de Yahoo",
-            }
-
-        mkt_b = rec.get("market_cap_b")
-        pfcf = rec.get("p_fcf")
-        if not mkt_b or not pfcf or pfcf <= 0:
+        yf_end_str = rec.get("fcf_latest_date")
+        yf_dt = _parse_iso_date(yf_end_str)
+        chosen_end = common_ends[0]
+        if yf_dt is not None:
+            best_end = None
+            best_diff = 99999
+            for end_s in common_ends:
+                s_dt = _parse_iso_date(end_s)
+                if s_dt is not None:
+                    diff_d = abs((s_dt - yf_dt).days)
+                    if diff_d < best_diff:
+                        best_diff = diff_d
+                        best_end = end_s
+            if best_end is None or best_diff > 45:
+                return {
+                    "sec_status": "PERIOD_MISMATCH",
+                    "sec_verified": None,
+                    "sec_fiscal_end": common_ends[0],
+                    "sec_note": f"Desfase de ejercicio fiscal: SEC ({common_ends[0]}) vs Yahoo ({yf_end_str})",
+                }
+            chosen_end = best_end
+        else:
             return {
                 "sec_status": "INCOMPLETE",
                 "sec_verified": None,
-                "sec_note": f"SEC FCF {sec_fcf / 1e9:.2f}B USD, pero falta MarketCap o P/FCF en Yahoo para cruzar",
+                "sec_fiscal_end": chosen_end,
+                "sec_note": f"Falta fecha fiscal de FCF en Yahoo para alinear contra SEC ({chosen_end})",
             }
 
-        yf_fcf_est = (mkt_b * 1e9) / pfcf
-        ref_sec = sec_owner if (rec.get("owner_earnings_adjusted") and sec_owner > 0) else sec_fcf
-        diff_pct = abs(yf_fcf_est - ref_sec) / max(abs(ref_sec), 1.0) * 100.0
+        sec_dt = _parse_iso_date(chosen_end)
+        if sec_dt is not None and (datetime.now(timezone.utc) - sec_dt).days > 550:
+            return {
+                "sec_status": "STALE",
+                "sec_verified": None,
+                "sec_fiscal_end": chosen_end,
+                "sec_note": f"10-K SEC obsoleto (cierre {chosen_end})",
+            }
+
+        sec_ocf = ocf_map[chosen_end]
+        sec_capex = capex_map[chosen_end]
+        sec_sbc = sbc_map.get(chosen_end)
+
+        sec_fcf = sec_ocf - abs(sec_capex)
+        if rec.get("owner_earnings_adjusted"):
+            if sec_sbc is None:
+                return {
+                    "sec_status": "INCOMPLETE",
+                    "sec_verified": None,
+                    "sec_fiscal_end": chosen_end,
+                    "sec_note": f"SEC ({chosen_end}) sin etiqueta SBC para cruzar Owner Earnings",
+                }
+            ref_sec = sec_fcf - abs(sec_sbc)
+        else:
+            ref_sec = sec_fcf
+
+        if ref_sec <= 0:
+            return {
+                "sec_status": "MISMATCH",
+                "sec_verified": False,
+                "sec_fiscal_end": chosen_end,
+                "sec_note": f"ALERTA SEC {chosen_end}: caja oficial negativa ({ref_sec / 1e9:.2f}B USD) frente a Yahoo",
+            }
+
+        yf_fcf_ref = _sf(rec.get("fcf_latest_trade"))
+        if yf_fcf_ref is None:
+            mkt_b = rec.get("market_cap_b")
+            pfcf = rec.get("p_fcf")
+            if mkt_b and pfcf and pfcf > 0:
+                yf_fcf_ref = (mkt_b * 1e9) / pfcf
+
+        if yf_fcf_ref is None or yf_fcf_ref <= 0:
+            return {
+                "sec_status": "INCOMPLETE",
+                "sec_verified": None,
+                "sec_fiscal_end": chosen_end,
+                "sec_note": f"SEC ({chosen_end}) FCF {ref_sec / 1e9:.2f}B USD, pero falta FCF válido en Yahoo para cruzar",
+            }
+
+        diff_pct = abs(yf_fcf_ref - ref_sec) / max(abs(ref_sec), 1.0) * 100.0
         if diff_pct > 30.0:
             return {
                 "sec_status": "MISMATCH",
                 "sec_verified": False,
-                "sec_note": f"Discrepancia SEC vs Yahoo del {diff_pct:.0f}% en FCF (SEC {ref_sec / 1e9:.2f}B vs Yahoo {yf_fcf_est / 1e9:.2f}B)",
+                "sec_fiscal_end": chosen_end,
+                "sec_note": f"Discrepancia SEC ({chosen_end}) vs Yahoo del {diff_pct:.0f}% (SEC {ref_sec / 1e9:.2f}B vs Yahoo {yf_fcf_ref / 1e9:.2f}B)",
             }
+
         return {
             "sec_status": "VERIFIED",
             "sec_verified": True,
-            "sec_note": f"Verificado 10-K SEC EDGAR (desviación {diff_pct:.0f}% en caja)",
+            "sec_fiscal_end": chosen_end,
+            "sec_note": f"Verificado 10-K SEC {chosen_end} (desviación {diff_pct:.0f}% en caja)",
         }
     except Exception as exc:
-        return {"sec_status": "ERROR", "sec_verified": None, "sec_note": f"SEC no disponible ({str(exc)[:60]})"}
+        return {"sec_status": "ERROR", "sec_verified": None, "sec_fiscal_end": None, "sec_note": f"SEC no disponible ({str(exc)[:60]})"}
 
 
 def extract_gemini_json(body: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
@@ -361,15 +523,40 @@ def _normalize_verdict(val: Any) -> Optional[str]:
     return up if up in VALID_VERDICTS else None
 
 
+def validate_tribunal_payload(parsed: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Valida que el JSON del Tribunal IA esté 100% completo: rechaza campos vacíos o riesgo ausente."""
+    verdict = _normalize_verdict(parsed.get("veredicto"))
+    if not verdict:
+        return None, f"veredicto fuera de enum ({parsed.get('veredicto')})"
+
+    raw_risk = parsed.get("riesgo_trampa")
+    if isinstance(raw_risk, bool) or raw_risk is None:
+        return None, "riesgo_trampa ausente"
+    f_risk = _sf(raw_risk)
+    if f_risk is None or f_risk < 0 or f_risk > 10:
+        return None, f"riesgo_trampa fuera de rango 0-10 ({raw_risk})"
+    risk_int = int(round(f_risk))
+
+    req_texts = {}
+    for key in ("fiscal", "abogado", "comprobar_5min"):
+        val = parsed.get(key)
+        if not isinstance(val, str) or len(val.strip()) < 10:
+            return None, f"campo '{key}' ausente o demasiado corto"
+        req_texts[key] = val.strip()
+
+    return {
+        "veredicto": verdict,
+        "riesgo_trampa": risk_int,
+        **req_texts,
+    }, None
+
+
 def run_tribunal_ia(
     rec: Dict[str, Any],
     gemini_api_key: str,
     gemini_models: Tuple[str, ...],
 ) -> Tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
-    """Tribunal Fiscal vs. Abogado con salida JSON estricta.
-
-    Devuelve: (texto_formateado, veredicto_enum, trap_risk_0_10, error)
-    """
+    """Tribunal Fiscal vs. Abogado con salida JSON estricta y validación completa de los 5 campos."""
     if not gemini_api_key:
         return None, None, None, "Sin GEMINI_API_KEY"
 
@@ -399,7 +586,7 @@ def run_tribunal_ia(
         f"Auditoría SEC: {sec_note}.\n"
         f"Avisos automáticos: {flags_block}.\n"
         f"Titulares recientes:\n{news_block}\n\n"
-        "Devuelve EXCLUSIVAMENTE un objeto JSON válido con estas 5 claves exactas en español (sin markdown ni texto fuera del JSON):\n"
+        "Devuelve EXCLUSIVAMENTE un objeto JSON válido con estas 5 claves OBLIGATORIAS y no vacías en español:\n"
         '{\n'
         '  "fiscal": "argumento más duro para NO comprar (1-2 frases)",\n'
         '  "abogado": "por qué la caída podría ser temporal a 10 años (1-2 frases)",\n'
@@ -432,27 +619,19 @@ def run_tribunal_ia(
                     last_err = f"{model}: {err}"
                     continue
 
-                verdict = _normalize_verdict(parsed.get("veredicto"))
-                if not verdict:
-                    last_err = f"{model}: veredicto fuera de enum ({parsed.get('veredicto')})"
+                valid, v_err = validate_tribunal_payload(parsed)
+                if v_err or not valid:
+                    last_err = f"{model}: respuesta incompleta ({v_err})"
                     continue
 
-                raw_risk = _sf(parsed.get("riesgo_trampa"))
-                risk_num = min(10, max(0, int(round(raw_risk)))) if raw_risk is not None else None
-
-                fiscal = str(parsed.get("fiscal") or "—").strip()
-                abogado = str(parsed.get("abogado") or "—").strip()
-                check5 = str(parsed.get("comprobar_5min") or "—").strip()
-                risk_txt = f"{risk_num}/10" if risk_num is not None else "N/D"
-
                 formatted = (
-                    f"FISCAL: {fiscal}\n"
-                    f"ABOGADO: {abogado}\n"
-                    f"COMPROBAR (5 min): {check5}\n"
-                    f"RIESGO_TRAMPA: {risk_txt}\n"
-                    f"VEREDICTO: {verdict}"
+                    f"FISCAL: {valid['fiscal']}\n"
+                    f"ABOGADO: {valid['abogado']}\n"
+                    f"COMPROBAR (5 min): {valid['comprobar_5min']}\n"
+                    f"RIESGO_TRAMPA: {valid['riesgo_trampa']}/10\n"
+                    f"VEREDICTO: {valid['veredicto']}"
                 )[:980]
-                return formatted, verdict, risk_num, None
+                return formatted, valid["veredicto"], valid["riesgo_trampa"], None
             except urllib.error.HTTPError as exc:
                 last_err = f"{model} HTTP {exc.code}"
                 if exc.code in (429, 500, 503) and attempt == 0:
@@ -469,26 +648,24 @@ def run_tribunal_ia(
 
 
 def is_oro_puro(rec: Dict[str, Any]) -> bool:
-    """Filtro francotirador final v10.1 (tolerancia cero): la ausencia de pruebas SIEMPRE bloquea."""
+    """Filtro francotirador final v10.2 (tolerancia cero real): NINGUNA ausencia de datos aprueba."""
     if rec.get("status") != "OPORTUNIDAD":
         return False
     if rec.get("opportunity_tier") not in ("ENTRADA_YA", "GANGA"):
         return False
 
-    # 1) Doble verificación oficial SEC EDGAR obligatoria (None o False bloquean)
-    if rec.get("sec_verified") is not True:
+    # 1) Doble verificación oficial SEC EDGAR obligatoria con alineación fiscal
+    if rec.get("sec_verified") is not True or rec.get("sec_status") != "VERIFIED":
         return False
 
-    # 2) Anti-cíclicas y estimaciones futuras obligatorias
+    # 2) Anti-cíclicas y estimaciones futuras verificadas (None o False bloquean)
     if rec.get("is_cyclical_risk") or rec.get("forward_ok") is not True:
         return False
 
-    # 3) Piotroski obligatorio con cobertura >= 6/9 y nota escalada >= 7/9
+    # 3) Piotroski BRUTO (sin reescalar): al menos 7 señales verificadas y 7 puntos reales obtenidos
     p_score = rec.get("piotroski_score")
     p_max = rec.get("piotroski_max") or 0
-    if p_score is None or p_max < 6:
-        return False
-    if round((p_score / p_max) * 9) < 7:
+    if p_score is None or p_max < 7 or p_score < 7:
         return False
 
     # 4) Cobertura de intereses: si tiene deuda neta > 0.2x EBITDA, debe superar 8x obligatoriamente
@@ -498,11 +675,11 @@ def is_oro_puro(rec: Dict[str, Any]) -> bool:
         if cov is None or cov < 8.0:
             return False
 
-    # 5) Tribunal IA obligatorio: veredicto TEMPORAL + nota de riesgo explícita <= 4/10
+    # 5) Tribunal IA completo obligatorio: veredicto TEMPORAL + nota de riesgo explícita <= 4/10
     if rec.get("ai_verdict") != "TEMPORAL":
         return False
     risk = rec.get("trap_risk_score")
-    if risk is None or risk > 4:
+    if risk is None or not isinstance(risk, int) or risk > 4:
         return False
 
     return True
