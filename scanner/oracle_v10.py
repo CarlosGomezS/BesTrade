@@ -1,10 +1,10 @@
-"""Radar Cocodrilo v10 — Módulo Francotirador (Oráculo Anti-Trampas).
+"""Radar Cocodrilo v10.1 — Módulo Francotirador (Oráculo Anti-Trampas Blindado).
 
-Capas de blindaje:
-1) Auditoría oficial SEC EDGAR (data.sec.gov) para empresas de EE. UU. (detecta datos sucios de Yahoo).
-2) Piotroski F-Score (0-9) + Cobertura de intereses + Anti-Cíclicas (estabilidad de márgenes).
-3) Forward Check (bloquea alertas si el beneficio o ventas futuras ya están cayendo).
-4) Tribunal IA (Fiscal vs. Abogado + nota de riesgo de trampa 0-10) en las finalistas.
+Mejoras v10.1 tras auditoría:
+1) SEC EDGAR estricto: nunca marca VERIFIED sin cruce real contra Yahoo y solo valida emisores USD.
+2) Tribunal IA con salida JSON estricta (sin regex frágil) + estado EVIDENCIA_INSUFICIENTE.
+3) Validación segura de respuesta Gemini (candidates / promptFeedback / finishReason).
+4) Filtro ORO PURO tolerancia cero: la ausencia de verificación SEC, nota de riesgo o Piotroski BLOQUEA.
 """
 
 from __future__ import annotations
@@ -19,7 +19,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-SEC_USER_AGENT = "RadarCocodriloPro/10.0 (personal-value-scanner@github.com)"
+SEC_USER_AGENT = "RadarCocodriloPro/10.1 (personal-value-scanner@github.com)"
+VALID_VERDICTS = ("TEMPORAL", "DUDOSO", "PERMANENTE", "EVIDENCIA_INSUFICIENTE")
 _sec_cik_map: Optional[Dict[str, str]] = None
 
 
@@ -149,8 +150,11 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
         scaled_9 = round((f_pts / f_max) * 9)
         if scaled_9 <= 4:
             flags.append(f"Piotroski débil ({f_pts}/{f_max}): tendencia financiera deteriorándose")
+    elif f_max > 0:
+        out["piotroski_max"] = f_max
+        flags.append(f"Piotroski incompleto ({f_max}/9 señales disponibles)")
 
-    # --- 2) COBERTURA DE INTERESES (EBIT / Intereses) ---
+    # --- 2) COBERTURA DE INTERESES (EBIT / |Intereses|) ---
     ebit0, ie0 = v(ebit, 0), v(int_exp, 0)
     if ebit0 is not None and ie0 is not None and abs(ie0) > 0:
         cov = ebit0 / abs(ie0)
@@ -222,7 +226,7 @@ def _latest_10k_value(facts_us_gaap: Dict[str, Any], tags: List[str], unit: str 
         arr = (node.get("units") or {}).get(unit) or []
         annual = [
             x for x in arr
-            if x.get("form") in ("10-K", "20-F") and x.get("val") is not None
+            if x.get("form") == "10-K" and x.get("val") is not None
             and (not x.get("frame") or "Q" not in str(x.get("frame")))
         ]
         if not annual:
@@ -235,10 +239,18 @@ def _latest_10k_value(facts_us_gaap: Dict[str, Any], tags: List[str], unit: str 
 
 
 def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
-    """Cruza FCF oficial 10-K en SEC EDGAR contra los datos de Yahoo para empresas de EE. UU."""
+    """Cruza FCF oficial 10-K (USD) en SEC EDGAR contra los datos de Yahoo.
+
+    Regla estricta v10.1: solo devuelve sec_verified=True si logra comparar numéricamente
+    el FCF oficial del 10-K contra el FCF de Yahoo con desviación <= 30%.
+    """
     ticker = (rec.get("ticker") or "").upper()
     if "." in ticker or rec.get("region") != "EE. UU.":
         return {"sec_status": "NO_US", "sec_verified": None, "sec_note": "Empresa no cotizada en SEC (EE. UU.)"}
+
+    fin_cur = (rec.get("financial_currency") or rec.get("currency") or "USD").upper()
+    if fin_cur != "USD":
+        return {"sec_status": "NON_USD", "sec_verified": None, "sec_note": f"Reporta en {fin_cur} (no comparable en USD US-GAAP)"}
 
     cik_map = _load_sec_cik_map()
     cik = cik_map.get(ticker) or cik_map.get(ticker.replace("-", "."))
@@ -253,7 +265,7 @@ def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
             facts = json.loads(resp.read().decode("utf-8"))
         us_gaap = (facts.get("facts") or {}).get("us-gaap") or {}
         if not us_gaap:
-            return {"sec_status": "NO_GAAP", "sec_verified": None, "sec_note": "Sin etiquetas US-GAAP en SEC"}
+            return {"sec_status": "NO_GAAP", "sec_verified": None, "sec_note": "Sin etiquetas US-GAAP 10-K en SEC"}
 
         sec_ocf = _latest_10k_value(us_gaap, ["NetCashProvidedByUsedInOperatingActivities"])
         sec_capex = _latest_10k_value(
@@ -267,7 +279,7 @@ def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
         sec_sbc = _latest_10k_value(us_gaap, ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"]) or 0.0
 
         if sec_ocf is None:
-            return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_note": "SEC sin OCF anual estándar"}
+            return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_note": "SEC sin OCF anual 10-K estándar"}
 
         sec_fcf = sec_ocf - abs(sec_capex or 0.0)
         sec_owner = sec_fcf - (sec_sbc if rec.get("owner_earnings_adjusted") else 0.0)
@@ -281,65 +293,128 @@ def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
 
         mkt_b = rec.get("market_cap_b")
         pfcf = rec.get("p_fcf")
-        if mkt_b and pfcf and pfcf > 0:
-            yf_fcf_est = (mkt_b * 1e9) / pfcf
-            ref_sec = sec_owner if (rec.get("owner_earnings_adjusted") and sec_owner > 0) else sec_fcf
-            diff_pct = abs(yf_fcf_est - ref_sec) / max(abs(ref_sec), 1.0) * 100.0
-            if diff_pct > 30.0:
-                return {
-                    "sec_status": "MISMATCH",
-                    "sec_verified": False,
-                    "sec_note": f"Discrepancia SEC vs Yahoo del {diff_pct:.0f}% en FCF (SEC {ref_sec / 1e9:.2f}B vs Yahoo {yf_fcf_est / 1e9:.2f}B)",
-                }
+        if not mkt_b or not pfcf or pfcf <= 0:
             return {
-                "sec_status": "VERIFIED",
-                "sec_verified": True,
-                "sec_note": f"Verificado 10-K SEC EDGAR (desviación {diff_pct:.0f}% en caja)",
+                "sec_status": "INCOMPLETE",
+                "sec_verified": None,
+                "sec_note": f"SEC FCF {sec_fcf / 1e9:.2f}B USD, pero falta MarketCap o P/FCF en Yahoo para cruzar",
             }
 
-        return {"sec_status": "VERIFIED", "sec_verified": True, "sec_note": f"FCF oficial SEC positivo ({sec_fcf / 1e9:.2f}B USD)"}
+        yf_fcf_est = (mkt_b * 1e9) / pfcf
+        ref_sec = sec_owner if (rec.get("owner_earnings_adjusted") and sec_owner > 0) else sec_fcf
+        diff_pct = abs(yf_fcf_est - ref_sec) / max(abs(ref_sec), 1.0) * 100.0
+        if diff_pct > 30.0:
+            return {
+                "sec_status": "MISMATCH",
+                "sec_verified": False,
+                "sec_note": f"Discrepancia SEC vs Yahoo del {diff_pct:.0f}% en FCF (SEC {ref_sec / 1e9:.2f}B vs Yahoo {yf_fcf_est / 1e9:.2f}B)",
+            }
+        return {
+            "sec_status": "VERIFIED",
+            "sec_verified": True,
+            "sec_note": f"Verificado 10-K SEC EDGAR (desviación {diff_pct:.0f}% en caja)",
+        }
     except Exception as exc:
         return {"sec_status": "ERROR", "sec_verified": None, "sec_note": f"SEC no disponible ({str(exc)[:60]})"}
+
+
+def extract_gemini_json(body: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Extrae y valida de forma segura una respuesta JSON de Gemini sin asumir estructura fija."""
+    if not isinstance(body, dict):
+        return None, "Respuesta Gemini no es JSON objeto"
+    candidates = body.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        fb = body.get("promptFeedback") or {}
+        reason = fb.get("blockReason") or "sin candidatos"
+        return None, f"Gemini bloqueado/vacío ({reason})"
+
+    cand0 = candidates[0] if isinstance(candidates[0], dict) else {}
+    finish = cand0.get("finishReason")
+    content = cand0.get("content") if isinstance(cand0.get("content"), dict) else {}
+    parts = content.get("parts") if isinstance(content.get("parts"), list) else []
+    raw_text = "".join(str(p.get("text", "")) for p in parts if isinstance(p, dict) and not p.get("thought")).strip()
+    if not raw_text:
+        return None, f"Respuesta vacía (finishReason={finish})"
+
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_text, flags=re.IGNORECASE | re.DOTALL).strip()
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+            return parsed, None
+        return None, "JSON devuelto no es un objeto"
+    except Exception:
+        m = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if m:
+            try:
+                parsed = json.loads(m.group(0))
+                if isinstance(parsed, dict):
+                    return parsed, None
+            except Exception:
+                pass
+        return None, f"JSON inválido de Gemini (finishReason={finish})"
+
+
+def _normalize_verdict(val: Any) -> Optional[str]:
+    if not isinstance(val, str):
+        return None
+    up = val.strip().upper().replace(" ", "_")
+    return up if up in VALID_VERDICTS else None
 
 
 def run_tribunal_ia(
     rec: Dict[str, Any],
     gemini_api_key: str,
     gemini_models: Tuple[str, ...],
-) -> Tuple[Optional[str], Optional[int], Optional[str]]:
-    """Tribunal Fiscal vs. Abogado para las candidatas top. Devuelve (texto, trap_risk_0_10, error)."""
+) -> Tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
+    """Tribunal Fiscal vs. Abogado con salida JSON estricta.
+
+    Devuelve: (texto_formateado, veredicto_enum, trap_risk_0_10, error)
+    """
     if not gemini_api_key:
-        return None, None, "Sin GEMINI_API_KEY"
+        return None, None, None, "Sin GEMINI_API_KEY"
 
     news = rec.get("recent_news") or []
-    news_block = "\n".join(f"- {h}" for h in news) if news else "- Sin titulares recientes en Yahoo."
+    news_status = rec.get("news_status") or ("OK" if news else "OK_EMPTY")
+    if news:
+        news_block = "\n".join(f"- {h}" for h in news)
+    elif news_status == "ERROR":
+        news_block = "- ERROR al obtener titulares de Yahoo Finance (no asumas ausencia de malas noticias)."
+    else:
+        news_block = "- Sin titulares recientes disponibles en Yahoo Finance."
+
     flags_block = "; ".join((rec.get("data_warnings") or []) + (rec.get("oracle_flags") or [])) or "Ninguna"
     dcf = rec.get("dcf") or {}
     sec_note = rec.get("sec_note") or "N/D"
 
     prompt = (
-        "Actúa como un TRIBUNAL DE INVERSIÓN estilo Warren Buffett y Charlie Munger para decidir si una empresa es una "
-        "OPORTUNIDAD DE ORO (solo 1-2 al año) o una TRAMPA DE VALOR.\n"
+        "Actúa como un TRIBUNAL DE INVERSIÓN escéptico estilo Warren Buffett y Charlie Munger para decidir si una empresa "
+        "es una OPORTUNIDAD DE ORO (solo 1-2 al año) o una TRAMPA DE VALOR.\n"
+        "REGLA ESTRICTA: Si no hay titulares claros sobre esta empresa o faltan pruebas para saber por qué cae, "
+        "NO inventes una explicación ni regales TEMPORAL; usa el veredicto EVIDENCIA_INSUFICIENTE.\n"
         f"Empresa: {rec['name']} ({rec['ticker']}), {rec['sector']} / {rec['industry']} ({rec['region']}).\n"
         f"Números: Precio {rec['price']} {rec['currency']} (52s: {rec['drawdown_52w_pct']}%), Score {rec['quality_score']}/100, "
         f"ROIC {rec['roic_pct']}%, Piotroski {rec.get('piotroski_score')}/{rec.get('piotroski_max')}, "
         f"Cobertura intereses {rec.get('interest_coverage')}x, P/FCF {rec['p_fcf']}x, PER futuro {rec['forward_pe']}x, "
-        f"DCF base {dcf.get('intrinsic_base')} {rec['currency']}, Compras directivos 90d: {rec.get('insider_buys_90d', 0)}.\n"
+        f"DCF base {dcf.get('intrinsic_base')} {rec['currency']}, Compras directivos 90d: {rec.get('insider_buys_90d')}.\n"
         f"Auditoría SEC: {sec_note}.\n"
         f"Avisos automáticos: {flags_block}.\n"
         f"Titulares recientes:\n{news_block}\n\n"
-        "Responde en español directo, sin asteriscos ni negritas, en exactamente 5 líneas:\n"
-        "FISCAL: el argumento más duro para NO comprar (disrupción, ciclo en pico, pérdida de moat o contabilidad).\n"
-        "ABOGADO: por qué la caída podría ser temporal y el negocio seguir fuerte a 10 años.\n"
-        "COMPROBAR (5 min): las 2 cosas exactas que el inversor debe verificar hoy antes de meter dinero.\n"
-        "RIESGO_TRAMPA: X/10 (donde 0 es segurísima y 10 es trampa mortal).\n"
-        "VEREDICTO: TEMPORAL, DUDOSO o PERMANENTE."
+        "Devuelve EXCLUSIVAMENTE un objeto JSON válido con estas 5 claves exactas en español (sin markdown ni texto fuera del JSON):\n"
+        '{\n'
+        '  "fiscal": "argumento más duro para NO comprar (1-2 frases)",\n'
+        '  "abogado": "por qué la caída podría ser temporal a 10 años (1-2 frases)",\n'
+        '  "comprobar_5min": "las 2 verificaciones concretas que el inversor debe hacer hoy antes de comprar",\n'
+        '  "riesgo_trampa": 5,\n'
+        '  "veredicto": "TEMPORAL | DUDOSO | PERMANENTE | EVIDENCIA_INSUFICIENTE"\n'
+        '}\n'
+        "riesgo_trampa debe ser un número entero del 0 (segurísima) al 10 (trampa mortal)."
     )
 
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 1200,
+            "maxOutputTokens": 1000,
+            "responseMimeType": "application/json",
             "thinkingConfig": {"thinkingLevel": "LOW"},
         },
     }).encode("utf-8")
@@ -352,15 +427,32 @@ def run_tribunal_ia(
             try:
                 with urllib.request.urlopen(req, timeout=28) as resp:
                     body = json.loads(resp.read().decode("utf-8"))
-                parts = body["candidates"][0]["content"]["parts"]
-                text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-                text = re.sub(r"\*\*(.*?)\*\*", r"\1", text).strip()[:950]
-                if not text:
-                    last_err = f"{model}: respuesta vacía"
+                parsed, err = extract_gemini_json(body)
+                if err or not parsed:
+                    last_err = f"{model}: {err}"
                     continue
-                m_risk = re.search(r"RIESGO[_\s]*TRAMPA[^\d]{0,12}(\d{1,2})\s*/\s*10", text, flags=re.IGNORECASE)
-                risk_num = min(10, max(0, int(m_risk.group(1)))) if m_risk else None
-                return text, risk_num, None
+
+                verdict = _normalize_verdict(parsed.get("veredicto"))
+                if not verdict:
+                    last_err = f"{model}: veredicto fuera de enum ({parsed.get('veredicto')})"
+                    continue
+
+                raw_risk = _sf(parsed.get("riesgo_trampa"))
+                risk_num = min(10, max(0, int(round(raw_risk)))) if raw_risk is not None else None
+
+                fiscal = str(parsed.get("fiscal") or "—").strip()
+                abogado = str(parsed.get("abogado") or "—").strip()
+                check5 = str(parsed.get("comprobar_5min") or "—").strip()
+                risk_txt = f"{risk_num}/10" if risk_num is not None else "N/D"
+
+                formatted = (
+                    f"FISCAL: {fiscal}\n"
+                    f"ABOGADO: {abogado}\n"
+                    f"COMPROBAR (5 min): {check5}\n"
+                    f"RIESGO_TRAMPA: {risk_txt}\n"
+                    f"VEREDICTO: {verdict}"
+                )[:980]
+                return formatted, verdict, risk_num, None
             except urllib.error.HTTPError as exc:
                 last_err = f"{model} HTTP {exc.code}"
                 if exc.code in (429, 500, 503) and attempt == 0:
@@ -373,38 +465,44 @@ def run_tribunal_ia(
                     time.sleep(2.0)
                     continue
                 break
-    return None, None, last_err
+    return None, None, None, last_err
 
 
 def is_oro_puro(rec: Dict[str, Any]) -> bool:
-    """Filtro francotirador final (1-2 disparos/año): exige doble verificación y cero banderas rojas."""
+    """Filtro francotirador final v10.1 (tolerancia cero): la ausencia de pruebas SIEMPRE bloquea."""
     if rec.get("status") != "OPORTUNIDAD":
         return False
     if rec.get("opportunity_tier") not in ("ENTRADA_YA", "GANGA"):
         return False
-    if rec.get("sec_verified") is False:
-        return False
-    if rec.get("is_cyclical_risk"):
-        return False
-    if not rec.get("forward_ok", True):
+
+    # 1) Doble verificación oficial SEC EDGAR obligatoria (None o False bloquean)
+    if rec.get("sec_verified") is not True:
         return False
 
+    # 2) Anti-cíclicas y estimaciones futuras obligatorias
+    if rec.get("is_cyclical_risk") or rec.get("forward_ok") is not True:
+        return False
+
+    # 3) Piotroski obligatorio con cobertura >= 6/9 y nota escalada >= 7/9
     p_score = rec.get("piotroski_score")
     p_max = rec.get("piotroski_max") or 0
-    if p_score is not None and p_max >= 5:
-        if round((p_score / p_max) * 9) < 7:
-            return False
+    if p_score is None or p_max < 6:
+        return False
+    if round((p_score / p_max) * 9) < 7:
+        return False
 
+    # 4) Cobertura de intereses: si tiene deuda neta > 0.2x EBITDA, debe superar 8x obligatoriamente
     cov = rec.get("interest_coverage")
     nde = rec.get("net_debt_ebitda")
-    if cov is not None and cov < 8.0 and (nde is None or nde > 0.2):
-        return False
+    if nde is None or nde > 0.2:
+        if cov is None or cov < 8.0:
+            return False
 
+    # 5) Tribunal IA obligatorio: veredicto TEMPORAL + nota de riesgo explícita <= 4/10
     if rec.get("ai_verdict") != "TEMPORAL":
         return False
-
     risk = rec.get("trap_risk_score")
-    if risk is not None and risk > 4:
+    if risk is None or risk > 4:
         return False
 
     return True
