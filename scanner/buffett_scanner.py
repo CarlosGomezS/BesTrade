@@ -1,4 +1,4 @@
-"""Radar Cocodrilo Pro v10.2 — Oráculo Blindado (Warren Buffett & Charlie Munger).
+"""Radar Cocodrilo Pro v10.3 — Oráculo Blindado (Warren Buffett & Charlie Munger).
 
 Novedades v9:
 - Owner Earnings reales: descuenta Stock-Based Compensation (SBC) del FCF para evitar trampas en tech.
@@ -1241,7 +1241,7 @@ def build_urgent_telegram_alert(entradas_ya: List[Dict[str, Any]], gap_pts: Opti
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     lines = [
         "🚨🔥🚨 <b>ALERTA MÁXIMA: ENTRAR YA</b> 🚨🔥🚨",
-        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.2</i>",
+        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.3</i>",
     ]
     if gap_pts is not None and gap_pts >= 12:
         lines.append(f"⚡ <b>MUY DESPLAZADA DEL RESTO:</b> saca <b>+{gap_pts:.0f} pts</b> de ventaja al siguiente valor.")
@@ -1268,7 +1268,7 @@ def build_telegram_report(
 
     if UNIVERSE_MODE == "custom":
         lines = [
-            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.2 — {date_str}</b>",
+            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.3 — {date_str}</b>",
             f"<i>Empresas analizadas: {len(results)}/{total_scanned}</i>",
         ]
         for r in results[:10]:
@@ -1295,7 +1295,7 @@ def build_telegram_report(
     ya_txt = f"🚨 {len(entradas_ya)} ENTRAR YA · " if entradas_ya else ""
     tier_summary = f"{ya_txt}🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
-        f"🐊 <b>RADAR COCODRILO PRO v10.2 — {date_str}</b>",
+        f"🐊 <b>RADAR COCODRILO PRO v10.3 — {date_str}</b>",
         f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
     if market_ctx and (market_ctx.get("vix") is not None or market_ctx.get("us10y_pct") is not None):
@@ -1567,7 +1567,7 @@ def main() -> None:
     t0 = time.time()
 
     if MERGE_DIR:
-        print(f"🧩 Cocodrilo Pro v10.2 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
+        print(f"🧩 Cocodrilo Pro v10.3 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
         results, total_scanned, failed, shard_elapsed = load_merged_shards(Path(MERGE_DIR))
         elapsed_total = max(shard_elapsed, round(time.time() - t0))
     else:
@@ -1581,7 +1581,7 @@ def main() -> None:
         if SHARD_TOTAL > 1:
             tickers = [sym for idx, sym in enumerate(all_tickers) if idx % SHARD_TOTAL == SHARD_INDEX]
             print(
-                f"🐊 Cocodrilo Pro v10.2 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
+                f"🐊 Cocodrilo Pro v10.3 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
                 f"| Empresas: {len(tickers)} (total universo: {len(all_tickers)})"
             )
             results, failed = run_scan_batch(tickers)
@@ -1604,7 +1604,7 @@ def main() -> None:
                 raise RuntimeError(f"Shard {SHARD_INDEX} devolvió 0 empresas válidas.")
             return
 
-        print(f"🐊 Escáner Cocodrilo Pro v10.2 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
+        print(f"🐊 Escáner Cocodrilo Pro v10.3 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
         total_scanned = len(all_tickers)
         results, failed = run_scan_batch(all_tickers)
         elapsed_total = round(time.time() - t0)
@@ -1731,7 +1731,7 @@ def main() -> None:
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
-        "scanner_version": "v10.2-oraculo",
+        "scanner_version": "v10.3-oraculo",
         "fx_rates_eur": fx_rates_eur,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe_mode": UNIVERSE_MODE,
