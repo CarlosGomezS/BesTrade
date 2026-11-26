@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-26T12:32:29.222463+00:00",
+  "updated_at": "2026-11-26T15:59:51.288777+00:00",
   "entries": [
     {
       "ticker": "GDDY",
@@ -113,7 +113,7 @@
       "last_price": 85.56,
       "return_pct": 0.4,
       "last_checked": "2026-11-26",
-      "current_status": "ENTRADA_YA",
+      "current_status": "GANGA",
       "milestones_pct": {
         "d30": null,
         "d90": null,
