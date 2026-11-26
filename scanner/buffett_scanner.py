@@ -1,11 +1,13 @@
-"""Radar Cocodrilo Pro v10.1 — Oráculo Blindado (Warren Buffett & Charlie Munger).
+"""Radar Cocodrilo Pro v10.2 — Oráculo Blindado (Warren Buffett & Charlie Munger).
 
-Novedades v10.1:
-- Distingue 0 real frente a ERROR de Yahoo en directivos y noticias.
-- Salida JSON estricta en Gemini (adiós regex frágil) + estado EVIDENCIA_INSUFICIENTE.
-- Fusión semanal estricta: aborta si falta algún shard para no publicar datos incompletos.
-- Exporta fx_rates_eur para que Mi Cartera convierta divisas sin mezclar EUR y USD.
-- Bloquea ENTRADA_YA en EE. UU. si falta verificación oficial SEC EDGAR.
+Novedades v9:
+- Owner Earnings reales: descuenta Stock-Based Compensation (SBC) del FCF para evitar trampas en tech.
+- Buscador inteligente por nombre en modo 'custom' (ej. 'Alphabet' -> GOOGL, 'Inditex' -> ITX.MC).
+- Aviso de presentación de resultados próximos (<= 10 días) para no comprar a ciegas antes de earnings.
+- Radar de compras de directivos (Insider Buying últimos 90 días) en candidatas top.
+- Termómetro de mercado (VIX, Bono EE. UU. 10A y distancia S&P 500 a máximos) en Telegram y web.
+- Diario automático de aciertos (data/history.json) con seguimiento de rentabilidad real de alertas.
+- Mantiene Nivel 0 'ENTRADA_YA', sharding paralelo (6 bloques), rotación diaria y Gemini 3 escéptico.
 """
 
 from __future__ import annotations
@@ -285,6 +287,7 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
         "fcf_years_pos": None,
         "fcf_years_total": None,
         "fcf_latest": None,
+        "fcf_latest_date": None,
         "fcf_normalized": None,
         "fcf_spike_capped": False,
         "sbc_latest": None,
@@ -332,11 +335,17 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
     if fcf_series is not None and len(fcf_series) >= 1:
         raw_vals: List[float] = []
         adj_vals: List[float] = []
+        raw_dates: List[Optional[str]] = []
         for idx_col, v in fcf_series.items():
             fv = safe_float(v)
             if fv is None:
                 continue
             raw_vals.append(fv)
+            try:
+                dt_c = pd.to_datetime(idx_col, errors="coerce")
+                raw_dates.append(dt_c.strftime("%Y-%m-%d") if pd.notna(dt_c) else None)
+            except Exception:
+                raw_dates.append(None)
             sbc_col = 0.0
             if sbc_series is not None and idx_col in sbc_series.index:
                 sv = safe_float(sbc_series.get(idx_col))
@@ -347,6 +356,7 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
         if raw_vals:
             out["fcf_years_total"] = len(raw_vals)
             out["fcf_years_pos"] = sum(1 for v in raw_vals if v > 0)
+            out["fcf_latest_date"] = raw_dates[0] if raw_dates else None
 
             use_vals = raw_vals
             if sbc_latest and raw_vals[0] > 0:
@@ -770,6 +780,8 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
         "fcf_years_pos": stm["fcf_years_pos"],
         "fcf_years_total": stm["fcf_years_total"],
         "fcf_latest": fcf_latest_conv,
+        "fcf_latest_date": stm["fcf_latest_date"],
+        "fcf_latest_trade": round(fcf_latest_conv, 2) if fcf_latest_conv is not None else None,
         "sbc_pct_of_fcf": stm["sbc_pct_of_fcf"],
         "owner_earnings_adjusted": stm["owner_earnings_adjusted"],
         "net_debt_ebitda": round(stm["net_debt_ebitda"], 2) if stm["net_debt_ebitda"] is not None else None,
@@ -975,10 +987,16 @@ def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], O
                 if verdict not in VALID_VERDICTS:
                     last_err = f"{model}: veredicto inválido ({verdict})"
                     continue
+                motivo = str(parsed.get("motivo_caida") or "").strip()
+                foso = str(parsed.get("foso") or "").strip()
+                riesgo = str(parsed.get("mayor_riesgo") or "").strip()
+                if len(motivo) < 8 or len(foso) < 8 or len(riesgo) < 8:
+                    last_err = f"{model}: respuesta JSON incompleta"
+                    continue
                 txt = (
-                    f"1) Por qué cae: {str(parsed.get('motivo_caida') or '—').strip()}\n"
-                    f"2) Foso: {str(parsed.get('foso') or '—').strip()}\n"
-                    f"3) Mayor riesgo: {str(parsed.get('mayor_riesgo') or '—').strip()}\n"
+                    f"1) Por qué cae: {motivo}\n"
+                    f"2) Foso: {foso}\n"
+                    f"3) Mayor riesgo: {riesgo}\n"
                     f"4) Veredicto: {verdict}"
                 )
                 return clean_ai_text(txt), verdict, None
@@ -1223,7 +1241,7 @@ def build_urgent_telegram_alert(entradas_ya: List[Dict[str, Any]], gap_pts: Opti
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     lines = [
         "🚨🔥🚨 <b>ALERTA MÁXIMA: ENTRAR YA</b> 🚨🔥🚨",
-        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.1</i>",
+        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.2</i>",
     ]
     if gap_pts is not None and gap_pts >= 12:
         lines.append(f"⚡ <b>MUY DESPLAZADA DEL RESTO:</b> saca <b>+{gap_pts:.0f} pts</b> de ventaja al siguiente valor.")
@@ -1250,7 +1268,7 @@ def build_telegram_report(
 
     if UNIVERSE_MODE == "custom":
         lines = [
-            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.1 — {date_str}</b>",
+            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.2 — {date_str}</b>",
             f"<i>Empresas analizadas: {len(results)}/{total_scanned}</i>",
         ]
         for r in results[:10]:
@@ -1277,7 +1295,7 @@ def build_telegram_report(
     ya_txt = f"🚨 {len(entradas_ya)} ENTRAR YA · " if entradas_ya else ""
     tier_summary = f"{ya_txt}🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
-        f"🐊 <b>RADAR COCODRILO PRO v10.1 — {date_str}</b>",
+        f"🐊 <b>RADAR COCODRILO PRO v10.2 — {date_str}</b>",
         f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
     if market_ctx and (market_ctx.get("vix") is not None or market_ctx.get("us10y_pct") is not None):
@@ -1549,7 +1567,7 @@ def main() -> None:
     t0 = time.time()
 
     if MERGE_DIR:
-        print(f"🧩 Cocodrilo Pro v10.1 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
+        print(f"🧩 Cocodrilo Pro v10.2 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
         results, total_scanned, failed, shard_elapsed = load_merged_shards(Path(MERGE_DIR))
         elapsed_total = max(shard_elapsed, round(time.time() - t0))
     else:
@@ -1563,7 +1581,7 @@ def main() -> None:
         if SHARD_TOTAL > 1:
             tickers = [sym for idx, sym in enumerate(all_tickers) if idx % SHARD_TOTAL == SHARD_INDEX]
             print(
-                f"🐊 Cocodrilo Pro v10.1 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
+                f"🐊 Cocodrilo Pro v10.2 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
                 f"| Empresas: {len(tickers)} (total universo: {len(all_tickers)})"
             )
             results, failed = run_scan_batch(tickers)
@@ -1586,7 +1604,7 @@ def main() -> None:
                 raise RuntimeError(f"Shard {SHARD_INDEX} devolvió 0 empresas válidas.")
             return
 
-        print(f"🐊 Escáner Cocodrilo Pro v10.1 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
+        print(f"🐊 Escáner Cocodrilo Pro v10.2 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
         total_scanned = len(all_tickers)
         results, failed = run_scan_batch(all_tickers)
         elapsed_total = round(time.time() - t0)
@@ -1637,7 +1655,7 @@ def main() -> None:
             news_list, news_st = extract_recent_news(r["ticker"], limit=5)
             r["recent_news"] = news_list
             r["news_status"] = news_st
-            use_tribunal = (idx_t < 3) or (UNIVERSE_MODE == "custom")
+            use_tribunal = (idx_t < 6) or (UNIVERSE_MODE == "custom")
             if use_tribunal:
                 print(f"⚖️ Tribunal IA JSON (Fiscal vs Abogado) para {r['ticker']}...")
                 ai_text, ai_verdict, trap_risk, ai_err = run_tribunal_ia(r, GEMINI_API_KEY, GEMINI_MODELS)
@@ -1659,7 +1677,7 @@ def main() -> None:
         r["conviction_score"] = compute_conviction_score(r)
         tier = classify_opportunity_tier(r)
         sec_fail_us = (r.get("region") == "EE. UU." and r.get("sec_verified") is not True)
-        if tier == "ENTRADA_YA" and (r.get("sec_verified") is False or sec_fail_us or r.get("is_cyclical_risk") or not r.get("forward_ok", True)):
+        if tier == "ENTRADA_YA" and (r.get("sec_verified") is False or sec_fail_us or r.get("is_cyclical_risk") or r.get("forward_ok") is not True):
             tier = "MUY_BUENA"
         r["opportunity_tier"] = tier
         r["oro_puro"] = is_oro_puro(r)
@@ -1713,7 +1731,7 @@ def main() -> None:
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
-        "scanner_version": "v10.1-oraculo",
+        "scanner_version": "v10.2-oraculo",
         "fx_rates_eur": fx_rates_eur,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe_mode": UNIVERSE_MODE,
