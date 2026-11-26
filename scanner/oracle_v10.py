@@ -1,13 +1,15 @@
-"""Radar Cocodrilo v10.2 — Módulo Francotirador (Oráculo Anti-Trampas Tolerancia Cero).
+"""Radar Cocodrilo v10.3 — Módulo Francotirador (Oráculo Anti-Trampas Tolerancia Cero).
 
-Correcciones v10.2 tras auditoría técnica:
-1) Piotroski sin reescalado: conserva puntos reales obtenidos (f_pts / f_max) y exige f_max >= 7 y f_pts >= 7 para ORO PURO.
-2) CapEx ausente en SEC EDGAR nunca se asume como 0: devuelve INCOMPLETE y bloquea ORO PURO.
-3) Alineación fiscal SEC vs Yahoo: comprueba año fiscal completo (330-385 días), misma fecha entre OCF y CapEx,
-   y desfase <= 45 días frente a la fecha fiscal del FCF de Yahoo (si no coincide, PERIOD_MISMATCH).
-4) Diagnóstico real de índice CIK en SEC EDGAR (distingue fallo de red/HTTP de ticker sin CIK, con reintento y gzip).
-5) Forward Check tri-estado (True / False / None): si faltan estimaciones futuras, devuelve None y BLOQUEA ORO PURO.
-6) Tribunal IA estricto: rechaza respuestas JSON incompletas (exige los 5 campos y riesgo_trampa entero 0-10).
+Correcciones v10.3 tras tercera auditoría técnica:
+1) Forward Check real: separa crecimiento histórico de ventas (info.revenueGrowth) de las previsiones
+   futuras de ingresos (t.revenue_estimate 0y/+1y). Si faltan previsiones futuras de ingresos o BPA,
+   forward_ok es None (MISSING) y BLOQUEA ORO PURO y ENTRADA_YA.
+2) Validación estricta de entero en riesgo_trampa: rechaza flotantes/decimales (ej. 3.7) y booleanos.
+3) SEC EDGAR depurado:
+   - Elimina CapitalExpendituresIncurredButNotYetPaid (CapEx devengado no pagado en efectivo).
+   - Soporta enmiendas 10-K/A (prioriza la cifra corregida más reciente para el mismo cierre fiscal).
+   - Combina múltiples etiquetas de CapEx entre distintos ejercicios fiscales sin quedarse atrapado en la primera.
+   - Soporta ejercicios fiscales de 53 semanas (rango 330-385 días).
 """
 
 from __future__ import annotations
@@ -24,8 +26,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-ORACLE_VERSION = "v10.2-oraculo"
-SEC_USER_AGENT = "RadarCocodriloPro/10.2 (contact: carlosgomezs.radar@gmail.com)"
+ORACLE_VERSION = "v10.3-oraculo"
+SEC_USER_AGENT = "RadarCocodriloPro/10.3 (contact: carlosgomezs.radar@gmail.com)"
 VALID_VERDICTS = ("TEMPORAL", "DUDOSO", "PERMANENTE", "EVIDENCIA_INSUFICIENTE")
 
 _sec_cik_map: Optional[Dict[str, str]] = None
@@ -34,7 +36,7 @@ _sec_cik_error: Optional[str] = None
 
 def _sf(val: Any) -> Optional[float]:
     try:
-        if val is None or (isinstance(val, float) and (math.isnan(val) or math.isinf(val))):
+        if val is None or isinstance(val, bool) or (isinstance(val, float) and (math.isnan(val) or math.isinf(val))):
             return None
         f = float(val)
         return None if (math.isnan(f) or math.isinf(f)) else f
@@ -84,8 +86,57 @@ def _row(df: Optional[pd.DataFrame], names: List[str]) -> Optional[pd.Series]:
     return None
 
 
+def extract_forward_revenue_growth(t: Any, info: Dict[str, Any]) -> Tuple[Optional[float], str]:
+    """Extrae crecimiento previsto de ingresos futuros (0y / +1y) desde t.revenue_estimate.
+
+    Devuelve (porcentaje_crecimiento_previsto_o_None, estado):
+    - OK: previsión obtenida (si existen 0y y +1y, toma el más conservador para detectar frenazos).
+    - MISSING: Yahoo no devuelve estimaciones anuales de ingresos.
+    - ERROR: fallo consultando t.revenue_estimate.
+    """
+    direct = _sf(info.get("forwardRevenueGrowth"))
+    if direct is not None:
+        return round(direct * 100.0, 1), "OK"
+
+    try:
+        rev_est = getattr(t, "revenue_estimate", None)
+    except Exception:
+        return None, "ERROR"
+
+    if rev_est is None or not isinstance(rev_est, pd.DataFrame) or rev_est.empty:
+        return None, "MISSING"
+
+    idx_map = {str(k).strip().lower(): k for k in rev_est.index}
+    cols_map = {str(c).strip().lower(): c for c in rev_est.columns}
+    growth_col = cols_map.get("growth")
+    avg_col = cols_map.get("avg")
+    ago_col = cols_map.get("yearagorevenue")
+
+    found_pcts: List[float] = []
+    for period in ("0y", "+1y"):
+        row_key = idx_map.get(period)
+        if row_key is None:
+            continue
+        row = rev_est.loc[row_key]
+        if isinstance(row, pd.DataFrame):
+            row = row.iloc[0]
+
+        g_val = _sf(row.get(growth_col)) if growth_col is not None else None
+        if g_val is None and avg_col is not None and ago_col is not None:
+            avg_v = _sf(row.get(avg_col))
+            ago_v = _sf(row.get(ago_col))
+            if avg_v is not None and ago_v is not None and ago_v > 0:
+                g_val = (avg_v / ago_v) - 1.0
+        if g_val is not None:
+            found_pcts.append(round(g_val * 100.0, 1))
+
+    if not found_pcts:
+        return None, "MISSING"
+    return min(found_pcts), "OK"
+
+
 def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> Dict[str, Any]:
-    """Calcula Piotroski (sin reescalar), cobertura de intereses, estabilidad de márgenes y Forward Check tri-estado."""
+    """Calcula Piotroski (sin reescalar), cobertura de intereses, estabilidad de márgenes y Forward Check real."""
     out: Dict[str, Any] = {
         "oracle_version": ORACLE_VERSION,
         "piotroski_score": None,
@@ -93,6 +144,10 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
         "interest_coverage": None,
         "margin_spread_pct": None,
         "is_cyclical_risk": False,
+        "hist_rev_growth_pct": None,
+        "forward_eps_growth_pct": None,
+        "forward_rev_growth_pct": None,
+        "forward_rev_status": "MISSING",
         "forward_ok": None,
         "forward_status": "MISSING",
         "oracle_flags": [],
@@ -208,38 +263,58 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
                 out["is_cyclical_risk"] = True
                 flags.append(f"Márgenes cíclicos/volátiles (oscilación {spread:.1f} pp en {len(margins)}a)")
 
-    # --- 4) FORWARD CHECK TRI-ESTADO (True solo si hay estimaciones completas y sanas) ---
+    # --- 4) FORWARD CHECK REAL (separa crecimiento histórico de previsiones futuras) ---
+    hist_rev_g = _sf(info.get("revenueGrowth"))
+    if hist_rev_g is not None:
+        out["hist_rev_growth_pct"] = round(hist_rev_g * 100.0, 1)
+        if hist_rev_g < -0.05:
+            flags.append(f"Ingresos históricos cayendo ({hist_rev_g * 100:.1f}%)")
+
     tr_eps = _sf(info.get("trailingEps"))
     fw_eps = _sf(info.get("forwardEps"))
-    rev_g = _sf(info.get("revenueGrowth"))
 
     eps_checked = False
-    rev_checked = False
+    fwd_rev_checked = False
     forward_failed = False
 
     if tr_eps is not None and fw_eps is not None and tr_eps > 0:
         eps_checked = True
-        eps_chg = ((fw_eps / tr_eps) - 1.0) * 100.0
+        eps_chg = round(((fw_eps / tr_eps) - 1.0) * 100.0, 1)
+        out["forward_eps_growth_pct"] = eps_chg
         if eps_chg < -10.0:
             forward_failed = True
             flags.append(f"BPA futuro previsto a la baja ({eps_chg:.1f}%)")
 
-    if rev_g is not None:
-        rev_checked = True
-        if rev_g < -0.05:
-            forward_failed = True
-            flags.append(f"Ingresos cayendo ({rev_g * 100:.1f}%)")
+    # Solo consultar t.revenue_estimate en candidatas relevantes (o tests sin status) para evitar 429 masivos
+    status_val = rec.get("status")
+    if status_val in (None, "OPORTUNIDAD", "VIGILAR"):
+        fwd_rev_pct, fwd_rev_st = extract_forward_revenue_growth(t, info)
+        out["forward_rev_growth_pct"] = fwd_rev_pct
+        out["forward_rev_status"] = fwd_rev_st
+        if fwd_rev_pct is not None:
+            fwd_rev_checked = True
+            if fwd_rev_pct < -5.0:
+                forward_failed = True
+                flags.append(f"Ventas futuras previstas a la baja ({fwd_rev_pct:.1f}%)")
+    else:
+        out["forward_rev_status"] = "SKIPPED"
 
     if forward_failed:
         out["forward_ok"] = False
         out["forward_status"] = "FAIL"
-    elif eps_checked and rev_checked:
+    elif eps_checked and fwd_rev_checked:
         out["forward_ok"] = True
         out["forward_status"] = "OK"
     else:
         out["forward_ok"] = None
         out["forward_status"] = "MISSING"
-        flags.append("Estimaciones futuras incompletas (faltan forwardEps/trailingEps o revenueGrowth)")
+        if status_val in (None, "OPORTUNIDAD", "VIGILAR"):
+            missing_parts = []
+            if not eps_checked:
+                missing_parts.append("BPA futuro")
+            if not fwd_rev_checked:
+                missing_parts.append("ingresos futuros previstos")
+            flags.append(f"Previsiones futuras incompletas (falta {' y '.join(missing_parts)})")
 
     out["oracle_flags"] = flags
     return out
@@ -290,9 +365,13 @@ def _extract_annual_10k_by_end(
     tags: List[str],
     unit: str = "USD",
 ) -> Dict[str, float]:
-    """Extrae valores de ejercicio fiscal completo (10-K, ~330-385 días) indexados por fecha 'end' (YYYY-MM-DD)."""
-    by_end: Dict[str, Tuple[str, float]] = {}
-    for tag in tags:
+    """Extrae valores de ejercicio fiscal completo (10-K y 10-K/A, 330-385 días incl. años de 53 semanas).
+
+    Combina todas las etiquetas válidas entre ejercicios distintos y, para un mismo cierre fiscal,
+    prioriza la presentación más reciente (10-K/A enmendado por delante del 10-K original) y la etiqueta primaria.
+    """
+    by_end: Dict[str, Tuple[str, int, int, float]] = {}
+    for tag_idx, tag in enumerate(tags):
         node = facts_us_gaap.get(tag)
         if not isinstance(node, dict):
             continue
@@ -300,7 +379,8 @@ def _extract_annual_10k_by_end(
         for x in arr:
             if not isinstance(x, dict):
                 continue
-            if x.get("form") != "10-K":
+            form = str(x.get("form") or "").upper().strip()
+            if form not in ("10-K", "10-K/A"):
                 continue
             frame = str(x.get("frame") or "")
             if frame and "Q" in frame.upper():
@@ -317,16 +397,16 @@ def _extract_annual_10k_by_end(
                     if days < 330 or days > 385:
                         continue
             filed_s = str(x.get("filed") or "")
+            is_amend = 1 if form == "10-K/A" else 0
+            cand = (filed_s, is_amend, -tag_idx, val)
             prev = by_end.get(end_s)
-            if prev is None or filed_s > prev[0]:
-                by_end[end_s] = (filed_s, val)
-        if by_end:
-            break
-    return {end_s: pair[1] for end_s, pair in by_end.items()}
+            if prev is None or cand[:3] > prev[:3]:
+                by_end[end_s] = cand
+    return {end_s: item[3] for end_s, item in by_end.items()}
 
 
 def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
-    """Cruza FCF oficial 10-K (USD) en SEC EDGAR contra Yahoo con alineación estricta de ejercicio fiscal."""
+    """Cruza FCF oficial 10-K/10-K/A (USD) en SEC EDGAR contra Yahoo con alineación estricta de ejercicio fiscal."""
     ticker = (rec.get("ticker") or "").upper()
     if "." in ticker or rec.get("region") != "EE. UU.":
         return {"sec_status": "NO_US", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "Empresa no cotizada en SEC (EE. UU.)"}
@@ -359,13 +439,13 @@ def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
                 "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
             ],
         )
+        # Solo pagos reales de CapEx en efectivo (se excluye CapitalExpendituresIncurredButNotYetPaid)
         capex_map = _extract_annual_10k_by_end(
             us_gaap,
             [
                 "PaymentsToAcquirePropertyPlantAndEquipment",
                 "PaymentsToAcquireProductiveAssets",
                 "PaymentsToAcquirePropertyPlantAndEquipmentAndIntangibleAssets",
-                "CapitalExpendituresIncurredButNotYetPaid",
                 "PaymentsForCapitalImprovements",
             ],
         )
@@ -377,7 +457,7 @@ def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
         if not ocf_map:
             return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "SEC 10-K sin OCF anual estándar"}
         if not capex_map:
-            return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "SEC 10-K sin CapEx estándar (no se asume 0)"}
+            return {"sec_status": "INCOMPLETE", "sec_verified": None, "sec_fiscal_end": None, "sec_note": "SEC 10-K sin pagos de CapEx en efectivo (no se asume 0 ni devengado)"}
 
         common_ends = sorted(set(ocf_map.keys()).intersection(capex_map.keys()), reverse=True)
         if not common_ends:
@@ -524,18 +604,16 @@ def _normalize_verdict(val: Any) -> Optional[str]:
 
 
 def validate_tribunal_payload(parsed: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-    """Valida que el JSON del Tribunal IA esté 100% completo: rechaza campos vacíos o riesgo ausente."""
+    """Valida que el JSON del Tribunal IA esté 100% completo y riesgo_trampa sea un entero estricto 0-10."""
     verdict = _normalize_verdict(parsed.get("veredicto"))
     if not verdict:
         return None, f"veredicto fuera de enum ({parsed.get('veredicto')})"
 
     raw_risk = parsed.get("riesgo_trampa")
-    if isinstance(raw_risk, bool) or raw_risk is None:
-        return None, "riesgo_trampa ausente"
-    f_risk = _sf(raw_risk)
-    if f_risk is None or f_risk < 0 or f_risk > 10:
+    if type(raw_risk) is not int:
+        return None, f"riesgo_trampa debe ser un entero exacto 0-10 (recibido {type(raw_risk).__name__}: {raw_risk})"
+    if raw_risk < 0 or raw_risk > 10:
         return None, f"riesgo_trampa fuera de rango 0-10 ({raw_risk})"
-    risk_int = int(round(f_risk))
 
     req_texts = {}
     for key in ("fiscal", "abogado", "comprobar_5min"):
@@ -546,7 +624,7 @@ def validate_tribunal_payload(parsed: Dict[str, Any]) -> Tuple[Optional[Dict[str
 
     return {
         "veredicto": verdict,
-        "riesgo_trampa": risk_int,
+        "riesgo_trampa": raw_risk,
         **req_texts,
     }, None
 
@@ -582,6 +660,7 @@ def run_tribunal_ia(
         f"Números: Precio {rec['price']} {rec['currency']} (52s: {rec['drawdown_52w_pct']}%), Score {rec['quality_score']}/100, "
         f"ROIC {rec['roic_pct']}%, Piotroski {rec.get('piotroski_score')}/{rec.get('piotroski_max')}, "
         f"Cobertura intereses {rec.get('interest_coverage')}x, P/FCF {rec['p_fcf']}x, PER futuro {rec['forward_pe']}x, "
+        f"Previsión ingresos: {rec.get('forward_rev_growth_pct')}% ({rec.get('forward_rev_status')}), "
         f"DCF base {dcf.get('intrinsic_base')} {rec['currency']}, Compras directivos 90d: {rec.get('insider_buys_90d')}.\n"
         f"Auditoría SEC: {sec_note}.\n"
         f"Avisos automáticos: {flags_block}.\n"
@@ -594,7 +673,7 @@ def run_tribunal_ia(
         '  "riesgo_trampa": 5,\n'
         '  "veredicto": "TEMPORAL | DUDOSO | PERMANENTE | EVIDENCIA_INSUFICIENTE"\n'
         '}\n'
-        "riesgo_trampa debe ser un número entero del 0 (segurísima) al 10 (trampa mortal)."
+        "riesgo_trampa debe ser un número ENTERO exacto (sin decimales) del 0 (segurísima) al 10 (trampa mortal)."
     )
 
     payload = json.dumps({
@@ -648,7 +727,7 @@ def run_tribunal_ia(
 
 
 def is_oro_puro(rec: Dict[str, Any]) -> bool:
-    """Filtro francotirador final v10.2 (tolerancia cero real): NINGUNA ausencia de datos aprueba."""
+    """Filtro francotirador final v10.3 (tolerancia cero real): NINGUNA ausencia de datos aprueba."""
     if rec.get("status") != "OPORTUNIDAD":
         return False
     if rec.get("opportunity_tier") not in ("ENTRADA_YA", "GANGA"):
@@ -658,7 +737,7 @@ def is_oro_puro(rec: Dict[str, Any]) -> bool:
     if rec.get("sec_verified") is not True or rec.get("sec_status") != "VERIFIED":
         return False
 
-    # 2) Anti-cíclicas y estimaciones futuras verificadas (None o False bloquean)
+    # 2) Anti-cíclicas y Forward Check real verificado (BPA futuro + ingresos futuros previstos)
     if rec.get("is_cyclical_risk") or rec.get("forward_ok") is not True:
         return False
 
@@ -675,11 +754,510 @@ def is_oro_puro(rec: Dict[str, Any]) -> bool:
         if cov is None or cov < 8.0:
             return False
 
-    # 5) Tribunal IA completo obligatorio: veredicto TEMPORAL + nota de riesgo explícita <= 4/10
+    # 5) Tribunal IA completo obligatorio: veredicto TEMPORAL + nota de riesgo entero estricto <= 4/10
     if rec.get("ai_verdict") != "TEMPORAL":
         return False
     risk = rec.get("trap_risk_score")
-    if risk is None or not isinstance(risk, int) or risk > 4:
+    if type(risk) is not int or risk < 0 or risk > 4:
         return False
 
     return True
+
+"""Batería de pruebas automatizadas (unitarias + integración) — Radar Cocodrilo v10.3.
+
+Ejecutar desde la raíz del repo:
+    python -m unittest scanner/test_oracle_v10.py -v
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import types
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import pandas as pd
+
+SCANNER_DIR = Path(__file__).resolve().parent
+if str(SCANNER_DIR) not in sys.path:
+    sys.path.insert(0, str(SCANNER_DIR))
+
+import oracle_v10 as o10
+
+
+def _make_rev_estimate(growth_0y: float = 0.08, growth_1y: float = 0.09) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "avg": [540e6, 588e6],
+            "yearAgoRevenue": [500e6, 540e6],
+            "growth": [growth_0y, growth_1y],
+        },
+        index=["0y", "+1y"],
+    )
+
+
+class DummyTickerFull:
+    def __init__(self, rev_estimate: pd.DataFrame | None = None, has_rev_est: bool = True):
+        self.financials = pd.DataFrame({
+            "2025-12-31": [120, 500, 300, 150, 10, 100],
+            "2024-12-31": [100, 450, 265, 130, 10, 102],
+            "2023-12-31": [90, 410, 240, 118, 10, 105],
+        }, index=["Net Income", "Total Revenue", "Gross Profit", "EBIT", "Interest Expense", "Diluted Average Shares"])
+        self.balance_sheet = pd.DataFrame({
+            "2025-12-31": [1000, 100, 400, 150],
+            "2024-12-31": [980, 120, 360, 160],
+        }, index=["Total Assets", "Long Term Debt", "Current Assets", "Current Liabilities"])
+        self.cashflow = pd.DataFrame({
+            "2025-12-31": [140],
+            "2024-12-31": [115],
+        }, index=["Operating Cash Flow"])
+        self.revenue_estimate = rev_estimate if rev_estimate is not None else (_make_rev_estimate() if has_rev_est else None)
+
+
+class DummyTickerPartialPiotroski:
+    """Solo 6 señales disponibles (de 9) y las 6 positivas -> NO debe reescalarse a 9/9."""
+    def __init__(self):
+        self.financials = pd.DataFrame({
+            "2025-12-31": [120, 500, 150],
+            "2024-12-31": [100, 450, 130],
+        }, index=["Net Income", "Total Revenue", "EBIT"])
+        self.balance_sheet = pd.DataFrame({
+            "2025-12-31": [1000, 100],
+            "2024-12-31": [980, 120],
+        }, index=["Total Assets", "Long Term Debt"])
+        self.cashflow = pd.DataFrame({
+            "2025-12-31": [140],
+            "2024-12-31": [115],
+        }, index=["Operating Cash Flow"])
+        self.revenue_estimate = _make_rev_estimate()
+
+
+def _base_oro_record() -> dict:
+    return {
+        "ticker": "ACME",
+        "region": "EE. UU.",
+        "currency": "USD",
+        "financial_currency": "USD",
+        "status": "OPORTUNIDAD",
+        "opportunity_tier": "GANGA",
+        "sec_status": "VERIFIED",
+        "sec_verified": True,
+        "is_cyclical_risk": False,
+        "forward_ok": True,
+        "piotroski_score": 8,
+        "piotroski_max": 9,
+        "interest_coverage": 12.0,
+        "net_debt_ebitda": 0.5,
+        "ai_verdict": "TEMPORAL",
+        "trap_risk_score": 3,
+    }
+
+
+class TestOracleV103(unittest.TestCase):
+    def setUp(self):
+        o10._sec_cik_map = None
+        o10._sec_cik_error = None
+
+    # --- 1) PIOTROSKI SIN REESCALADO ---
+    def test_piotroski_no_rescaling_blocks_oro_puro(self):
+        chk = o10.compute_oracle_checks(
+            DummyTickerPartialPiotroski(),
+            {"trailingEps": 5.0, "forwardEps": 5.5, "revenueGrowth": 0.10},
+            {"sector_profile": "general", "status": "OPORTUNIDAD"},
+        )
+        self.assertEqual(chk["piotroski_score"], 6)
+        self.assertEqual(chk["piotroski_max"], 6)
+        rec = dict(_base_oro_record(), piotroski_score=chk["piotroski_score"], piotroski_max=chk["piotroski_max"])
+        self.assertFalse(o10.is_oro_puro(rec))
+
+    def test_piotroski_full_passes(self):
+        chk = o10.compute_oracle_checks(
+            DummyTickerFull(),
+            {"trailingEps": 5.0, "forwardEps": 5.5, "revenueGrowth": 0.10},
+            {"sector_profile": "general", "status": "OPORTUNIDAD"},
+        )
+        self.assertEqual(chk["piotroski_score"], 9)
+        self.assertEqual(chk["piotroski_max"], 9)
+        self.assertIs(chk["forward_ok"], True)
+        self.assertEqual(chk["forward_rev_growth_pct"], 8.0)
+
+    # --- 2) FORWARD CHECK REAL (HISTÓRICO VS PREVISIÓN FUTURA) ---
+    def test_forward_check_missing_estimates_is_none_and_blocks(self):
+        chk = o10.compute_oracle_checks(
+            DummyTickerFull(has_rev_est=False),
+            {"trailingEps": 5.0, "forwardEps": 5.6, "revenueGrowth": 0.18},
+            {"sector_profile": "general", "status": "OPORTUNIDAD"},
+        )
+        self.assertEqual(chk["hist_rev_growth_pct"], 18.0)
+        self.assertIsNone(chk["forward_rev_growth_pct"])
+        self.assertEqual(chk["forward_rev_status"], "MISSING")
+        self.assertIsNone(chk["forward_ok"])
+        self.assertEqual(chk["forward_status"], "MISSING")
+        self.assertFalse(o10.is_oro_puro(dict(_base_oro_record(), forward_ok=chk["forward_ok"])))
+
+    def test_forward_check_hist_positive_but_forward_revenue_negative_fails(self):
+        chk = o10.compute_oracle_checks(
+            DummyTickerFull(rev_estimate=_make_rev_estimate(growth_0y=0.02, growth_1y=-0.085)),
+            {"trailingEps": 5.0, "forwardEps": 5.3, "revenueGrowth": 0.15},
+            {"sector_profile": "general", "status": "OPORTUNIDAD"},
+        )
+        self.assertEqual(chk["hist_rev_growth_pct"], 15.0)
+        self.assertEqual(chk["forward_rev_growth_pct"], -8.5)
+        self.assertIs(chk["forward_ok"], False)
+        self.assertEqual(chk["forward_status"], "FAIL")
+        self.assertFalse(o10.is_oro_puro(dict(_base_oro_record(), forward_ok=chk["forward_ok"])))
+
+    def test_forward_check_negative_eps_fails(self):
+        chk = o10.compute_oracle_checks(
+            DummyTickerFull(),
+            {"trailingEps": 5.0, "forwardEps": 4.0, "revenueGrowth": 0.05},
+            {"sector_profile": "general", "status": "OPORTUNIDAD"},
+        )
+        self.assertIs(chk["forward_ok"], False)
+        self.assertEqual(chk["forward_status"], "FAIL")
+
+    # --- 3) SEC EDGAR: CAPEX DEVENGADO, MULTI-ETIQUETA, 53 SEMANAS Y 10-K/A ---
+    @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
+    @patch.object(o10, "_read_http_json")
+    def test_sec_missing_capex_returns_incomplete(self, mock_http, _mock_cik):
+        mock_http.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "NetCashProvidedByUsedInOperatingActivities": {
+                        "units": {"USD": [{"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 10e9}]}
+                    }
+                }
+            }
+        }
+        rec = {
+            "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
+            "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 8e9, "owner_earnings_adjusted": False,
+        }
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "INCOMPLETE")
+        self.assertIsNone(res["sec_verified"])
+
+    @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
+    @patch.object(o10, "_read_http_json")
+    def test_sec_unpaid_accrued_capex_is_ignored_and_incomplete(self, mock_http, _mock_cik):
+        """CapitalExpendituresIncurredButNotYetPaid NO debe usarse como CapEx pagado en efectivo."""
+        mock_http.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "NetCashProvidedByUsedInOperatingActivities": {
+                        "units": {"USD": [{"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 10e9}]}
+                    },
+                    "CapitalExpendituresIncurredButNotYetPaid": {
+                        "units": {"USD": [{"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 1.5e9}]}
+                    },
+                }
+            }
+        }
+        rec = {
+            "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
+            "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 8.5e9, "owner_earnings_adjusted": False,
+        }
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "INCOMPLETE")
+        self.assertIsNone(res["sec_verified"])
+
+    @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
+    @patch.object(o10, "_read_http_json")
+    def test_sec_multiple_capex_tags_across_years(self, mock_http, _mock_cik):
+        """Empresa que usó tag 1 en 2024 y cambió a tag 2 en 2025 debe alinear correctamente 2025."""
+        mock_http.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "NetCashProvidedByUsedInOperatingActivities": {
+                        "units": {"USD": [
+                            {"form": "10-K", "start": "2024-01-01", "end": "2024-12-31", "filed": "2025-02-20", "val": 9e9},
+                            {"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 11e9},
+                        ]}
+                    },
+                    "PaymentsToAcquirePropertyPlantAndEquipment": {
+                        "units": {"USD": [
+                            {"form": "10-K", "start": "2024-01-01", "end": "2024-12-31", "filed": "2025-02-20", "val": 2e9},
+                        ]}
+                    },
+                    "PaymentsToAcquireProductiveAssets": {
+                        "units": {"USD": [
+                            {"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 3e9},
+                        ]}
+                    },
+                }
+            }
+        }
+        rec = {
+            "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
+            "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 8.0e9, "owner_earnings_adjusted": False,
+        }
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "VERIFIED")
+        self.assertIs(res["sec_verified"], True)
+        self.assertEqual(res["sec_fiscal_end"], "2025-12-31")
+
+    @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
+    @patch.object(o10, "_read_http_json")
+    def test_sec_53_week_fiscal_year_accepted(self, mock_http, _mock_cik):
+        """Ejercicio fiscal de 53 semanas (370-371 días) debe ser aceptado como anual válido."""
+        mock_http.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "NetCashProvidedByUsedInOperatingActivities": {
+                        "units": {"USD": [
+                            {"form": "10-K", "start": "2024-12-29", "end": "2026-01-03", "filed": "2026-02-25", "val": 10e9},
+                        ]}
+                    },
+                    "PaymentsToAcquirePropertyPlantAndEquipment": {
+                        "units": {"USD": [
+                            {"form": "10-K", "start": "2024-12-29", "end": "2026-01-03", "filed": "2026-02-25", "val": 2e9},
+                        ]}
+                    },
+                }
+            }
+        }
+        rec = {
+            "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
+            "fcf_latest_date": "2026-01-03", "fcf_latest_trade": 8.1e9, "owner_earnings_adjusted": False,
+        }
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "VERIFIED")
+        self.assertIs(res["sec_verified"], True)
+        self.assertEqual(res["sec_fiscal_end"], "2026-01-03")
+
+    @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
+    @patch.object(o10, "_read_http_json")
+    def test_sec_10ka_restatement_overrides_original_10k(self, mock_http, _mock_cik):
+        """Una enmienda 10-K/A posterior que rebaja la caja debe prevalecer sobre el 10-K original."""
+        mock_http.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "NetCashProvidedByUsedInOperatingActivities": {
+                        "units": {"USD": [
+                            {"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 10e9},
+                            {"form": "10-K/A", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-05-10", "val": 5e9},
+                        ]}
+                    },
+                    "PaymentsToAcquirePropertyPlantAndEquipment": {
+                        "units": {"USD": [
+                            {"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 2e9},
+                        ]}
+                    },
+                }
+            }
+        }
+        rec = {
+            "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
+            "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 8.0e9, "owner_earnings_adjusted": False,
+        }
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "MISMATCH")
+        self.assertIs(res["sec_verified"], False)
+
+    @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
+    @patch.object(o10, "_read_http_json")
+    def test_sec_fiscal_period_mismatch_blocked(self, mock_http, _mock_cik):
+        mock_http.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "NetCashProvidedByUsedInOperatingActivities": {
+                        "units": {"USD": [{"form": "10-K", "start": "2024-01-01", "end": "2024-12-31", "filed": "2025-02-20", "val": 10e9}]}
+                    },
+                    "PaymentsToAcquirePropertyPlantAndEquipment": {
+                        "units": {"USD": [{"form": "10-K", "start": "2024-01-01", "end": "2024-12-31", "filed": "2025-02-20", "val": 2e9}]}
+                    },
+                }
+            }
+        }
+        rec = {
+            "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
+            "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 8e9, "owner_earnings_adjusted": False,
+        }
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "PERIOD_MISMATCH")
+        self.assertIsNone(res["sec_verified"])
+
+    @patch.object(o10, "_read_http_json", side_effect=RuntimeError("HTTP 403 Forbidden"))
+    def test_sec_cik_download_failure_returns_error_not_no_cik(self, _mock_http):
+        rec = {"ticker": "ADBE", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD"}
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "ERROR")
+        self.assertIsNone(res["sec_verified"])
+
+    # --- 4) GEMINI: VALIDACIÓN ESTRICTA DE ENTERO Y CAMPOS OBLIGATORIOS ---
+    def test_gemini_decimal_and_incomplete_payload_rejected(self):
+        base_ok = {
+            "fiscal": "Riesgo real de márgenes a la baja por competencia.",
+            "abogado": "Marca líder con caja neta y clientes recurrentes.",
+            "comprobar_5min": "Revisar guía trimestral y crecimiento orgánico.",
+            "riesgo_trampa": 3,
+            "veredicto": "TEMPORAL",
+        }
+        v_dec, e_dec = o10.validate_tribunal_payload(dict(base_ok, riesgo_trampa=3.7))
+        self.assertIsNone(v_dec)
+        self.assertIn("entero", e_dec)
+
+        for bad_val in (3.0, True, "3", None, -1, 11):
+            v_b, e_b = o10.validate_tribunal_payload(dict(base_ok, riesgo_trampa=bad_val))
+            self.assertIsNone(v_b, f"Debió rechazar riesgo_trampa={bad_val!r}")
+            self.assertIsNotNone(e_b)
+
+        v_inc, e_inc = o10.validate_tribunal_payload({"veredicto": "TEMPORAL", "riesgo_trampa": 3})
+        self.assertIsNone(v_inc)
+        self.assertIsNotNone(e_inc)
+
+        v_ok, e_ok = o10.validate_tribunal_payload(base_ok)
+        self.assertIsNone(e_ok)
+        self.assertEqual(v_ok["veredicto"], "TEMPORAL")
+        self.assertEqual(v_ok["riesgo_trampa"], 3)
+
+    # --- 5) ORO PURO TOLERANCIA CERO ---
+    def test_oro_puro_strict_gates(self):
+        good = _base_oro_record()
+        self.assertTrue(o10.is_oro_puro(good))
+        self.assertFalse(o10.is_oro_puro(dict(good, sec_verified=None)))
+        self.assertFalse(o10.is_oro_puro(dict(good, sec_status="PERIOD_MISMATCH")))
+        self.assertFalse(o10.is_oro_puro(dict(good, forward_ok=None)))
+        self.assertFalse(o10.is_oro_puro(dict(good, forward_ok=False)))
+        self.assertFalse(o10.is_oro_puro(dict(good, trap_risk_score=None)))
+        self.assertFalse(o10.is_oro_puro(dict(good, trap_risk_score=3.5)))
+        self.assertFalse(o10.is_oro_puro(dict(good, piotroski_score=6, piotroski_max=6)))
+        self.assertFalse(o10.is_oro_puro(dict(good, ai_verdict="EVIDENCIA_INSUFICIENTE")))
+
+    # --- 6) PRUEBA DE INTEGRACIÓN COMPLETA (ESCANEO -> ORÁCULO -> JSON PUBLICADO) ---
+    def test_end_to_end_scan_to_published_json(self):
+        """Prueba de integración de principio a fin: analyze_ticker -> main() -> JSONs coherentes v10.3."""
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: ["ACME"]
+            stub_u.parse_custom_tickers = lambda s: ["ACME"]
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+
+        class MockYFTicker:
+            def __init__(self, sym: str):
+                self.sym = sym
+                self.info = {
+                    "shortName": "Acme Quality Corp",
+                    "currency": "USD",
+                    "financialCurrency": "USD",
+                    "currentPrice": 50.0,
+                    "marketCap": 50e9,
+                    "sharesOutstanding": 1e9,
+                    "fiftyTwoWeekHigh": 85.0,
+                    "fiftyTwoWeekLow": 48.0,
+                    "sector": "Technology",
+                    "industry": "Software",
+                    "operatingMargins": 0.30,
+                    "revenueGrowth": 0.12,
+                    "earningsGrowth": 0.12,
+                    "trailingPE": 14.0,
+                    "forwardPE": 12.0,
+                    "trailingEps": 3.5,
+                    "forwardEps": 4.1,
+                    "totalDebt": 2e9,
+                    "totalCash": 6e9,
+                    "ebitda": 8e9,
+                }
+                self.financials = pd.DataFrame({
+                    "2025-12-31": [4.0e9, 20e9, 15e9, 6.0e9, 0.2e9, 1.0e9, 5.0e9, 1.0e9],
+                    "2024-12-31": [3.5e9, 18e9, 13.4e9, 5.3e9, 0.2e9, 1.02e9, 4.4e9, 0.9e9],
+                    "2023-12-31": [3.1e9, 16e9, 11.8e9, 4.7e9, 0.2e9, 1.05e9, 3.9e9, 0.8e9],
+                }, index=[
+                    "Net Income", "Total Revenue", "Gross Profit", "EBIT", "Interest Expense",
+                    "Diluted Average Shares", "Pretax Income", "Tax Provision",
+                ])
+                self.balance_sheet = pd.DataFrame({
+                    "2025-12-31": [30e9, 2e9, 2e9, 18e9, 6e9, 12e9, 4e9],
+                    "2024-12-31": [28e9, 2.5e9, 2.5e9, 16e9, 5e9, 10e9, 4.2e9],
+                }, index=[
+                    "Total Assets", "Total Debt", "Long Term Debt", "Stockholders Equity",
+                    "Cash And Cash Equivalents", "Current Assets", "Current Liabilities",
+                ])
+                self.cashflow = pd.DataFrame({
+                    "2025-12-31": [5.5e9, -0.5e9, 5.0e9, 0.1e9],
+                    "2024-12-31": [5.1e9, -0.5e9, 4.6e9, 0.1e9],
+                    "2023-12-31": [4.7e9, -0.5e9, 4.2e9, 0.1e9],
+                }, index=["Operating Cash Flow", "Capital Expenditure", "Free Cash Flow", "Stock Based Compensation"])
+                self.revenue_estimate = _make_rev_estimate(growth_0y=0.09, growth_1y=0.10)
+                self.insider_transactions = pd.DataFrame()
+                self.news = [{"title": "Acme posts strong cloud growth despite macro pullback", "publisher": "Reuters"}]
+
+            def history(self, period="5d"):
+                return pd.DataFrame({"Close": [0.92]})
+
+        sec_ok = {
+            "sec_status": "VERIFIED",
+            "sec_verified": True,
+            "sec_fiscal_end": "2025-12-31",
+            "sec_note": "Verificado 10-K SEC 2025-12-31 (desviación 2% en caja)",
+        }
+        tribunal_ok = (
+            "FISCAL: Competencia creciente.\nABOGADO: Caja neta y márgenes 30%.\n"
+            "COMPROBAR (5 min): Guía Q1.\nRIESGO_TRAMPA: 3/10\nVEREDICTO: TEMPORAL",
+            "TEMPORAL",
+            3,
+            None,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            with (
+                patch.object(bs, "DATA_DIR", tmp_dir),
+                patch.object(bs, "OUT_LATEST_JSON", tmp_dir / "latest-scan.json"),
+                patch.object(bs, "OUT_DAILY_JSON", tmp_dir / "daily-scan.json"),
+                patch.object(bs, "OUT_WEEKLY_JSON", tmp_dir / "weekly-scan.json"),
+                patch.object(bs, "OUT_HISTORY_JSON", tmp_dir / "history.json"),
+                patch.object(bs, "UNIVERSE_MODE", "rotacion_diaria"),
+                patch.object(bs, "SHARD_TOTAL", 1),
+                patch.object(bs, "MERGE_DIR", ""),
+                patch.object(bs, "URGENT_ONLY", False),
+                patch.object(bs, "GEMINI_API_KEY", "fake-key"),
+                patch.object(bs, "get_universe", return_value=["ACME"]),
+                patch.object(bs, "get_market_context", return_value={"vix": 18.0, "us10y_pct": 4.2, "sp500_drawdown_pct": -3.0, "regime": "NORMAL", "summary": "OK"}),
+                patch.object(bs, "verify_with_sec_edgar", return_value=sec_ok),
+                patch.object(bs, "run_tribunal_ia", return_value=tribunal_ok),
+                patch.object(bs, "send_telegram", return_value=None),
+                patch.object(bs.yf, "Ticker", side_effect=MockYFTicker),
+                patch.object(bs.time, "sleep", return_value=None),
+            ):
+                bs.main()
+
+            latest_path = tmp_dir / "latest-scan.json"
+            daily_path = tmp_dir / "daily-scan.json"
+            hist_path = tmp_dir / "history.json"
+            self.assertTrue(latest_path.exists())
+            self.assertTrue(daily_path.exists())
+            self.assertTrue(hist_path.exists())
+
+            published = json.loads(latest_path.read_text(encoding="utf-8"))
+            self.assertEqual(published["scanner_version"], "v10.3-oraculo")
+            self.assertIn("fx_rates_eur", published)
+            self.assertEqual(len(published["companies"]), 1)
+
+            c = published["companies"][0]
+            self.assertEqual(c["ticker"], "ACME")
+            self.assertEqual(c["oracle_version"], "v10.3-oraculo")
+            self.assertEqual(c["fcf_latest_date"], "2025-12-31")
+            self.assertIs(c["forward_ok"], True)
+            self.assertEqual(c["forward_rev_growth_pct"], 9.0)
+            self.assertEqual(c["piotroski_score"], 9)
+            self.assertEqual(c["piotroski_max"], 9)
+            self.assertTrue(c["oro_puro"])
+
+
+if __name__ == "__main__":
+    unittest.main()
