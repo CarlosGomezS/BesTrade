@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-26T11:09:02.748997+00:00",
+  "updated_at": "2026-11-26T11:28:11.299399+00:00",
   "entries": [
     {
       "ticker": "GDDY",
@@ -55,7 +55,18 @@
       "last_price": 232.83,
       "return_pct": -0.3,
       "last_checked": "2026-11-26",
-      "current_status": "GANGA"
+      "current_status": "GANGA",
+      "milestones_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      },
+      "benchmarks": {
+        "msci_world_pct": null,
+        "sp500_pct": null
+      },
+      "status": "ACTIVA"
     },
     {
       "ticker": "DECK",
@@ -69,7 +80,18 @@
       "last_price": 85.56,
       "return_pct": 0.4,
       "last_checked": "2026-11-26",
-      "current_status": "GANGA"
+      "current_status": "ENTRADA_YA",
+      "milestones_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      },
+      "benchmarks": {
+        "msci_world_pct": null,
+        "sp500_pct": null
+      },
+      "status": "ACTIVA"
     }
   ]
 }
