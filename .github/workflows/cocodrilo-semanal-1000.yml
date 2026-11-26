@@ -1,8 +1,8 @@
-name: Mega Escaner Semanal 2000
+name: Radar Cocodrilo Semanal Mega +2000
 
 on:
   schedule:
-    - cron: "0 9 * * 6"
+    - cron: '0 8 * * 6'
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  scan-shard:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install --upgrade yfinance pandas
+
+      - name: Ejecutar tests del Oráculo (obligatorio)
+        run: python -m unittest scanner/test_oracle_v10.py -v
+
+  scan:
+    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -24,31 +43,31 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Python 3.11
+      - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Instalar dependencias
-        run: pip install --no-cache-dir -r requirements.txt
+        run: pip install --upgrade yfinance pandas
 
-      - name: Escanear bloque paralelo ${{ matrix.shard }}
+      - name: Escanear bloque ${{ matrix.shard }}
         env:
-          UNIVERSE_MODE: "global_mega"
+          UNIVERSE_MODE: global_mega
           SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_TOTAL: "6"
-          MAX_WORKERS: "3"
+          SHARD_TOTAL: 6
+          MAX_WORKERS: 3
         run: python scanner/buffett_scanner.py
 
-      - name: Guardar bloque temporal
+      - name: Subir shard ${{ matrix.shard }}
         uses: actions/upload-artifact@v4
         with:
-          name: cocodrilo-shard-${{ matrix.shard }}
+          name: shard-${{ matrix.shard }}
           path: data/shards/shard-${{ matrix.shard }}.json
           retention-days: 1
 
-  merge-and-publish:
-    needs: scan-shard
+  merge:
+    needs: scan
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -56,53 +75,44 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Python 3.11
+      - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Instalar dependencias
-        run: pip install --no-cache-dir -r requirements.txt
+        run: pip install --upgrade yfinance pandas
 
-      - name: Descargar todos los bloques
+      - name: Descargar los 6 shards
         uses: actions/download-artifact@v4
         with:
-          pattern: cocodrilo-shard-*
-          path: data/shards
-          merge-multiple: true
+          path: /tmp/cocodrilo_shards
 
-      - name: Fusionar + Filtro Gemini 3 + Avisar a Telegram
+      - name: Fusionar, auditar y avisar por Telegram
         env:
-          UNIVERSE_MODE: "global_mega"
-          MERGE_DIR: "data/shards"
-          TEST_MODE: "true"
+          UNIVERSE_MODE: global_mega
+          MERGE_DIR: /tmp/cocodrilo_shards
+          SHARD_TOTAL: 6
+          TEST_MODE: 'true'
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scanner/buffett_scanner.py
 
-      - name: Publicar resultados en el panel visual
+      - name: Publicar JSON semanal
         run: |
           mkdir -p /tmp/cocodrilo_out
-          for f in data/latest-scan.json data/weekly-scan.json data/history.json; do
-            if [ -f "$f" ]; then cp "$f" /tmp/cocodrilo_out/; fi
-          done
+          cp data/*.json /tmp/cocodrilo_out/ 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           git reset --hard origin/main
           mkdir -p data
           cp /tmp/cocodrilo_out/*.json data/ 2>/dev/null || true
-          git config user.name "Cocodrilo Bot"
-          git config user.email "bot@users.noreply.github.com"
           git add data/
-          git diff --staged --quiet || git commit -m "Mega-escaneo semanal global +2000 empresas"
-          git push
-
-      - name: Avisar a Telegram si falla el bot
-        if: failure()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=ERROR en Mega Escaner Semanal (${{ github.workflow }}). Revisa el fallo aqui: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if ! git diff --cached --quiet; then
+            git commit -m "Update Radar Cocodrilo weekly mega scan"
+            git push
+          else
+            echo "Sin cambios en data/"
+          fi
