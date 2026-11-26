@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cocodrilo">
 <link rel="manifest" href="./manifest.json">
-<title>Radar Cocodrilo Pro v10 — Oráculo</title>
+<title>Radar Cocodrilo Pro v10.1 — Oráculo Blindado</title>
 <style>
 :root{
   --bg:#060a08;--bg2:#0b120e;--glass:rgba(15,24,19,.84);--glass-strong:rgba(10,17,13,.94);
@@ -259,7 +259,7 @@ a{color:var(--emerald);text-decoration:none}
 .cmp-tbl th:first-child,.cmp-tbl td:first-child{text-align:left;color:var(--muted);font-weight:650}
 .win{color:var(--emerald);font-weight:900}
 
-.port-form{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:7px;margin-bottom:8px}
+.port-form{display:grid;grid-template-columns:1.1fr .9fr .8fr .75fr;gap:6px;margin-bottom:8px}
 @media(max-width:520px){.port-form{grid-template-columns:1fr 1fr}}
 .port-row{background:rgba(6,11,8,.72);border:1px solid var(--line);border-radius:15px;padding:12px;margin-bottom:10px}
 .port-row.sell-alert{border-color:rgba(248,113,113,.6);background:rgba(50,15,15,.42)}
@@ -350,7 +350,7 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
       <div class="logo">🐊</div>
       <div>
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">RADAR BUFFETT · ORÁCULO v10</small>
+        <small id="appSubtitle">RADAR BUFFETT · ORÁCULO v10.1</small>
       </div>
     </div>
     <div class="appbar-right">
@@ -510,9 +510,10 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
       <h3 style="margin:4px 0 6px">💼 Mi Cartera</h3>
       <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">Se sincroniza automáticamente con tu repo privado <code>BesTrade-DB</code>. Te avisa en rojo si la <b>tesis se rompe</b> o en dorado si conviene <b>recoger beneficios</b>.</p>
       <div class="port-form">
-        <input class="finput" id="portTickerIn" placeholder="Ticker (ej. ADBE)">
-        <input class="finput" id="portPriceIn" type="number" step="0.01" placeholder="Precio compra">
+        <input class="finput" id="portTickerIn" placeholder="Ticker (ADBE)">
+        <input class="finput" id="portPriceIn" type="number" step="0.01" placeholder="Precio">
         <input class="finput" id="portSharesIn" type="number" step="0.01" placeholder="Acciones">
+        <select class="finput" id="portCurIn" style="padding:0 6px"><option value="AUTO">Auto</option><option value="EUR">EUR</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="CHF">CHF</option><option value="CAD">CAD</option></select>
       </div>
       <button class="btn primary sm full" id="addPortBtn">+ Añadir / Actualizar posición</button>
       <div id="portfolioSummary" style="margin-top:10px"></div>
@@ -545,7 +546,7 @@ input.finput{width:100%;height:40px;border-radius:11px;border:1px solid var(--li
     <div class="panel" id="ghControlPanel">
       <div class="eyebrow">Workflows + Base de Datos Privada en GitHub</div>
       <h3 style="margin:4px 0 6px">☁️ Conexión GitHub (Todo en 1)</h3>
-      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Un solo <b>Fine-grained Token</b> (con permisos <b>Actions: Read &amp; write</b> y <b>Contents: Read &amp; write</b> en tus 2 repos) controla los botones del Radar y guarda tu Cartera, Bote de 80 €, Favoritas y Notas en tu repo privado.</p>
+      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Un solo <b>Fine-grained Token</b> (con permisos <b>Actions: Read &amp; write</b> y <b>Contents: Read &amp; write</b> en tus 2 repos) controla los botones del Radar y guarda tu Cartera, Favoritas y Notas en tu repo privado.</p>
       <label class="flabel">Repo principal de la app (público)</label>
       <input class="finput" id="ghRepoInput" placeholder="CarlosGomezS/BesTrade">
       <label class="flabel">Repo privado para tu Base de Datos</label>
@@ -644,7 +645,9 @@ const STORE = {
   GH_REPO: 'cocodriloApp.ghRepo.v8',
   GH_DB_REPO: 'cocodriloApp.ghDbRepo.v9',
   GH_TOKEN: 'cocodriloApp.ghToken.v8',
-  UPDATED_AT: 'cocodriloApp.updatedAt.v9'
+  UPDATED_AT: 'cocodriloApp.updatedAt.v9',
+  BACKUP: 'cocodriloApp.backup.v10',
+  PENDING: 'cocodriloApp.pendingSync.v10'
 };
 const DB_FILE = 'user-db.json';
 const WORKFLOWS = { daily: 'cocodrilo-diario.yml', weekly: 'cocodrilo-semanal-1000.yml' };
@@ -656,6 +659,7 @@ const DEMO_PAYLOAD = {
   universe_mode: "demo (ejemplo)",
   total_scanned: 2150,
   total_ok: 3,
+  fx_rates_eur: { EUR: 1.0, USD: 0.92, GBP: 1.18, CHF: 1.06, CAD: 0.67 },
   market_context: { vix: 18.2, us10y_pct: 4.25, sp500_drawdown_pct: -4.1, regime: "NORMAL", summary: "Mercado tranquilo: ser selectivo y paciente" },
   companies: [
     {
@@ -736,6 +740,7 @@ let wasRunning = false;
 let cloudSha = null;
 let cloudSaveTimer = null;
 let cloudState = { status: 'local', msg: 'Solo en este dispositivo' };
+let pendingSync = localStorage.getItem(STORE.PENDING) === '1';
 
 const $ = id => document.getElementById(id);
 function readJSON(k, def){ try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : def; } catch(e){ return def; } }
@@ -779,15 +784,76 @@ function setCloudUI(status, text, detail){
   pill.textContent = text;
 }
 
-function saveLocalUserState(triggerCloud = true){
-  localUpdatedAt = Date.now();
+function snapshotLocalBackup(){
+  try {
+    const snap = { saved_at: Date.now(), favs, portfolio, cash_pot: cashPot, notes, checks };
+    localStorage.setItem(STORE.BACKUP, JSON.stringify(snap));
+  } catch(e){}
+}
+
+function isValidRemoteDb(obj){
+  return !!(obj && typeof obj === 'object' && Array.isArray(obj.favs) && Array.isArray(obj.portfolio) && obj.notes && typeof obj.notes === 'object');
+}
+
+function mergeUserStates(remote, local){
+  // Fusión semántica segura ante conflicto 409 entre móvil y PC
+  const favSet = new Set([...(Array.isArray(remote.favs) ? remote.favs : []), ...(Array.isArray(local.favs) ? local.favs : [])]);
+
+  const portMap = new Map();
+  (Array.isArray(remote.portfolio) ? remote.portfolio : []).forEach(p => {
+    if(p && p.ticker) portMap.set(p.ticker.toUpperCase(), { ...p, ticker: p.ticker.toUpperCase() });
+  });
+  (Array.isArray(local.portfolio) ? local.portfolio : []).forEach(p => {
+    if(!p || !p.ticker) return;
+    const key = p.ticker.toUpperCase();
+    const prev = portMap.get(key);
+    if(!prev || Number(p.updated_at || local.updated_at || 0) >= Number(prev.updated_at || remote.updated_at || 0)){
+      portMap.set(key, { ...p, ticker: key });
+    }
+  });
+
+  const mergedNotes = { ...(remote.notes || {}) };
+  Object.entries(local.notes || {}).forEach(([k, v]) => {
+    const rv = mergedNotes[k] || '';
+    if(v && (!rv || Number(local.updated_at || 0) >= Number(remote.updated_at || 0))){
+      mergedNotes[k] = v;
+    }
+  });
+
+  const mergedChecks = { ...(remote.checks || {}), ...(local.checks || {}) };
+  const rPot = Number(remote.cash_pot);
+  const lPot = Number(local.cash_pot);
+  const mergedPot = (Number.isFinite(lPot) && Number(local.updated_at || 0) >= Number(remote.updated_at || 0))
+    ? lPot : (Number.isFinite(rPot) ? rPot : (Number.isFinite(lPot) ? lPot : 0));
+
+  return {
+    favs: Array.from(favSet),
+    portfolio: Array.from(portMap.values()),
+    notes: mergedNotes,
+    checks: mergedChecks,
+    cash_pot: mergedPot
+  };
+}
+
+function persistLocalOnly(){
   localStorage.setItem(STORE.FAVS, JSON.stringify(favs));
   localStorage.setItem(STORE.NOTES, JSON.stringify(notes));
   localStorage.setItem(STORE.PORTFOLIO, JSON.stringify(portfolio));
   localStorage.setItem(STORE.CASH_POT, String(cashPot));
   localStorage.setItem(STORE.CHECKS, JSON.stringify(checks));
   localStorage.setItem(STORE.UPDATED_AT, String(localUpdatedAt));
+}
+
+function setPending(flag){
+  pendingSync = !!flag;
+  localStorage.setItem(STORE.PENDING, pendingSync ? '1' : '0');
+}
+
+function saveLocalUserState(triggerCloud = true){
+  localUpdatedAt = Date.now();
+  persistLocalOnly();
   if(triggerCloud && ghToken && ghDbRepo && ghDbRepo.includes('/')){
+    setPending(true);
     setCloudUI('saving', '☁️ Guardando…', 'Sincronizando cambios con GitHub…');
     clearTimeout(cloudSaveTimer);
     cloudSaveTimer = setTimeout(() => cloudPush(false), 1400);
@@ -806,7 +872,7 @@ async function cloudPull(forceApply = false, showMsg = false){
     });
     if(r.status === 404){
       cloudSha = null;
-      const hasLocal = favs.length > 0 || portfolio.length > 0 || Object.keys(notes).length > 0;
+      const hasLocal = favs.length > 0 || portfolio.length > 0 || cashPot > 0 || Object.keys(notes).length > 0;
       if(hasLocal){
         await cloudPush(showMsg);
       } else {
@@ -824,21 +890,35 @@ async function cloudPull(forceApply = false, showMsg = false){
     const meta = await r.json();
     cloudSha = meta.sha || null;
     const decoded = JSON.parse(fromBase64Utf8(meta.content || ''));
+    if(!isValidRemoteDb(decoded)){
+      setCloudUI('err', '☁️ JSON inválido', 'El archivo remoto user-db.json tiene formato inesperado');
+      if(showMsg) toast('⚠️ user-db.json remoto inválido; no se sobrescribió tu copia local.');
+      return;
+    }
     const remoteTs = Number(decoded.updated_at || 0);
 
+    if(pendingSync && !forceApply){
+      // Cambios locales pendientes: fusionar en vez de pisar
+      snapshotLocalBackup();
+      const merged = mergeUserStates(decoded, { favs, portfolio, notes, checks, cash_pot: cashPot, updated_at: localUpdatedAt });
+      favs = merged.favs; portfolio = merged.portfolio; notes = merged.notes; checks = merged.checks; cashPot = merged.cash_pot;
+      localUpdatedAt = Date.now();
+      persistLocalOnly();
+      renderAll();
+      await cloudPush(showMsg);
+      return;
+    }
+
     if(forceApply || remoteTs >= localUpdatedAt){
-      favs = Array.isArray(decoded.favs) ? decoded.favs : [];
-      notes = (decoded.notes && typeof decoded.notes === 'object') ? decoded.notes : {};
-      portfolio = Array.isArray(decoded.portfolio) ? decoded.portfolio : [];
+      snapshotLocalBackup();
+      favs = decoded.favs;
+      notes = decoded.notes;
+      portfolio = decoded.portfolio;
       if(decoded.cash_pot !== undefined && Number.isFinite(Number(decoded.cash_pot))) cashPot = Number(decoded.cash_pot);
       checks = (decoded.checks && typeof decoded.checks === 'object') ? decoded.checks : {};
       localUpdatedAt = remoteTs || Date.now();
-      localStorage.setItem(STORE.FAVS, JSON.stringify(favs));
-      localStorage.setItem(STORE.NOTES, JSON.stringify(notes));
-      localStorage.setItem(STORE.PORTFOLIO, JSON.stringify(portfolio));
-      localStorage.setItem(STORE.CASH_POT, String(cashPot));
-      localStorage.setItem(STORE.CHECKS, JSON.stringify(checks));
-      localStorage.setItem(STORE.UPDATED_AT, String(localUpdatedAt));
+      persistLocalOnly();
+      setPending(false);
       renderAll();
       setCloudUI('ok', '☁️ OK', `Sincronizado con ${ghDbRepo}`);
       if(showMsg) toast('☁️ Datos descargados desde GitHub.');
@@ -846,7 +926,7 @@ async function cloudPull(forceApply = false, showMsg = false){
       await cloudPush(showMsg);
     }
   } catch(e){
-    setCloudUI('err', '☁️ Offline', 'Sin conexión con GitHub DB');
+    setCloudUI('err', pendingSync ? '☁️ Pendiente' : '☁️ Offline', 'Sin conexión con GitHub DB');
     if(showMsg) toast('Error de red al leer la BD de GitHub.');
   }
 }
@@ -859,7 +939,7 @@ async function cloudPush(showMsg = false, retryCount = 0){
   setCloudUI('saving', '☁️ Subiendo…', 'Guardando en GitHub…');
   try {
     const dbObj = {
-      version: 1,
+      version: 2,
       updated_at: localUpdatedAt || Date.now(),
       favs,
       portfolio,
@@ -868,7 +948,7 @@ async function cloudPush(showMsg = false, retryCount = 0){
       checks
     };
     const body = {
-      message: 'Sync Cocodrilo user-db',
+      message: 'Sync Cocodrilo user-db v10.1',
       content: toBase64Utf8(JSON.stringify(dbObj, null, 2))
     };
     if(cloudSha) body.sha = cloudSha;
@@ -879,13 +959,25 @@ async function cloudPush(showMsg = false, retryCount = 0){
       body: JSON.stringify(body)
     });
 
-    if(r.status === 409 && retryCount < 1){
+    if(r.status === 409 && retryCount < 2){
+      // Conflicto real entre dispositivos: descargar contenido remoto y FUSIONAR antes de resubir
       const latest = await fetch(`https://api.github.com/repos/${ghDbRepo}/contents/${DB_FILE}?t=${Date.now()}`, {
         headers: ghHeaders(true), cache: 'no-store'
       });
       if(latest.ok){
         const j = await latest.json();
         cloudSha = j.sha || null;
+        try {
+          const remoteObj = JSON.parse(fromBase64Utf8(j.content || ''));
+          if(isValidRemoteDb(remoteObj)){
+            snapshotLocalBackup();
+            const merged = mergeUserStates(remoteObj, dbObj);
+            favs = merged.favs; portfolio = merged.portfolio; notes = merged.notes; checks = merged.checks; cashPot = merged.cash_pot;
+            localUpdatedAt = Date.now();
+            persistLocalOnly();
+            renderAll();
+          }
+        } catch(errMerge){}
         return cloudPush(showMsg, retryCount + 1);
       }
     }
@@ -893,17 +985,20 @@ async function cloudPush(showMsg = false, retryCount = 0){
     if(r.ok){
       const res = await r.json();
       cloudSha = res.content?.sha || cloudSha;
+      setPending(false);
       setCloudUI('ok', '☁️ OK', `Guardado en ${ghDbRepo} · ${fmtShortDate(new Date().toISOString())}`);
       if(showMsg) toast('☁️ Guardado en tu BD privada de GitHub.');
       if(activeView === 'app') renderAppView();
     } else {
+      setPending(true);
       const errTxt = r.status === 404 ? `No existe el repo ${ghDbRepo}` : (r.status === 403 || r.status === 401) ? 'Falta permiso Contents (Read & write)' : `HTTP ${r.status}`;
-      setCloudUI('err', '☁️ Error', errTxt);
+      setCloudUI('err', '☁️ Pendiente', errTxt);
       if(showMsg) toast(`Error al guardar en GitHub: ${errTxt}`);
     }
   } catch(e){
-    setCloudUI('err', '☁️ Offline', 'No se pudo subir (guardado en local)');
-    if(showMsg) toast('Sin red: guardado en local.');
+    setPending(true);
+    setCloudUI('err', '☁️ Pendiente', 'Sin red: guardado en local y pendiente de subir');
+    if(showMsg) toast('Sin red: guardado en local (se subirá al reconectar).');
   }
 }
 
@@ -946,6 +1041,7 @@ function aiBadge(c){
   if(!c.ai_check) return '';
   const v = c.ai_verdict;
   if(v === 'TEMPORAL') return '<span class="pill">🤖 IA: TEMPORAL</span>';
+  if(v === 'EVIDENCIA_INSUFICIENTE') return '<span class="pill gold">🤖 IA: SIN PRUEBAS</span>';
   if(v === 'DUDOSO') return '<span class="pill gold">🤖 IA: DUDOSO</span>';
   if(v === 'PERMANENTE') return '<span class="pill red">⚠️ IA: TRAMPA</span>';
   return '<span class="pill blue">🤖 IA</span>';
@@ -993,7 +1089,7 @@ function buildBuffettPrompt(c){
   const news = (c.recent_news && c.recent_news.length) ? `\nTitulares recientes:\n${c.recent_news.map(n => '- ' + n).join('\n')}\n` : '';
   return `Actúa como analista siguiendo estrictamente el método de Warren Buffett y Charlie Munger.
 Analiza ${c.name} (${c.ticker}), sector ${c.sector} (${c.region}).
-Datos del Radar Cocodrilo v9:
+Datos del Radar Cocodrilo v10.1:
 - Precio actual: ${c.price} ${c.currency} (caída 52s: ${c.drawdown_52w_pct ?? 'N/D'}%)
 - Calidad: ${c.quality_score}/100 | ROIC: ${c.roic_pct ?? 'N/D'}% | Margen op: ${c.operating_margin_pct ?? 'N/D'}%
 - Deuda/EBITDA: ${c.net_debt_ebitda ?? 'N/D'}x | P/FCF (caja real): ${c.p_fcf ?? 'N/D'}x | PER Futuro: ${c.forward_pe ?? 'N/D'}x
@@ -1422,21 +1518,26 @@ function renderFavsView(){
     pSum.innerHTML = '';
     pHost.innerHTML = '<div class="empty" style="padding:16px">Aún no has anotado ninguna compra en Mi Cartera.</div>';
   } else {
-    let totalCost = 0, totalVal = 0, alertsCount = 0;
+    const fxMap = { EUR: 1.0, ...(datasets.weekly?.fx_rates_eur || {}), ...(datasets.daily?.fx_rates_eur || {}), ...(payload?.fx_rates_eur || {}) };
+    let totalCostEur = 0, totalValEur = 0, missingFx = 0, alertsCount = 0;
     pHost.innerHTML = portfolio.map((pos, idx) => {
       const c = findCompany(pos.ticker);
+      const cur = (pos.currency && pos.currency !== 'AUTO') ? pos.currency.toUpperCase() : (c?.currency || 'USD').toUpperCase();
+      const fx = Number(fxMap[cur]);
+      const hasFx = Number.isFinite(fx) && fx > 0;
       const curPrice = c ? c.price : pos.avgPrice;
       const cost = pos.avgPrice * pos.shares, val = curPrice * pos.shares;
       const pnlPct = pos.avgPrice > 0 ? ((curPrice / pos.avgPrice) - 1) * 100 : 0;
-      totalCost += cost; totalVal += val;
+      if(hasFx){ totalCostEur += cost * fx; totalValEur += val * fx; } else { missingFx++; }
       const sig = evaluatePortfolioSignal(pos, c);
       if(sig.kind === 'sell' || sig.kind === 'profit') alertsCount++;
       const rowCls = sig.kind === 'sell' ? 'sell-alert' : sig.kind === 'profit' ? 'profit-alert' : '';
+      const eurNote = (hasFx && cur !== 'EUR') ? ` (~${(val * fx).toFixed(0)} €)` : (!hasFx ? ' (sin FX EUR)' : '');
       return `<div class="port-row ${rowCls}">
         <div class="port-top">
           <div>
-            <b>${esc(c ? c.name : pos.ticker)}</b> <span class="tkr">${esc(pos.ticker)}</span>
-            <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${pos.shares} acc. · Compra: ${pos.avgPrice.toFixed(2)} · Hoy: <b>${fmtMoney(curPrice, c?.currency||'')}</b></div>
+            <b>${esc(c ? c.name : pos.ticker)}</b> <span class="tkr">${esc(pos.ticker)}</span> <span class="tkr" style="opacity:.7">${esc(cur)}</span>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px">${pos.shares} acc. · Compra: ${pos.avgPrice.toFixed(2)} · Hoy: <b>${fmtMoney(curPrice, cur)}</b>${esc(eurNote)}</div>
           </div>
           <div style="text-align:right">
             <b style="color:${pnlPct>=0?'#4ade80':'#f87171'};font-size:15px">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</b>
@@ -1450,8 +1551,9 @@ function renderFavsView(){
         </div>
       </div>`;
     }).join('');
-    const totPnl = totalCost > 0 ? ((totalVal / totalCost) - 1) * 100 : 0;
-    pSum.innerHTML = `<div class="notice ${alertsCount>0?'warn':'good'}"><b>Posiciones:</b> ${portfolio.length} · <b>Rentabilidad estimada:</b> <span style="color:${totPnl>=0?'#4ade80':'#f87171'}">${totPnl>=0?'+':''}${totPnl.toFixed(1)}%</span>${alertsCount>0?` · <b>${alertsCount} aviso(s) de venta/revisión</b>`:''}</div>`;
+    const totPnl = totalCostEur > 0 ? ((totalValEur / totalCostEur) - 1) * 100 : 0;
+    const fxWarn = missingFx > 0 ? ` · <small>(${missingFx} sin FX EUR excluidas del total)</small>` : '';
+    pSum.innerHTML = `<div class="notice ${alertsCount>0?'warn':'good'}"><b>Posiciones:</b> ${portfolio.length} · <b>Total en EUR:</b> ${totalValEur.toFixed(0)} € (<span style="color:${totPnl>=0?'#4ade80':'#f87171'}">${totPnl>=0?'+':''}${totPnl.toFixed(1)}%</span>)${fxWarn}${alertsCount>0?` · <b>${alertsCount} aviso(s)</b>`:''}</div>`;
     pHost.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openModal(b.dataset.open));
     pHost.querySelectorAll('[data-delport]').forEach(b => b.onclick = () => {
       portfolio.splice(Number(b.dataset.delport), 1);
@@ -1584,9 +1686,10 @@ function openModal(ticker){
       ((c.piotroski_score!==null && c.piotroski_score!==undefined) ? `• Piotroski F-Score: <b>${c.piotroski_score}/${c.piotroski_max}</b>` + (c.interest_coverage!==null&&c.interest_coverage!==undefined ? ` · Cob. Intereses: <b>${c.interest_coverage}x</b>` : '') + '<br>' : '') +
       ((c.sec_note && c.sec_status!=='NO_US') ? `• SEC EDGAR: ${c.sec_verified===true?'✅ ':c.sec_verified===false?'🚨 ':'ℹ️ '}${esc(c.sec_note)}<br>` : '') +
       ((c.trap_risk_score!==null && c.trap_risk_score!==undefined) ? `• Riesgo de trampa IA: <b>${c.trap_risk_score}/10</b><br>` : '') +
+      ((c.news_status==='ERROR'||c.insider_status==='ERROR') ? `• ⚠️ Error parcial de Yahoo (${c.news_status==='ERROR'?'noticias ':''}${c.insider_status==='ERROR'?'directivos':''})<br>` : '') +
       ((c.oracle_flags && c.oracle_flags.length) ? `• 🚩 ${c.oracle_flags.map(esc).join(' | ')}` : '') +
     `</div>` : ''}
-    ${c.ai_check ? `<div class="notice ${c.ai_verdict==='PERMANENTE'?'bad':c.ai_verdict==='DUDOSO'?'warn':'good'}"><b>🤖 Filtro IA Gemini${c.ai_verdict?' ('+esc(c.ai_verdict)+')':''}:</b><br>${esc(c.ai_check).replace(/\n/g,'<br>')}</div>` : ''}
+    ${c.ai_check ? `<div class="notice ${c.ai_verdict==='PERMANENTE'?'bad':(c.ai_verdict==='DUDOSO'||c.ai_verdict==='EVIDENCIA_INSUFICIENTE')?'warn':'good'}"><b>🤖 Filtro IA Gemini${c.ai_verdict?' ('+esc(c.ai_verdict)+')':''}:</b><br>${esc(c.ai_check).replace(/\n/g,'<br>')}</div>` : ''}
     ${news.length ? `<div class="notice info"><b>📰 Titulares analizados:</b><ul class="news-list">${news.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
     ${warns.length ? `<div class="notice warn"><b>⚠️ Avisos de datos:</b><br>• ${warns.map(esc).join('<br>• ')}</div>` : ''}
     ${(c.hard_fails||[]).length ? `<div class="notice bad"><b>Alertas críticas:</b><br>• ${c.hard_fails.map(esc).join('<br>• ')}</div>` : ''}
@@ -1684,6 +1787,7 @@ function openModal(ticker){
     switchView('favs');
     $('portTickerIn').value = c.ticker;
     $('portPriceIn').value = c.price;
+    if($('portCurIn')) $('portCurIn').value = ['EUR','USD','GBP','CHF','CAD'].includes(c.currency) ? c.currency : 'AUTO';
     $('portSharesIn').focus();
     toast(`Introduce cuántas acciones compraste de ${c.ticker}`);
   };
@@ -1795,14 +1899,20 @@ $('spendPotBtn').onclick = () => {
 $('addPortBtn').onclick = () => {
   const tkr = $('portTickerIn').value.trim().toUpperCase();
   const pr = parseFloat($('portPriceIn').value), sh = parseFloat($('portSharesIn').value);
+  const selCur = $('portCurIn') ? $('portCurIn').value : 'AUTO';
   if(!tkr || !Number.isFinite(pr) || pr <= 0 || !Number.isFinite(sh) || sh <= 0){
     toast('Rellena ticker, precio medio y número de acciones válidos.'); return;
   }
+  const found = findCompany(tkr);
+  const cur = selCur !== 'AUTO' ? selCur : (found?.currency || 'USD');
+  const nowTs = Date.now();
   const ex = portfolio.find(x => x.ticker === tkr);
-  if(ex){ ex.avgPrice = pr; ex.shares = sh; } else portfolio.push({ ticker: tkr, avgPrice: pr, shares: sh });
+  if(ex){ ex.avgPrice = pr; ex.shares = sh; ex.currency = cur; ex.updated_at = nowTs; }
+  else portfolio.push({ ticker: tkr, avgPrice: pr, shares: sh, currency: cur, updated_at: nowTs });
   saveLocalUserState(true);
   $('portTickerIn').value = ''; $('portPriceIn').value = ''; $('portSharesIn').value = '';
-  renderAll(); toast(`💼 ${tkr} guardada y sincronizando…`);
+  if($('portCurIn')) $('portCurIn').value = 'AUTO';
+  renderAll(); toast(`💼 ${tkr} (${cur}) guardada y sincronizando…`);
 };
 
 $('saveGhBtn').onclick = () => {
