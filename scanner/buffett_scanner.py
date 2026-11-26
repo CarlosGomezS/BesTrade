@@ -1,13 +1,11 @@
-"""Radar Cocodrilo Pro v9 — Escáner Global Experto (Warren Buffett & Charlie Munger).
+"""Radar Cocodrilo Pro v10.1 — Oráculo Blindado (Warren Buffett & Charlie Munger).
 
-Novedades v9:
-- Owner Earnings reales: descuenta Stock-Based Compensation (SBC) del FCF para evitar trampas en tech.
-- Buscador inteligente por nombre en modo 'custom' (ej. 'Alphabet' -> GOOGL, 'Inditex' -> ITX.MC).
-- Aviso de presentación de resultados próximos (<= 10 días) para no comprar a ciegas antes de earnings.
-- Radar de compras de directivos (Insider Buying últimos 90 días) en candidatas top.
-- Termómetro de mercado (VIX, Bono EE. UU. 10A y distancia S&P 500 a máximos) en Telegram y web.
-- Diario automático de aciertos (data/history.json) con seguimiento de rentabilidad real de alertas.
-- Mantiene Nivel 0 'ENTRADA_YA', sharding paralelo (6 bloques), rotación diaria y Gemini 3 escéptico.
+Novedades v10.1:
+- Distingue 0 real frente a ERROR de Yahoo en directivos y noticias.
+- Salida JSON estricta en Gemini (adiós regex frágil) + estado EVIDENCIA_INSUFICIENTE.
+- Fusión semanal estricta: aborta si falta algún shard para no publicar datos incompletos.
+- Exporta fx_rates_eur para que Mi Cartera convierta divisas sin mezclar EUR y USD.
+- Bloquea ENTRADA_YA en EE. UU. si falta verificación oficial SEC EDGAR.
 """
 
 from __future__ import annotations
@@ -32,7 +30,7 @@ import pandas as pd
 import yfinance as yf
 
 from universe import detect_region, get_universe, parse_custom_tickers
-from oracle_v10 import compute_oracle_checks, is_oro_puro, run_tribunal_ia, verify_with_sec_edgar
+from oracle_v10 import VALID_VERDICTS, compute_oracle_checks, extract_gemini_json, is_oro_puro, run_tribunal_ia, verify_with_sec_edgar
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
@@ -55,6 +53,7 @@ ROTATION_BATCH_SIZE = int(os.environ.get("ROTATION_BATCH_SIZE", "220"))
 SHARD_INDEX = int(os.environ.get("SHARD_INDEX", "0"))
 SHARD_TOTAL = int(os.environ.get("SHARD_TOTAL", "1"))
 MERGE_DIR = os.environ.get("MERGE_DIR", "").strip()
+ALLOW_PARTIAL_MERGE = os.environ.get("ALLOW_PARTIAL_MERGE", "false").strip().lower() == "true"
 MAX_DISCARDED_IN_WEB_JSON = int(os.environ.get("MAX_DISCARDED_IN_WEB_JSON", "250"))
 URGENT_ONLY = os.environ.get("URGENT_ONLY", "false").strip().lower() == "true"
 URGENT_DOUBLE_PING = os.environ.get("URGENT_DOUBLE_PING", "true").strip().lower() == "true"
@@ -779,10 +778,12 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
         "dividend_yield_pct": round(div_y, 2) if div_y is not None else None,
         "earnings_date": earnings_date,
         "earnings_days": earnings_days,
-        "insider_buys_90d": 0,
+        "insider_buys_90d": None,
+        "insider_status": "NOT_CHECKED",
         "dcf": dcf,
         "data_warnings": data_warnings,
         "recent_news": [],
+        "news_status": "NOT_CHECKED",
     }
 
     q = score_company(record)
@@ -831,19 +832,20 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     record["oro_puro"] = False
     record.update(compute_oracle_checks(t, info, record))
     return record
-def check_insider_buying(ticker: str) -> int:
-    """Cuenta compras reales de directivos en mercado abierto durante los últimos 90 días."""
+
+def check_insider_buying(ticker: str) -> Tuple[Optional[int], str]:
+    """Cuenta compras reales de directivos en 90d distinguiendo 0 real vs ERROR de Yahoo."""
     try:
         df = yf.Ticker(ticker).insider_transactions
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-            return 0
+            return 0, "OK_EMPTY"
         now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
         buys = 0
         cols_lower = {str(c).strip().lower(): c for c in df.columns}
         txt_col = cols_lower.get("text") or cols_lower.get("transaction")
         date_col = cols_lower.get("start date") or cols_lower.get("date")
         if not txt_col:
-            return 0
+            return None, "UNAVAILABLE"
         for _, row in df.head(25).iterrows():
             txt = str(row.get(txt_col) or "").lower()
             if "purchase" not in txt and "buy" not in txt:
@@ -860,17 +862,20 @@ def check_insider_buying(ticker: str) -> int:
                 except Exception:
                     pass
             buys += 1
-        return buys
+        return buys, "OK"
     except Exception:
-        return 0
+        return None, "ERROR"
 
 
-def extract_recent_news(ticker: str, limit: int = 5) -> List[str]:
+def extract_recent_news(ticker: str, limit: int = 5) -> Tuple[List[str], str]:
+    """Extrae titulares recientes distinguiendo sin noticias vs ERROR de Yahoo."""
     headlines: List[str] = []
     try:
-        raw_news = yf.Ticker(ticker).news or []
+        raw_news = yf.Ticker(ticker).news
+        if raw_news is None:
+            return [], "OK_EMPTY"
     except Exception:
-        return headlines
+        return [], "ERROR"
     for item in raw_news:
         if not isinstance(item, dict):
             continue
@@ -900,7 +905,7 @@ def extract_recent_news(ticker: str, limit: int = 5) -> List[str]:
             headlines.append(entry)
         if len(headlines) >= limit:
             break
-    return headlines
+    return headlines, ("OK" if headlines else "OK_EMPTY")
 
 
 def clean_ai_text(text: str) -> str:
@@ -909,22 +914,31 @@ def clean_ai_text(text: str) -> str:
     return text.strip()[:800]
 
 
-def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Filtro IA escéptico con salida JSON estricta. Devuelve (texto, veredicto_enum, error)."""
     if not GEMINI_API_KEY:
-        return None, "GEMINI_API_KEY no configurada"
+        return None, None, "GEMINI_API_KEY no configurada"
 
-    news = extract_recent_news(rec["ticker"], limit=5)
-    rec["recent_news"] = news
-    news_block = "\n".join(f"- {h}" for h in news) if news else "- Sin titulares recientes disponibles en Yahoo Finance."
+    news = rec.get("recent_news") or []
+    news_status = rec.get("news_status") or ("OK" if news else "OK_EMPTY")
+    if news:
+        news_block = "\n".join(f"- {h}" for h in news)
+    elif news_status == "ERROR":
+        news_block = "- ERROR obteniendo titulares en Yahoo Finance (no asumas ausencia de problemas)."
+    else:
+        news_block = "- Sin titulares recientes disponibles en Yahoo Finance."
+
     warnings_block = "; ".join(rec.get("data_warnings") or []) or "Ninguna"
     dcf = rec.get("dcf") or {}
     dcf_info = f"{dcf.get('intrinsic_base')} {rec['currency']} (obj -25%: {dcf.get('target_price')})" if dcf else "N/A"
-    insider_txt = f"Sí ({rec.get('insider_buys_90d')} compras)" if (rec.get("insider_buys_90d") or 0) > 0 else "Sin compras recientes"
+    ins_val = rec.get("insider_buys_90d")
+    ins_st = rec.get("insider_status")
+    insider_txt = f"Sí ({ins_val} compras)" if (ins_val or 0) > 0 else ("Error proveedor" if ins_st == "ERROR" else "Sin compras recientes")
 
     prompt = (
         "Eres un analista ESCÉPTICO estilo Charlie Munger buscando razones para NO comprar (evitar trampas de valor).\n"
-        "No regales el veredicto TEMPORAL: si hay riesgo estructural de disrupción (IA, pérdida de clientes, márgenes cayendo) "
-        "o faltan noticias claras que expliquen la caída, sé duro y clasifícala como DUDOSO o PERMANENTE.\n"
+        "No regales el veredicto TEMPORAL: si faltan noticias claras que expliquen la caída usa EVIDENCIA_INSUFICIENTE; "
+        "si hay riesgo estructural usa DUDOSO o PERMANENTE.\n"
         f"Empresa: {rec['name']} ({rec['ticker']}), Sector: {rec['sector']} / {rec['industry']}.\n"
         f"Datos: Precio {rec['price']} {rec['currency']} (caída 52s: {rec['drawdown_52w_pct']}%), "
         f"Calidad: {rec['quality_score']}/100, ROIC: {rec['roic_pct']}%, Margen op: {rec['operating_margin_pct']}%, "
@@ -932,17 +946,15 @@ def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], O
         f"DCF base (caja real): {dcf_info}, Compras de directivos 90d: {insider_txt}.\n"
         f"Alertas de datos: {warnings_block}.\n"
         f"Titulares recientes (ignora noticias genéricas que no hablen de esta empresa):\n{news_block}\n\n"
-        "Responde en español directo en máximo 4 líneas cortas (sin asteriscos ni negritas):\n"
-        "1) Por qué cae: motivo concreto según titulares (o indica si no hay catalizador claro).\n"
-        "2) Foso competitivo: ¿sigue intacto o hay señales de erosión real?\n"
-        "3) Mayor riesgo real para perder dinero aquí.\n"
-        "4) Veredicto Cocodrilo: TEMPORAL, DUDOSO o PERMANENTE."
+        "Devuelve EXCLUSIVAMENTE un objeto JSON válido en español con estas 4 claves exactas:\n"
+        '{"motivo_caida": "...", "foso": "...", "mayor_riesgo": "...", "veredicto": "TEMPORAL | DUDOSO | PERMANENTE | EVIDENCIA_INSUFICIENTE"}'
     )
 
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 1200,
+            "maxOutputTokens": 900,
+            "responseMimeType": "application/json",
             "thinkingConfig": {"thinkingLevel": "LOW"},
         },
     }).encode("utf-8")
@@ -955,12 +967,21 @@ def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], O
             try:
                 with urllib.request.urlopen(req, timeout=25) as resp:
                     body = json.loads(resp.read().decode("utf-8"))
-                parts = body["candidates"][0]["content"]["parts"]
-                text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-                if not text.strip():
-                    last_err = f"{model}: respuesta vacía"
+                parsed, err = extract_gemini_json(body)
+                if err or not parsed:
+                    last_err = f"{model}: {err}"
                     continue
-                return clean_ai_text(text), None
+                verdict = str(parsed.get("veredicto") or "").strip().upper().replace(" ", "_")
+                if verdict not in VALID_VERDICTS:
+                    last_err = f"{model}: veredicto inválido ({verdict})"
+                    continue
+                txt = (
+                    f"1) Por qué cae: {str(parsed.get('motivo_caida') or '—').strip()}\n"
+                    f"2) Foso: {str(parsed.get('foso') or '—').strip()}\n"
+                    f"3) Mayor riesgo: {str(parsed.get('mayor_riesgo') or '—').strip()}\n"
+                    f"4) Veredicto: {verdict}"
+                )
+                return clean_ai_text(txt), verdict, None
             except urllib.error.HTTPError as exc:
                 err_body = ""
                 try:
@@ -980,7 +1001,7 @@ def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], O
                 break
 
     print(f"⚠️ Gemini falló en {rec['ticker']}: {last_err}")
-    return None, last_err
+    return None, None, last_err
 
 
 def esc_html(s: Any) -> str:
@@ -1026,19 +1047,11 @@ def send_telegram(html_text: str) -> None:
 
 
 def extract_ai_verdict(ai_text: Optional[str]) -> Optional[str]:
+    """Fallback estricto: solo acepta un veredicto exacto al final de la línea VEREDICTO."""
     if not ai_text:
         return None
-    m = re.search(r"veredicto[^\n:]*[:\-]?\s*([^\n]+)", ai_text, flags=re.IGNORECASE)
-    target = m.group(1) if m else ai_text.strip().splitlines()[-1]
-    up = target.upper()
-    for label in ("PERMANENTE", "DUDOSO", "TEMPORAL"):
-        if label in up:
-            return label
-    full_up = ai_text.upper()
-    for label in ("PERMANENTE", "DUDOSO", "TEMPORAL"):
-        if label in full_up:
-            return label
-    return None
+    m = re.search(r"(?im)^\s*(?:\d\)\s*)?veredicto\s*:\s*(TEMPORAL|DUDOSO|PERMANENTE|EVIDENCIA_INSUFICIENTE)\b", ai_text)
+    return m.group(1).upper() if m else None
 
 
 def has_severe_warning(rec: Dict[str, Any]) -> bool:
@@ -1090,6 +1103,8 @@ def compute_conviction_score(rec: Dict[str, Any]) -> float:
     verdict = rec.get("ai_verdict") or extract_ai_verdict(rec.get("ai_check"))
     if verdict == "TEMPORAL":
         score += 8.0
+    elif verdict == "EVIDENCIA_INSUFICIENTE":
+        score -= 6.0
     elif verdict == "DUDOSO":
         score -= 10.0
     elif verdict == "PERMANENTE":
@@ -1208,7 +1223,7 @@ def build_urgent_telegram_alert(entradas_ya: List[Dict[str, Any]], gap_pts: Opti
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     lines = [
         "🚨🔥🚨 <b>ALERTA MÁXIMA: ENTRAR YA</b> 🚨🔥🚨",
-        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v9</i>",
+        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.1</i>",
     ]
     if gap_pts is not None and gap_pts >= 12:
         lines.append(f"⚡ <b>MUY DESPLAZADA DEL RESTO:</b> saca <b>+{gap_pts:.0f} pts</b> de ventaja al siguiente valor.")
@@ -1235,7 +1250,7 @@ def build_telegram_report(
 
     if UNIVERSE_MODE == "custom":
         lines = [
-            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v9 — {date_str}</b>",
+            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.1 — {date_str}</b>",
             f"<i>Empresas analizadas: {len(results)}/{total_scanned}</i>",
         ]
         for r in results[:10]:
@@ -1262,7 +1277,7 @@ def build_telegram_report(
     ya_txt = f"🚨 {len(entradas_ya)} ENTRAR YA · " if entradas_ya else ""
     tier_summary = f"{ya_txt}🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
-        f"🐊 <b>RADAR COCODRILO PRO v9 — {date_str}</b>",
+        f"🐊 <b>RADAR COCODRILO PRO v10.1 — {date_str}</b>",
         f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
     if market_ctx and (market_ctx.get("vix") is not None or market_ctx.get("us10y_pct") is not None):
@@ -1443,6 +1458,7 @@ def run_scan_batch(tickers: List[str]) -> Tuple[List[Dict[str, Any]], int]:
 
 
 def load_merged_shards(merge_dir: Path) -> Tuple[List[Dict[str, Any]], int, int, int]:
+    """Fusiona shards exigiendo integridad completa (rechaza publicaciones parciales salvo override)."""
     shard_files = sorted(merge_dir.rglob("shard-*.json"))
     if not shard_files:
         raise RuntimeError(f"No se encontraron archivos shard-*.json en {merge_dir}")
@@ -1451,13 +1467,34 @@ def load_merged_shards(merge_dir: Path) -> Tuple[List[Dict[str, Any]], int, int,
     total_scanned = 0
     total_failed = 0
     max_elapsed = 0
+    seen_indices = set()
+    expected_total: Optional[int] = SHARD_TOTAL if SHARD_TOTAL > 1 else None
+    seen_modes = set()
+    corrupt_files: List[str] = []
 
     for sf in shard_files:
         try:
             data = json.loads(sf.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or not isinstance(data.get("companies"), list):
+                raise ValueError("Estructura de shard inválida")
         except Exception as exc:
-            print(f"⚠️ Error leyendo {sf}: {exc}")
+            corrupt_files.append(f"{sf.name}: {exc}")
             continue
+
+        s_idx = data.get("shard_index")
+        s_tot = data.get("shard_total")
+        s_mode = data.get("universe_mode")
+        if s_tot and int(s_tot) > 1:
+            if expected_total is None:
+                expected_total = int(s_tot)
+            elif expected_total != int(s_tot):
+                corrupt_files.append(f"{sf.name}: shard_total inconsistente ({s_tot} != {expected_total})")
+                continue
+        if s_idx is not None:
+            seen_indices.add(int(s_idx))
+        if s_mode:
+            seen_modes.add(str(s_mode))
+
         total_scanned += int(data.get("total_scanned") or 0)
         total_failed += int(data.get("total_failed") or 0)
         max_elapsed = max(max_elapsed, int(data.get("elapsed_sec") or 0))
@@ -1466,8 +1503,37 @@ def load_merged_shards(merge_dir: Path) -> Tuple[List[Dict[str, Any]], int, int,
             if tkr and tkr not in by_ticker:
                 by_ticker[tkr] = rec
 
-    print(f"🧩 Fusionados {len(shard_files)} bloques: {len(by_ticker)} empresas válidas (de {total_scanned} escaneadas).")
+    if corrupt_files and not ALLOW_PARTIAL_MERGE:
+        raise RuntimeError(f"Fusión abortada por shards corruptos: {'; '.join(corrupt_files)}")
+    if len(seen_modes) > 1 and not ALLOW_PARTIAL_MERGE:
+        raise RuntimeError(f"Fusión abortada: universos mezclados en shards ({seen_modes})")
+    if expected_total is not None:
+        missing = sorted(set(range(expected_total)) - seen_indices)
+        if missing and not ALLOW_PARTIAL_MERGE:
+            raise RuntimeError(
+                f"Fusión abortada: faltan shards {missing} (recibidos {len(seen_indices)}/{expected_total}). "
+                "No se sobrescribe weekly-scan.json con un escaneo incompleto."
+            )
+
+    print(f"🧩 Fusionados {len(seen_indices)}/{expected_total or len(shard_files)} bloques íntegros: {len(by_ticker)} empresas válidas (de {total_scanned} escaneadas).")
     return list(by_ticker.values()), total_scanned, total_failed, max_elapsed
+
+
+def build_fx_rates_to_eur(results: List[Dict[str, Any]]) -> Dict[str, float]:
+    """Mapa de tipos de cambio hacia EUR para que la web calcule Mi Cartera sin mezclar divisas."""
+    currencies = {"EUR", "USD", "GBP", "CHF", "CAD", "JPY"}
+    for r in results:
+        c = (r.get("currency") or "").upper()
+        if c:
+            currencies.add(c)
+    rates: Dict[str, float] = {"EUR": 1.0}
+    for cur in sorted(currencies):
+        if cur == "EUR":
+            continue
+        fx = get_fx_rate(cur, "EUR")
+        if fx and fx > 0:
+            rates[cur] = round(fx, 6)
+    return rates
 
 
 def trim_for_mobile_web(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1483,7 +1549,7 @@ def main() -> None:
     t0 = time.time()
 
     if MERGE_DIR:
-        print(f"🧩 Cocodrilo Pro v9 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
+        print(f"🧩 Cocodrilo Pro v10.1 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
         results, total_scanned, failed, shard_elapsed = load_merged_shards(Path(MERGE_DIR))
         elapsed_total = max(shard_elapsed, round(time.time() - t0))
     else:
@@ -1497,7 +1563,7 @@ def main() -> None:
         if SHARD_TOTAL > 1:
             tickers = [sym for idx, sym in enumerate(all_tickers) if idx % SHARD_TOTAL == SHARD_INDEX]
             print(
-                f"🐊 Cocodrilo Pro v9 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
+                f"🐊 Cocodrilo Pro v10.1 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
                 f"| Empresas: {len(tickers)} (total universo: {len(all_tickers)})"
             )
             results, failed = run_scan_batch(tickers)
@@ -1520,7 +1586,7 @@ def main() -> None:
                 raise RuntimeError(f"Shard {SHARD_INDEX} devolvió 0 empresas válidas.")
             return
 
-        print(f"🐊 Escáner Cocodrilo Pro v9 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
+        print(f"🐊 Escáner Cocodrilo Pro v10.1 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
         total_scanned = len(all_tickers)
         results, failed = run_scan_batch(all_tickers)
         elapsed_total = round(time.time() - t0)
@@ -1536,12 +1602,13 @@ def main() -> None:
         r["conviction_score"] = compute_conviction_score(r)
     results.sort(key=lambda r: (status_order.get(r["status"], 9), -(r["conviction_score"] or 0)))
 
-    # Compras de directivos (Insider Buying) solo en las top candidatas
+    # Compras de directivos (Insider Buying) + Auditoría oficial SEC EDGAR en candidatas top
     insider_targets = results[:12] if UNIVERSE_MODE == "custom" else [r for r in results if r["status"] == "OPORTUNIDAD"][:15]
     for r in insider_targets:
-        buys = check_insider_buying(r["ticker"])
+        buys, ins_status = check_insider_buying(r["ticker"])
         r["insider_buys_90d"] = buys
-        if buys > 0:
+        r["insider_status"] = ins_status
+        if buys and buys > 0:
             r["strengths"] = ([f"Directivos comprando acciones ({buys} op. 90d)"] + (r.get("strengths") or []))[:4]
         sec_info = verify_with_sec_edgar(r)
         r.update(sec_info)
@@ -1567,18 +1634,20 @@ def main() -> None:
 
         for idx_t, r in enumerate(targets):
             ai_status["attempted"] += 1
-            r["recent_news"] = extract_recent_news(r["ticker"], limit=5)
+            news_list, news_st = extract_recent_news(r["ticker"], limit=5)
+            r["recent_news"] = news_list
+            r["news_status"] = news_st
             use_tribunal = (idx_t < 3) or (UNIVERSE_MODE == "custom")
             if use_tribunal:
-                print(f"⚖️ Tribunal IA (Fiscal vs Abogado) para {r['ticker']}...")
-                ai_text, trap_risk, ai_err = run_tribunal_ia(r, GEMINI_API_KEY, GEMINI_MODELS)
+                print(f"⚖️ Tribunal IA JSON (Fiscal vs Abogado) para {r['ticker']}...")
+                ai_text, ai_verdict, trap_risk, ai_err = run_tribunal_ia(r, GEMINI_API_KEY, GEMINI_MODELS)
                 r["trap_risk_score"] = trap_risk
             else:
-                print(f"🤖 Consultando Gemini 3 + titulares recientes para {r['ticker']}...")
-                ai_text, ai_err = optional_gemini_buffett_check(r)
-            if ai_text:
+                print(f"🤖 Consultando Gemini JSON + titulares recientes para {r['ticker']}...")
+                ai_text, ai_verdict, ai_err = optional_gemini_buffett_check(r)
+            if ai_text and ai_verdict:
                 r["ai_check"] = ai_text
-                r["ai_verdict"] = extract_ai_verdict(ai_text)
+                r["ai_verdict"] = ai_verdict
                 ai_status["ok"] += 1
             else:
                 ai_status["errors"] += 1
@@ -1589,7 +1658,8 @@ def main() -> None:
     for r in results:
         r["conviction_score"] = compute_conviction_score(r)
         tier = classify_opportunity_tier(r)
-        if tier == "ENTRADA_YA" and (r.get("sec_verified") is False or r.get("is_cyclical_risk") or not r.get("forward_ok", True)):
+        sec_fail_us = (r.get("region") == "EE. UU." and r.get("sec_verified") is not True)
+        if tier == "ENTRADA_YA" and (r.get("sec_verified") is False or sec_fail_us or r.get("is_cyclical_risk") or not r.get("forward_ok", True)):
             tier = "MUY_BUENA"
         r["opportunity_tier"] = tier
         r["oro_puro"] = is_oro_puro(r)
@@ -1639,9 +1709,12 @@ def main() -> None:
 
     web_companies = trim_for_mobile_web(results)
 
+    fx_rates_eur = build_fx_rates_to_eur(results)
+
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
-        "scanner_version": "v10-oraculo",
+        "scanner_version": "v10.1-oraculo",
+        "fx_rates_eur": fx_rates_eur,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe_mode": UNIVERSE_MODE,
         "total_scanned": total_scanned,
@@ -1684,4 +1757,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
