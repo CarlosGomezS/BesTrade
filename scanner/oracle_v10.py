@@ -10,6 +10,7 @@ Correcciones v10.3 tras tercera auditoría técnica:
    - Soporta enmiendas 10-K/A (prioriza la cifra corregida más reciente para el mismo cierre fiscal).
    - Combina múltiples etiquetas de CapEx entre distintos ejercicios fiscales sin quedarse atrapado en la primera.
    - Soporta ejercicios fiscales de 53 semanas (rango 330-385 días).
+   - Diferencia tolerancia SEC: MATCH (<=15%, obligatorio para ORO PURO), ACCEPTABLE (15-30%) y MISMATCH (>30%).
 """
 
 from __future__ import annotations
@@ -541,20 +542,30 @@ def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
                 "sec_note": f"SEC ({chosen_end}) FCF {ref_sec / 1e9:.2f}B USD, pero falta FCF válido en Yahoo para cruzar",
             }
 
-        diff_pct = abs(yf_fcf_ref - ref_sec) / max(abs(ref_sec), 1.0) * 100.0
+        diff_pct = round(abs(yf_fcf_ref - ref_sec) / max(abs(ref_sec), 1.0) * 100.0, 1)
         if diff_pct > 30.0:
             return {
                 "sec_status": "MISMATCH",
                 "sec_verified": False,
                 "sec_fiscal_end": chosen_end,
-                "sec_note": f"Discrepancia SEC ({chosen_end}) vs Yahoo del {diff_pct:.0f}% (SEC {ref_sec / 1e9:.2f}B vs Yahoo {yf_fcf_ref / 1e9:.2f}B)",
+                "sec_diff_pct": diff_pct,
+                "sec_note": f"MISMATCH SEC ({chosen_end}) vs Yahoo del {diff_pct:.1f}% (SEC {ref_sec / 1e9:.2f}B vs Yahoo {yf_fcf_ref / 1e9:.2f}B)",
+            }
+        if diff_pct > 15.0:
+            return {
+                "sec_status": "ACCEPTABLE",
+                "sec_verified": True,
+                "sec_fiscal_end": chosen_end,
+                "sec_diff_pct": diff_pct,
+                "sec_note": f"ACEPTABLE 10-K SEC {chosen_end} (desviación {diff_pct:.1f}%; >15% no opta a ORO PURO)",
             }
 
         return {
-            "sec_status": "VERIFIED",
+            "sec_status": "MATCH",
             "sec_verified": True,
             "sec_fiscal_end": chosen_end,
-            "sec_note": f"Verificado 10-K SEC {chosen_end} (desviación {diff_pct:.0f}% en caja)",
+            "sec_diff_pct": diff_pct,
+            "sec_note": f"MATCH 10-K SEC {chosen_end} (desviación {diff_pct:.1f}% en caja)",
         }
     except Exception as exc:
         return {"sec_status": "ERROR", "sec_verified": None, "sec_fiscal_end": None, "sec_note": f"SEC no disponible ({str(exc)[:60]})"}
@@ -733,8 +744,8 @@ def is_oro_puro(rec: Dict[str, Any]) -> bool:
     if rec.get("opportunity_tier") not in ("ENTRADA_YA", "GANGA"):
         return False
 
-    # 1) Doble verificación oficial SEC EDGAR obligatoria con alineación fiscal
-    if rec.get("sec_verified") is not True or rec.get("sec_status") != "VERIFIED":
+    # 1) Doble verificación oficial SEC EDGAR estricta: MATCH (<=15% de desviación)
+    if rec.get("sec_verified") is not True or rec.get("sec_status") != "MATCH":
         return False
 
     # 2) Anti-cíclicas y Forward Check real verificado (BPA futuro + ingresos futuros previstos)
