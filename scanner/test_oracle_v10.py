@@ -78,7 +78,7 @@ def _base_oro_record() -> dict:
         "financial_currency": "USD",
         "status": "OPORTUNIDAD",
         "opportunity_tier": "GANGA",
-        "sec_status": "VERIFIED",
+        "sec_status": "MATCH",
         "sec_verified": True,
         "is_cyclical_risk": False,
         "forward_ok": True,
@@ -154,7 +154,7 @@ class TestOracleV103(unittest.TestCase):
         self.assertIs(chk["forward_ok"], False)
         self.assertEqual(chk["forward_status"], "FAIL")
 
-    # --- 3) SEC EDGAR: CAPEX DEVENGADO, MULTI-ETIQUETA, 53 SEMANAS Y 10-K/A ---
+    # --- 3) SEC EDGAR: CAPEX DEVENGADO, MULTI-ETIQUETA, 53 SEMANAS, 10-K/A Y TOLERANCIAS ---
     @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
     @patch.object(o10, "_read_http_json")
     def test_sec_missing_capex_returns_incomplete(self, mock_http, _mock_cik):
@@ -230,7 +230,7 @@ class TestOracleV103(unittest.TestCase):
             "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 8.0e9, "owner_earnings_adjusted": False,
         }
         res = o10.verify_with_sec_edgar(rec)
-        self.assertEqual(res["sec_status"], "VERIFIED")
+        self.assertEqual(res["sec_status"], "MATCH")
         self.assertIs(res["sec_verified"], True)
         self.assertEqual(res["sec_fiscal_end"], "2025-12-31")
 
@@ -259,7 +259,7 @@ class TestOracleV103(unittest.TestCase):
             "fcf_latest_date": "2026-01-03", "fcf_latest_trade": 8.1e9, "owner_earnings_adjusted": False,
         }
         res = o10.verify_with_sec_edgar(rec)
-        self.assertEqual(res["sec_status"], "VERIFIED")
+        self.assertEqual(res["sec_status"], "MATCH")
         self.assertIs(res["sec_verified"], True)
         self.assertEqual(res["sec_fiscal_end"], "2026-01-03")
 
@@ -287,6 +287,56 @@ class TestOracleV103(unittest.TestCase):
         rec = {
             "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
             "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 8.0e9, "owner_earnings_adjusted": False,
+        }
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "MISMATCH")
+        self.assertIs(res["sec_verified"], False)
+
+    @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
+    @patch.object(o10, "_read_http_json")
+    def test_sec_acceptable_tolerance_blocks_oro_puro(self, mock_http, _mock_cik):
+        """Desviación entre 15% y 30% se clasifica como ACCEPTABLE y NO puede obtener ORO PURO."""
+        mock_http.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "NetCashProvidedByUsedInOperatingActivities": {
+                        "units": {"USD": [{"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 10e9}]}
+                    },
+                    "PaymentsToAcquirePropertyPlantAndEquipment": {
+                        "units": {"USD": [{"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 2e9}]}
+                    },
+                }
+            }
+        }
+        rec = {
+            "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
+            "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 9.8e9, "owner_earnings_adjusted": False,
+        }
+        res = o10.verify_with_sec_edgar(rec)
+        self.assertEqual(res["sec_status"], "ACCEPTABLE")
+        self.assertIs(res["sec_verified"], True)
+        self.assertEqual(res["sec_diff_pct"], 22.5)
+        self.assertFalse(o10.is_oro_puro(dict(_base_oro_record(), sec_status=res["sec_status"], sec_verified=res["sec_verified"])))
+
+    @patch.object(o10, "_load_sec_cik_map", return_value=({"ACME": "0000001234"}, None))
+    @patch.object(o10, "_read_http_json")
+    def test_sec_over_30_pct_returns_mismatch(self, mock_http, _mock_cik):
+        """Desviación >30% debe devolver MISMATCH y sec_verified=False."""
+        mock_http.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "NetCashProvidedByUsedInOperatingActivities": {
+                        "units": {"USD": [{"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 10e9}]}
+                    },
+                    "PaymentsToAcquirePropertyPlantAndEquipment": {
+                        "units": {"USD": [{"form": "10-K", "start": "2025-01-01", "end": "2025-12-31", "filed": "2026-02-20", "val": 2e9}]}
+                    },
+                }
+            }
+        }
+        rec = {
+            "ticker": "ACME", "region": "EE. UU.", "currency": "USD", "financial_currency": "USD",
+            "fcf_latest_date": "2025-12-31", "fcf_latest_trade": 11.0e9, "owner_earnings_adjusted": False,
         }
         res = o10.verify_with_sec_edgar(rec)
         self.assertEqual(res["sec_status"], "MISMATCH")
@@ -354,6 +404,7 @@ class TestOracleV103(unittest.TestCase):
         good = _base_oro_record()
         self.assertTrue(o10.is_oro_puro(good))
         self.assertFalse(o10.is_oro_puro(dict(good, sec_verified=None)))
+        self.assertFalse(o10.is_oro_puro(dict(good, sec_status="ACCEPTABLE")))
         self.assertFalse(o10.is_oro_puro(dict(good, sec_status="PERIOD_MISMATCH")))
         self.assertFalse(o10.is_oro_puro(dict(good, forward_ok=None)))
         self.assertFalse(o10.is_oro_puro(dict(good, forward_ok=False)))
@@ -435,10 +486,11 @@ class TestOracleV103(unittest.TestCase):
                 return pd.DataFrame({"Close": [0.92]})
 
         sec_ok = {
-            "sec_status": "VERIFIED",
+            "sec_status": "MATCH",
             "sec_verified": True,
             "sec_fiscal_end": "2025-12-31",
-            "sec_note": "Verificado 10-K SEC 2025-12-31 (desviación 2% en caja)",
+            "sec_diff_pct": 2.0,
+            "sec_note": "MATCH 10-K SEC 2025-12-31 (desviación 2.0% en caja)",
         }
         tribunal_ok = (
             "FISCAL: Competencia creciente.\nABOGADO: Caja neta y márgenes 30%.\n"
