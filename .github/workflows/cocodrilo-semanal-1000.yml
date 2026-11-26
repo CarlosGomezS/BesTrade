@@ -67,7 +67,7 @@ jobs:
           retention-days: 1
 
   merge:
-    needs: scan
+    needs: [test, scan]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -111,7 +111,7 @@ jobs:
           cp /tmp/cocodrilo_out/*.json data/ 2>/dev/null || true
           git add data/
           if ! git diff --cached --quiet; then
-            git commit -m "Update Radar Cocodrilo weekly mega scan"
+            git commit -m "Update Radar Cocodrilo weekly scan"
             git push
           else
             echo "Sin cambios en data/"
