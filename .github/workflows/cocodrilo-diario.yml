@@ -39,7 +39,7 @@ jobs:
           python-version: '3.11'
 
       - name: Instalar dependencias
-        run: pip install --upgrade yfinance pandas
+        run: pip install --upgrade yfinance pandas google-auth requests
 
       - name: Ejecutar tests del Oráculo (obligatorio)
         run: python -m unittest scanner/test_oracle_v10.py -v
@@ -52,6 +52,8 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_DEVICE_TOKEN: ${{ secrets.FIREBASE_DEVICE_TOKEN }}
         run: python scanner/buffett_scanner.py
 
       - name: Publicar JSON actualizados
