@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<title>Radar Cocodrilo Pro v10.8 — Live Total + Agente IA</title>
+<title>Radar Cocodrilo Pro v10.9 — Alertas Push Firebase</title>
 <style>
 :root{
   --bg:#040806;
@@ -952,6 +952,15 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
   .icon-btn{width:29px;height:29px}
 }
 
+
+/* FIREBASE PUSH TOKEN BOX */
+.fcm-token-box{
+  display:none;margin-top:8px;padding:8px 10px;border-radius:11px;
+  background:#040907;border:1px solid var(--line2);font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:10px;color:#bbf7d0;word-break:break-all;line-height:1.4;
+}
+.fcm-token-box.show{display:block}
+
 </style>
 </head>
 <body>
@@ -962,7 +971,7 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
       <div class="logo">🐊</div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v10.8</span></small>
+        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v10.9</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -1279,6 +1288,22 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
       <div class="notice" id="geminiStatusBox" style="margin-top:10px">Comprobando conexión con Gemini…</div>
     </div>
 
+    <div class="panel" id="fcmPushPanel" style="border-color:rgba(251,113,133,.36)">
+      <div class="eyebrow" style="color:#fda4af">Notificaciones nativas en segundo plano (Firebase FCM)</div>
+      <h3 style="margin:4px 0 6px">🔔 Alertas Push ENTRAR YA</h3>
+      <p style="margin:0 0 8px;font-size:12px;color:var(--muted)">Activa las notificaciones push en este móvil para recibir un aviso instantáneo cada vez que salte una oportunidad <b>🚨 ENTRAR YA</b> (aunque la app esté cerrada) y abrir su ficha al tocarla.</p>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="btn primary sm" id="enablePushBtn" style="flex:1">🔔 Activar alertas push</button>
+        <button class="btn sm" id="copyFcmTokenBtn">📋 Copiar token</button>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">
+        <button class="btn sm gold" id="testLocalPushBtn" style="flex:1">🧪 Probar aviso aquí</button>
+        <button class="btn sm" id="launchIntradayTestBtn" style="flex:1">🚀 Prueba intradía</button>
+      </div>
+      <div class="fcm-token-box" id="fcmTokenBox"></div>
+      <div class="notice" id="fcmStatusBox" style="margin-top:9px">Alertas push pendientes de activar en este dispositivo.</div>
+    </div>
+
     <div class="panel">
       <div class="eyebrow">Checklist obligatorio antes de poner 1 €</div>
       <h3 style="margin:4px 0 6px">🐊 Los 4 filtros de Warren Buffett</h3>
@@ -1350,6 +1375,8 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
 
 <div class="toast" id="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script>
 (()=>{'use strict';
 
@@ -1370,10 +1397,11 @@ const STORE = {
   PROXY_URL: 'cocodriloApp.proxyUrl.v10',
   GEMINI_KEY: 'cocodriloApp.geminiKey.v10',
   AGENT_CHAT: 'cocodriloApp.agentChat.v10',
-  AGENT_MEMORY: 'cocodriloApp.agentMemory.v10'
+  AGENT_MEMORY: 'cocodriloApp.agentMemory.v10',
+  FCM_TOKEN: 'cocodriloApp.fcmToken.v10'
 };
 const DB_FILE = 'user-db.json';
-const WORKFLOWS = { daily: 'cocodrilo-diario.yml', weekly: 'cocodrilo-semanal-1000.yml' };
+const WORKFLOWS = { daily: 'cocodrilo-diario.yml', weekly: 'cocodrilo-semanal-1000.yml', intraday: 'cocodrilo-intradia.yml' };
 const PAGE_SIZE = 40;
 const FALLBACK_FX_EUR = { EUR: 1.0, USD: 0.94, GBP: 1.19, CHF: 1.07, CAD: 0.67, JPY: 0.0061 };
 
@@ -1489,6 +1517,20 @@ let cardScrollObserver = null;
 let scrollQueueSet = new Set();
 let scrollFetchTimer = null;
 const AGENT_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCnbl-l8AvaG8CZfSjnisYLqSCXdsHQnVw",
+  authDomain: "cocodrilopro-64220.firebaseapp.com",
+  projectId: "cocodrilopro-64220",
+  storageBucket: "cocodrilopro-64220.firebasestorage.app",
+  messagingSenderId: "842936884826",
+  appId: "1:842936884826:web:3e82485a7f3281b7074263",
+  measurementId: "G-PWMZG95KPM"
+};
+const FIREBASE_VAPID_KEY = 'BE2bSrsyiZ-gVQirODXuU-yIUw5gA4VfGKCakT0lpiWV9JghcYlnfzLfvUMYMr1NY0ABaQ47pxTyiGo1ao_2k9o';
+let fcmToken = (localStorage.getItem(STORE.FCM_TOKEN) || '').trim();
+let fcmTokensCloud = [];
+let fcmMessaging = null;
+let deepLinkHandled = false;
 
 const $ = id => document.getElementById(id);
 function readJSON(k, def){ try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : def; } catch(e){ return def; } }
@@ -2164,7 +2206,8 @@ function mergeUserStates(remote, local){
     checks: mergedChecks,
     cash_pot: mergedPot,
     proxy_url: (local.proxy_url || remote.proxy_url || ''),
-    agent_memory: (local.agent_memory || remote.agent_memory || '')
+    agent_memory: (local.agent_memory || remote.agent_memory || ''),
+    fcm_tokens: Array.from(new Set([...(Array.isArray(remote.fcm_tokens) ? remote.fcm_tokens : []), ...(Array.isArray(local.fcm_tokens) ? local.fcm_tokens : [])].filter(Boolean)))
   };
 }
 
@@ -2230,7 +2273,8 @@ async function cloudPull(forceApply = false, showMsg = false){
     const remoteTs = Number(decoded.updated_at || 0);
     if(pendingSync && !forceApply){
       snapshotLocalBackup();
-      const merged = mergeUserStates(decoded, { favs, portfolio, notes, checks, cash_pot: cashPot, proxy_url: proxyUrl, agent_memory: agentMemory, updated_at: localUpdatedAt });
+      const merged = mergeUserStates(decoded, { favs, portfolio, notes, checks, cash_pot: cashPot, proxy_url: proxyUrl, agent_memory: agentMemory, fcm_tokens: fcmToken ? [fcmToken] : [], updated_at: localUpdatedAt });
+      fcmTokensCloud = merged.fcm_tokens || [];
       if(merged.agent_memory){ agentMemory = merged.agent_memory; localStorage.setItem(STORE.AGENT_MEMORY, agentMemory); }
       if(merged.proxy_url && !proxyUrl){ proxyUrl = merged.proxy_url.trim().replace(/\/+$/, ''); localStorage.setItem(STORE.PROXY_URL, proxyUrl); }
       favs = merged.favs; portfolio = merged.portfolio; notes = merged.notes; checks = merged.checks; cashPot = merged.cash_pot;
@@ -2248,6 +2292,7 @@ async function cloudPull(forceApply = false, showMsg = false){
       if(decoded.cash_pot !== undefined && Number.isFinite(Number(decoded.cash_pot))) cashPot = Number(decoded.cash_pot);
       if(decoded.proxy_url && typeof decoded.proxy_url === 'string' && !proxyUrl){ proxyUrl = decoded.proxy_url.trim().replace(/\/+$/, ''); localStorage.setItem(STORE.PROXY_URL, proxyUrl); }
       if(decoded.agent_memory && typeof decoded.agent_memory === 'string'){ agentMemory = decoded.agent_memory; localStorage.setItem(STORE.AGENT_MEMORY, agentMemory); }
+      if(Array.isArray(decoded.fcm_tokens)){ fcmTokensCloud = decoded.fcm_tokens.filter(Boolean); }
       checks = (decoded.checks && typeof decoded.checks === 'object') ? decoded.checks : {};
       localUpdatedAt = remoteTs || Date.now();
       persistLocalOnly();
@@ -2279,6 +2324,7 @@ async function cloudPush(showMsg = false, retryCount = 0){
       cash_pot: cashPot,
       proxy_url: proxyUrl,
       agent_memory: agentMemory,
+      fcm_tokens: Array.from(new Set([...(fcmTokensCloud || []), ...(fcmToken ? [fcmToken] : [])])),
       notes,
       checks
     };
@@ -2516,9 +2562,10 @@ async function refreshWorkflowStatus(silent = true){
 
 async function triggerWorkflow(kind, customRaw = ''){
   if(!ghToken){ toast('Pega tu Fine-grained Token en la pestaña Método.'); switchView('app'); setTimeout(() => $('ghTokenInput')?.focus(), 180); return; }
-  const wfFile = kind === 'weekly' ? WORKFLOWS.weekly : WORKFLOWS.daily;
+  const wfFile = kind === 'weekly' ? WORKFLOWS.weekly : kind === 'intraday' ? WORKFLOWS.intraday : WORKFLOWS.daily;
   const bodyObj = { ref: 'main' };
   if(kind === 'daily') bodyObj.inputs = { universe: 'rotacion_diaria', test_mode: 'true', custom_tickers: '' };
+  else if(kind === 'intraday') bodyObj.inputs = { test_mode: 'true' };
   else if(kind === 'custom'){
     const cleaned = customRaw.trim();
     if(!cleaned){ toast('Escribe un nombre o ticker (ej. Alphabet, Inditex, DECK)'); return; }
@@ -2532,7 +2579,7 @@ async function triggerWorkflow(kind, customRaw = ''){
     });
     if(r.status === 204){
       wasRunning = true;
-      const lbl = kind === 'weekly' ? 'Mega +2.000' : kind === 'custom' ? `Búsqueda (${customRaw.trim()})` : 'Diario Rotativo';
+      const lbl = kind === 'weekly' ? 'Mega +2.000' : kind === 'intraday' ? 'Prueba Intradía (Push)' : kind === 'custom' ? `Búsqueda (${customRaw.trim()})` : 'Diario Rotativo';
       toast(`🚀 Lanzado: ${lbl}. Te avisará por Telegram.`);
       $('ghRunDot').className = 'run-dot running'; $('ghRunText').textContent = `Iniciando ${lbl}…`;
       if(kind === 'custom'){ $('customTickersInput').value = ''; $('customScanBox').classList.remove('show'); }
@@ -3190,6 +3237,22 @@ function renderAppView(){
       ? `✅ <b>Agente IA listo con tu clave Gemini local</b>${proxyUrl ? ' (enrutado de forma limpia).' : ' (conexión directa a Gemini).'}`
       : `⚠️ <b>Falta activar Gemini:</b> añade <code>GEMINI_API_KEY</code> como Secret en tu Cloudflare Worker o pégala arriba.`;
   }
+  if($('fcmStatusBox')){
+    const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+    const box = $('fcmTokenBox');
+    if(fcmToken){
+      $('fcmStatusBox').className = 'notice good';
+      $('fcmStatusBox').innerHTML = `✅ <b>Push activado en este móvil</b> (permiso: <code>${esc(perm)}</code>).<br><small>Pega el token en GitHub → <code>BesTrade</code> → Secrets → <b>FIREBASE_DEVICE_TOKEN</b> para recibir alertas automáticas <b>ENTRAR YA</b>.</small>`;
+      if(box){ box.textContent = fcmToken; box.classList.add('show'); }
+      if($('enablePushBtn')) $('enablePushBtn').textContent = '🔄 Renovar token push';
+    } else {
+      $('fcmStatusBox').className = perm === 'denied' ? 'notice bad' : 'notice warn';
+      $('fcmStatusBox').innerHTML = perm === 'denied'
+        ? `🚨 <b>Permiso bloqueado:</b> permite notificaciones para este sitio en los ajustes de Chrome/Android.`
+        : `🔔 Pulsa <b>Activar alertas push</b> para vincular este móvil con tu proyecto Firebase (<code>cocodrilopro-64220</code>).`;
+      if(box) box.classList.remove('show');
+    }
+  }
   $('remoteUrlInput').value = remoteUrl;
   const dTxt = datasets.daily ? `${datasets.daily.total_ok || datasets.daily.companies.length} emp. · ${fmtVer(datasets.daily.scanner_version)} (${fmtShortDate(datasets.daily.generated_at)})` : 'Pendiente';
   const wTxt = datasets.weekly ? `${datasets.weekly.total_ok || datasets.weekly.companies.length} emp. · ${fmtVer(datasets.weekly.scanner_version)} (${fmtShortDate(datasets.weekly.generated_at)})` : 'Pendiente';
@@ -3776,6 +3839,137 @@ function askAgentAboutTicker(ticker, name){
   sendAgentMessage(q);
 }
 
+
+/* ===========================
+   FIREBASE CLOUD MESSAGING (NOTIFICACIONES PUSH ENTRAR YA)
+   =========================== */
+function initFirebaseMessagingClient(){
+  if(fcmMessaging) return fcmMessaging;
+  if(typeof firebase === 'undefined' || !firebase.messaging || !firebase.messaging.isSupported()) return null;
+  try {
+    const app = firebase.apps && firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+    fcmMessaging = firebase.messaging(app);
+    fcmMessaging.onMessage((msg) => {
+      const notif = msg?.notification || {};
+      const data = msg?.data || {};
+      const title = notif.title || data.title || '🚨 ENTRAR YA — Cocodrilo Pro';
+      const body = notif.body || data.body || 'Nueva oportunidad extrema detectada.';
+      toast(`${title} — ${body}`);
+      if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && navigator.serviceWorker){
+        navigator.serviceWorker.getRegistration('./firebase-messaging-sw.js').then(reg => {
+          if(reg && reg.showNotification){
+            reg.showNotification(title, {
+              body,
+              tag: data.ticker ? `cocodrilo-entrar-ya-${data.ticker}` : 'cocodrilo-fg',
+              renotify: true,
+              data: { url: data.url || './?filter=ENTRADA_YA', ticker: data.ticker || '' }
+            });
+          }
+        }).catch(() => {});
+      }
+      if(proxyUrl) refreshActiveLivePrices(true);
+    });
+    return fcmMessaging;
+  } catch(e){
+    return null;
+  }
+}
+
+async function enableFirebasePush(silent = false){
+  if(typeof Notification === 'undefined' || !('serviceWorker' in navigator)){
+    if(!silent) toast('Este navegador no soporta Push Web. En iPhone añade la web a pantalla de inicio primero.');
+    return null;
+  }
+  if(location.protocol !== 'https:' && location.hostname !== 'localhost'){
+    if(!silent) toast('Las notificaciones push solo funcionan sobre HTTPS (GitHub Pages).');
+    return null;
+  }
+  try {
+    let perm = Notification.permission;
+    if(perm !== 'granted' && !silent){
+      perm = await Notification.requestPermission();
+    }
+    if(perm !== 'granted'){
+      if(!silent) toast('Permiso de notificaciones bloqueado. Actívalo en los ajustes del navegador.');
+      if(activeView === 'app') renderAppView();
+      return null;
+    }
+
+    const reg = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './' });
+    await navigator.serviceWorker.ready;
+
+    const msgClient = initFirebaseMessagingClient();
+    if(!msgClient){
+      if(!silent) toast('No se pudo cargar Firebase Messaging (revisa tu conexión).');
+      return null;
+    }
+
+    const tok = await msgClient.getToken({
+      vapidKey: FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: reg
+    });
+    if(!tok){
+      if(!silent) toast('Firebase no devolvió token de dispositivo. Reintenta en unos segundos.');
+      return null;
+    }
+
+    const changed = tok !== fcmToken;
+    fcmToken = tok;
+    localStorage.setItem(STORE.FCM_TOKEN, fcmToken);
+    if(!fcmTokensCloud.includes(fcmToken)) fcmTokensCloud.push(fcmToken);
+    if(changed) saveLocalUserState(true);
+    if(activeView === 'app') renderAppView();
+    if(!silent) toast('🔔 Push activado. Copia el token y guárdalo en FIREBASE_DEVICE_TOKEN en GitHub.');
+    return tok;
+  } catch(err){
+    if(!silent) toast(`Error activando Firebase Push: ${err?.message || err}`);
+    return null;
+  }
+}
+
+async function sendLocalTestNotification(){
+  if(typeof Notification === 'undefined'){ toast('Tu navegador no soporta notificaciones.'); return; }
+  if(Notification.permission !== 'granted'){
+    await enableFirebasePush(false);
+    if(Notification.permission !== 'granted') return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './' });
+    await navigator.serviceWorker.ready;
+    await reg.showNotification('🚨 PRUEBA ENTRAR YA: DECK', {
+      body: 'Notificaciones nativas de Cocodrilo Pro funcionando correctamente en este móvil.',
+      tag: 'cocodrilo-test-local',
+      renotify: true,
+      vibrate: [200, 100, 200],
+      data: { url: './?filter=ENTRADA_YA', ticker: '' }
+    });
+    toast('🔔 Aviso de prueba enviado a la barra de notificaciones.');
+  } catch(err){
+    toast(`No se pudo lanzar el aviso local: ${err?.message || err}`);
+  }
+}
+
+function handleStartupDeepLink(){
+  if(deepLinkHandled) return;
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const tkr = (sp.get('ticker') || '').trim().toUpperCase();
+    const flt = (sp.get('filter') || '').trim().toUpperCase();
+    if(tkr){
+      deepLinkHandled = true;
+      if(findCompany(tkr)){
+        openModal(tkr);
+      } else {
+        openLiveQuickModal({ symbol: tkr, name: tkr });
+      }
+    } else if(flt === 'ENTRADA_YA'){
+      deepLinkHandled = true;
+      activeFilter = 'TIER:ENTRADA_YA';
+      renderRadarView();
+    }
+  } catch(e){}
+}
+
 /* ===========================
    NAVEGACIÓN Y CARGA DE DATOS
    =========================== */
@@ -3847,6 +4041,7 @@ async function fetchData(showToast = false){
 
     selectActivePayload();
     renderAll();
+    handleStartupDeepLink();
     if(proxyUrl) refreshActiveLivePrices(true);
     if(showToast) toast(payload.is_demo ? 'Sin datos remotos aún (Demo)' : `Sincronizado (${payload.total_ok || payload.companies.length} empresas)`);
   } finally {
@@ -4110,10 +4305,23 @@ $('agentInput').addEventListener('keydown', (e) => {
   }
 });
 
+$('enablePushBtn').onclick = () => enableFirebasePush(false);
+$('copyFcmTokenBtn').onclick = () => {
+  if(!fcmToken){ toast('Primero pulsa 🔔 Activar alertas push.'); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(fcmToken).then(() => toast('📋 Token copiado. Pégalo en FIREBASE_DEVICE_TOKEN en GitHub.')).catch(() => prompt('Copia tu token FCM:', fcmToken));
+  } else prompt('Copia tu token FCM:', fcmToken);
+};
+$('testLocalPushBtn').onclick = () => sendLocalTestNotification();
+$('launchIntradayTestBtn').onclick = () => triggerWorkflow('intraday');
+
 fetchData(false);
 refreshWorkflowStatus(true);
 if(ghToken) cloudPull(false, false);
 if(proxyUrl) testProxyConnection(false);
+if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
+  enableFirebasePush(true);
+}
 })();
 </script>
 </body>
