@@ -776,6 +776,182 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
 .chat-send:active{transform:scale(.95)}
 .chat-send:disabled{opacity:.45;cursor:not-allowed}
 
+
+/* MARKDOWN DIVIDER */
+.msg-bubble .md-hr{
+  border:0;height:1px;margin:8px 0;
+  background:linear-gradient(90deg,transparent,rgba(155,212,175,.28),transparent);
+}
+
+/* ADAPTIVE MOBILE-FIRST COMPACT SCALE (PHONES <= 540px) */
+@media(max-width:540px){
+  :root{
+    --nav-h:60px;
+    --radius-xl:18px;
+    --radius-lg:15px;
+    --radius-md:11px;
+  }
+  body{
+    font-size:13px;
+    line-height:1.42;
+    padding-top:calc(52px + env(safe-area-inset-top));
+    padding-bottom:calc(var(--nav-h) + 22px + env(safe-area-inset-bottom));
+  }
+
+  /* AppBar ultra-limpia: nunca recorta título ni versión */
+  .appbar{
+    padding:env(safe-area-inset-top) 10px 0;
+    height:calc(52px + env(safe-area-inset-top));
+  }
+  .appbar-inner{height:52px;gap:6px}
+  .brand{gap:7px}
+  .logo{width:32px;height:32px;border-radius:10px;font-size:16px}
+  .brand h1{font-size:12.5px;letter-spacing:.03em}
+  .brand small{font-size:8.5px;gap:4px;margin-top:1px}
+  .ver-tag{font-size:8.5px;padding:1px 4px;border-radius:4px}
+  .appbar-right{gap:4px}
+  .cloud-pill{padding:4px 7px;font-size:9.5px}
+  .live-pill{padding:4px 7px;font-size:9.5px;gap:4px}
+  .dot{width:5.5px;height:5.5px}
+  .icon-btn{width:31px;height:31px;border-radius:9px;font-size:14px}
+
+  /* Contenedor principal y paneles */
+  .main{padding:9px 10px 10px}
+  .panel{padding:12px 13px;border-radius:17px;margin-bottom:10px}
+  .panel h3{font-size:14.5px;margin-bottom:7px}
+  .eyebrow{font-size:9px;letter-spacing:.1em}
+
+  /* Clima de mercado */
+  .mkt-bar{padding:8px 10px;border-radius:14px;gap:6px;margin-bottom:8px;font-size:11px}
+  .mkt-title{font-size:11px}
+  .mkt-sub{font-size:10.5px}
+  .mkt-chip{padding:4px 5px;font-size:10px;border-radius:8px}
+
+  /* Tarjeta de control (Switch + GitHub Actions) */
+  .control-card{padding:8px;border-radius:16px;margin-bottom:9px}
+  .source-switch{padding:3px;gap:4px;border-radius:12px;margin-bottom:7px}
+  .src-btn{padding:7px 5px;border-radius:9px;gap:2px}
+  .src-btn strong{font-size:11px;gap:4px}
+  .src-btn small{font-size:9.2px}
+  .src-ver{font-size:8.5px;padding:1px 4px}
+  .run-top{font-size:10px;margin-bottom:6px}
+  .run-btns{gap:5px}
+  .run-btn{height:33px;padding:0 8px;font-size:11px;border-radius:10px;gap:4px}
+  .run-btn svg{width:11px;height:11px}
+  .custom-scan-box input{height:34px;font-size:12px;padding:0 10px}
+
+  /* Hero */
+  .hero-card{padding:13px;border-radius:18px;margin-bottom:10px}
+  .hero-title{font-size:17px;margin:6px 0 4px}
+  .hero-sub{font-size:11.5px;line-height:1.36}
+  .ai-mini{font-size:9.5px;padding:2px 7px}
+  .kpi-row{gap:6px;margin-top:10px}
+  .kpi{padding:8px 9px;border-radius:12px}
+  .kpi span{font-size:9.5px;gap:4px}
+  .kpi strong{font-size:18px;margin-top:4px}
+
+  /* Filtros y buscador */
+  .chips-scroll{gap:5px;padding:1px 0 7px;margin-bottom:5px}
+  .fchip{padding:6px 10px;font-size:11px}
+  .search-row{gap:6px;margin-bottom:10px}
+  .search-box input{height:38px;padding:0 10px 0 33px;border-radius:12px;font-size:12.5px}
+  .search-box span{left:10px}
+  .sort-sel{height:38px;border-radius:12px;font-size:11.5px;padding:0 8px;max-width:128px}
+
+  /* Tarjetas de empresas */
+  .cards-grid{gap:10px}
+  .stock-card{padding:12px;border-radius:17px;gap:9px}
+  .card-name{font-size:14.5px}
+  .card-meta{font-size:10.5px;margin-top:3px;gap:5px}
+  .tkr{font-size:10px;padding:1.5px 6px;border-radius:6px}
+  .star-btn{width:31px;height:31px;border-radius:9px;font-size:14px}
+  .ring,.ring svg{width:44px;height:44px}
+  .ring-txt b{font-size:13px}
+  .ring-txt small{font-size:7px}
+  .pills{gap:4px}
+  .pill{padding:2.5px 7px;font-size:9.2px}
+  .quad-bar{padding:5.5px 9px;border-radius:10px;font-size:10.5px}
+  .val-box{padding:9px 10px;border-radius:12px}
+  .val-row{margin-bottom:5px}
+  .val-price{font-size:16px}
+  .val-dd{font-size:10.5px}
+  .val-track{height:7px;margin:6px 0 5px}
+  .val-pin{width:12px;height:12px;border-width:2.5px}
+  .val-labels{font-size:9.5px}
+  .mini5,.mini4{gap:5px}
+  .mcell{padding:5.5px 6.5px;border-radius:9px}
+  .mcell span{font-size:8.8px}
+  .mcell b{font-size:11.5px;margin-top:1px}
+  .tag{font-size:9.8px;padding:2.5px 7px;border-radius:7px}
+  .btn{min-height:36px;padding:8px 11px;font-size:12px;border-radius:11px}
+  .btn.sm{min-height:32px;padding:6px 9px;font-size:11px;border-radius:9px}
+
+  /* Cartera, Bote y Aciertos */
+  #cashPotVal{font-size:20px !important}
+  .port-hero{padding:9px;gap:6px;border-radius:13px;margin:9px 0}
+  .port-hero div span{font-size:9px}
+  .port-hero div b{font-size:14px}
+  .port-row{padding:11px;border-radius:14px;margin-bottom:8px}
+  .port-metrics{padding:6px 8px;gap:5px;margin-top:8px;border-radius:10px}
+  .port-metrics span{font-size:8.8px}
+  .port-metrics b{font-size:11.5px}
+  .hist-card{padding:10px;border-radius:13px;margin-bottom:8px}
+  .bench-chip{font-size:9.5px;padding:2.5px 6.5px}
+  input.finput,select.finput{height:38px;border-radius:10px;font-size:12.5px;padding:0 10px}
+  .notice{padding:9px 11px;border-radius:11px;font-size:11.5px;margin:7px 0}
+
+  /* Vista Agente IA — proporcional y fluida en pantalla móvil */
+  .agent-head-card{padding:10px 11px;border-radius:16px;margin-bottom:7px}
+  .agent-avatar{width:34px;height:34px;border-radius:11px;font-size:17px}
+  .agent-head-card h3{font-size:14px !important}
+  .agent-stats{gap:4px;margin-top:7px}
+  .agent-chip{font-size:9.5px;padding:2px 7px}
+  .agent-actions-bar{gap:5px;margin-top:7px}
+  .agent-actions-bar .btn.sm{min-height:29px;padding:4px 8px;font-size:10.5px}
+  .agent-prompts{gap:5px;padding:1px 0 6px;margin-bottom:4px}
+  .aprompt{padding:6px 10px;font-size:10.8px}
+  .chat-shell{
+    border-radius:17px;
+    min-height:320px;
+    height:calc(100dvh - 265px);
+    max-height:calc(100dvh - 230px);
+  }
+  .chat-feed{padding:10px;gap:8px}
+  .msg-row{max-width:95%}
+  .msg-bubble{padding:9px 11px;border-radius:14px;font-size:12.5px;line-height:1.44}
+  .msg-bubble h4{font-size:12.5px;margin:6px 0 3px}
+  .msg-bubble ul,.msg-bubble ol{padding-left:16px;margin:4px 0}
+  .msg-bubble li{margin-bottom:3px}
+  .msg-meta{font-size:9px;margin-top:3px}
+  .chat-composer{padding:7px;gap:6px}
+  .chat-composer textarea{
+    min-height:38px;max-height:92px;border-radius:11px;
+    padding:9px 10px;font-size:12.5px;
+  }
+  .chat-send{height:38px;min-width:38px;padding:0 11px;border-radius:11px}
+
+  /* Barra de navegación inferior más fina */
+  .bottom-nav{padding:10px 8px calc(6px + env(safe-area-inset-bottom))}
+  .bottom-nav-inner{border-radius:18px;padding:4px}
+  .nav-item{padding:5px 1px;gap:2px;border-radius:13px}
+  .nav-item svg{width:18px;height:18px}
+  .nav-item span{font-size:9px}
+  .nav-badge{min-width:14px;height:14px;font-size:8.5px;top:1px;right:calc(50% - 17px)}
+
+  /* Modal sheet más aprovechado */
+  .sheet{padding:10px 14px calc(20px + env(safe-area-inset-bottom));border-radius:22px 22px 0 0}
+  .sheet-head{padding-bottom:9px;margin-bottom:10px}
+  #mTitle{font-size:17px !important}
+  .dcf-card{padding:8px 7px;border-radius:12px}
+  .dcf-card b{font-size:14.5px}
+  .tool-box{padding:10px;border-radius:14px}
+}
+@media(max-width:360px){
+  .brand h1{font-size:11.5px}
+  .live-pill,.cloud-pill{padding:3.5px 5.5px;font-size:9px}
+  .icon-btn{width:29px;height:29px}
+}
+
 </style>
 </head>
 <body>
@@ -786,7 +962,7 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
       <div class="logo">🐊</div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO BUFFETT <span class="ver-tag">v10.8</span></small>
+        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v10.8</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -1030,7 +1206,7 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
     <div class="chat-shell">
       <div class="chat-feed" id="agentChatFeed"></div>
       <div class="chat-composer">
-        <textarea id="agentInput" rows="1" placeholder="Pregunta al Oráculo (ej. ¿Entro en DECK o espero? ¿Cómo ves NVDA?)…"></textarea>
+        <textarea id="agentInput" rows="1" placeholder="Pregunta al Oráculo (ej. ¿Entro en DECK?)…"></textarea>
         <button class="chat-send" id="agentSendBtn" title="Enviar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
@@ -1604,7 +1780,7 @@ function updateLiveBadgeOnly(){
     const hhmmss = liveLastUpdate ? new Date(liveLastUpdate).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
     badge.className = 'live-pill';
     badge.title = hhmmss ? `Turbo 15s · Última actualización ${hhmmss}` : 'Turbo 15s activo';
-    badge.innerHTML = `<i class="dot"></i> ${hhmmss || 'Vivo'} ⚡`;
+    badge.innerHTML = `<i class="dot"></i> <span class="mono">${hhmmss || 'Vivo'}</span>`;
   } else if(payload.is_demo){
     badge.className = 'live-pill demo';
     badge.innerHTML = '<i class="dot"></i> Demo';
@@ -3392,6 +3568,11 @@ function renderAgentMarkdown(rawText){
       closeLists(); closeTbl();
       continue;
     }
+    if(/^(-{3,}|\*{3,}|_{3,})$/.test(line)){
+      closeLists(); closeTbl();
+      html += '<hr class="md-hr">';
+      continue;
+    }
     if(line.startsWith('|') && line.endsWith('|')){
       closeLists();
       const cells = line.slice(1, -1).split('|').map(x => x.trim());
@@ -3914,12 +4095,12 @@ $('agentSendBtn').onclick = () => {
   const inp = $('agentInput');
   const txt = inp.value;
   inp.value = '';
-  inp.style.height = '42px';
+  inp.style.height = '38px';
   sendAgentMessage(txt);
 };
 $('agentInput').addEventListener('input', (e) => {
   const el = e.target;
-  el.style.height = '42px';
+  el.style.height = '38px';
   el.style.height = Math.min(110, el.scrollHeight) + 'px';
 });
 $('agentInput').addEventListener('keydown', (e) => {
