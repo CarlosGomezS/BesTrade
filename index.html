@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<title>Cocodrilo Pro v10.10 — Oráculo Value</title>
+<title>Cocodrilo Pro v10.11 — EUR + Plan Operativo</title>
 <style>
 :root{
   --bg:#000000;
@@ -957,6 +957,47 @@ input.finput:focus,select.finput:focus{border-color:var(--accent);box-shadow:0 0
   .icon-btn{width:29px;height:29px}
 }
 
+/* PLAN OPERATIVO (ENTRADA · SALIDA · STOP LOSS EN EUR) */
+.plan-strip{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:9px;
+  padding-top:9px;border-top:1px solid var(--line);
+}
+.pcell{
+  background:#0a0d14;border:1px solid var(--line);border-radius:9px;padding:6px 7px;min-width:0;
+}
+.pcell.in{border-color:rgba(59,130,246,.32);background:rgba(59,130,246,.07)}
+.pcell.out{border-color:rgba(34,197,94,.28);background:rgba(34,197,94,.06)}
+.pcell.sl{border-color:rgba(244,63,94,.28);background:rgba(244,63,94,.06)}
+.pcell span{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcell b{display:block;font-size:12px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums;color:#ffffff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcell.in b{color:#93c5fd}
+.pcell.out b{color:#4ade80}
+.pcell.sl b{color:#fda4af}
+.pcell small{display:block;font-size:9px;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}
+@media(max-width:520px){.exit-grid{grid-template-columns:1fr}}
+.ecard{background:#0c1018;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.ecard.tp1{border-color:rgba(59,130,246,.36);background:rgba(59,130,246,.08)}
+.ecard.tp2{border-color:rgba(34,197,94,.36);background:rgba(34,197,94,.08)}
+.ecard.sl{border-color:rgba(244,63,94,.36);background:rgba(244,63,94,.08)}
+.ecard span{display:block;font-size:10px;color:var(--muted);font-weight:700}
+.ecard b{display:block;font-size:15px;margin:3px 0;font-variant-numeric:tabular-nums;color:#ffffff}
+.ecard.tp1 b{color:#93c5fd}
+.ecard.tp2 b{color:#4ade80}
+.ecard.sl b{color:#fda4af}
+.port-levels{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:7px;
+  padding:7px 9px;border-radius:10px;background:#090c12;border:1px solid var(--line);
+}
+.port-levels span{display:block;font-size:8.8px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.port-levels b{display:block;font-size:11.5px;margin-top:1.5px;font-variant-numeric:tabular-nums}
+@media(max-width:540px){
+  .plan-strip{gap:5px;margin-top:7px;padding-top:7px}
+  .pcell{padding:5px 6px}
+  .pcell b{font-size:11px}
+  .pcell small{font-size:8.5px}
+}
+
 /* FIREBASE PUSH TOKEN BOX */
 .fcm-token-box{
   display:none;margin-top:8px;padding:9px 11px;border-radius:11px;
@@ -974,7 +1015,7 @@ input.finput:focus,select.finput:focus{border-color:var(--accent);box-shadow:0 0
       <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v10.10</span></small>
+        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v10.11</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -1964,7 +2005,7 @@ function attachTickerAutocomplete(inputEl, opts = {}){
     const rows = items.map((it, idx) => {
       const c = it.company || findCompany(it.symbol);
       const eff = c ? getEffectivePrice(c) : (liveQuotes[it.symbol] ? { price: liveQuotes[it.symbol].price, currency: liveQuotes[it.symbol].currency, changePct: liveQuotes[it.symbol].changePct } : null);
-      const priceStr = (eff && eff.price !== null) ? fmtMoney(eff.price, eff.currency) : '';
+      const priceStr = (eff && eff.price !== null) ? fmtEur(eff.price, eff.currency) : '';
       const badgeHtml = it.inRadar
         ? `<span class="ac-badge">🐊 Radar · ${c?.quality_score ?? '—'} pts</span>`
         : `<span class="ac-badge world">🌍 Mercado en vivo</span>`;
@@ -2085,8 +2126,11 @@ async function openLiveQuickModal(item){
   }
 
   const eurConv = convertAmount(q.price, q.currency, 'EUR');
-  const eurTxt = (q.currency !== 'EUR' && eurConv.ok) ? `≈ ${eurConv.value.toFixed(2)} €` : `${q.price.toFixed(2)} €`;
+  const priceEur = (eurConv.ok && eurConv.value) ? eurConv.value : q.price;
+  const origNote = (q.currency && q.currency.toUpperCase() !== 'EUR') ? `Divisa origen: ${fmtMoney(q.price, q.currency)} (FX en vivo)` : 'Cotiza directamente en EUR';
   const dd52 = (q.high52w && q.high52w > 0) ? (((q.price / q.high52w) - 1) * 100).toFixed(1) : null;
+  const quickTp = priceEur * 1.25;
+  const quickSl = priceEur * 0.82;
 
   $('mSub').textContent = `${sym} · ${q.exchange || item.exchange || 'Mercado Global'}${item.sector ? ' · ' + item.sector : ''}`;
   $('mTitle').textContent = q.name || item.name || sym;
@@ -2095,21 +2139,26 @@ async function openLiveQuickModal(item){
       <div class="val-row" style="margin-bottom:0">
         <div>
           ${liveSessionBadge({ isLive: true, session: q.session || q.marketState })}
-          <div class="val-price" style="margin-top:3px">${fmtMoney(q.price, q.currency)} ${liveChangePill(q.changePct)}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">Equivalente actual: <b style="color:var(--text)">${esc(eurTxt)}</b></div>
+          <div class="val-price" style="margin-top:3px">${priceEur.toFixed(2)} € ${liveChangePill(q.changePct)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(origNote)}</div>
         </div>
         <div style="text-align:right">
           <div style="font-size:11px;color:var(--muted)">Cierre previo</div>
-          <b>${fmtMoney(q.prevClose, q.currency)}</b>
+          <b>${fmtEur(q.prevClose, q.currency)}</b>
           ${dd52 !== null ? `<div style="font-size:11px;color:${Number(dd52)<=-15?'#4ade80':'var(--muted)'};margin-top:3px">${dd52}% vs máx 52s</div>` : ''}
         </div>
+      </div>
+      <div class="plan-strip">
+        <div class="pcell in"><span>Entrada ref.</span><b>${priceEur.toFixed(2)} €</b><small>Tramo 1 (35%)</small></div>
+        <div class="pcell out"><span>Salida (+25%)</span><b>${quickTp.toFixed(2)} €</b><small>Referencia rápida</small></div>
+        <div class="pcell sl"><span>Stop Loss (-18%)</span><b>${quickSl.toFixed(2)} €</b><small>Protección</small></div>
       </div>
     </div>
 
     <div class="mini4" style="margin-bottom:12px">
-      <div class="mcell"><span>Divisa</span><b>${esc(q.currency)}</b></div>
-      <div class="mcell"><span>Máx 52s</span><b>${q.high52w ? q.high52w.toFixed(2) : '—'}</b></div>
-      <div class="mcell"><span>Mín 52s</span><b>${q.low52w ? q.low52w.toFixed(2) : '—'}</b></div>
+      <div class="mcell"><span>Divisa orig.</span><b>${esc(q.currency)}</b></div>
+      <div class="mcell"><span>Máx 52s</span><b>${fmtEur(q.high52w, q.currency)}</b></div>
+      <div class="mcell"><span>Mín 52s</span><b>${fmtEur(q.low52w, q.currency)}</b></div>
       <div class="mcell"><span>Estado</span><b>${esc(q.marketState || 'LIVE')}</b></div>
     </div>
 
@@ -2155,6 +2204,75 @@ function convertAmount(amount, fromCur, toCur){
   const approx = (src !== 'EUR' && !live[src]) || (dst !== 'EUR' && !live[dst]);
   const factor = rSrc / rDst;
   return { value: val * factor, approx, ok: true, rate: factor };
+}
+
+function toEur(v, cur){
+  if(v === null || v === undefined || !Number.isFinite(Number(v))) return null;
+  const num = Number(v);
+  const src = (cur || 'EUR').toUpperCase();
+  if(src === 'EUR') return num;
+  const conv = convertAmount(num, src, 'EUR');
+  return (conv.ok && Number.isFinite(conv.value)) ? conv.value : num;
+}
+
+function fmtEur(v, cur){
+  const eur = toEur(v, cur);
+  if(eur === null || !Number.isFinite(eur)) return '—';
+  return `${eur.toFixed(2)} €`;
+}
+
+function computeTradePlanEur(c, budgetInput = null, customEntryEur = null){
+  if(!c) return null;
+  const cur = (c.currency || 'USD').toUpperCase();
+  const pNowEur = toEur(c.price, cur);
+  if(pNowEur === null || pNowEur <= 0) return null;
+
+  const dcf = c.dcf || null;
+  const baseEur = dcf && dcf.intrinsic_base ? toEur(dcf.intrinsic_base, cur) : null;
+  const bearEur = dcf && dcf.intrinsic_bear ? toEur(dcf.intrinsic_bear, cur) : null;
+  const buyObjEur = dcf && dcf.target_price ? toEur(dcf.target_price, cur) : null;
+
+  const defaultBudget = cashPot >= 80 ? Math.round(cashPot) : 240;
+  const budget = (budgetInput !== null && Number.isFinite(Number(budgetInput)) && Number(budgetInput) >= 20)
+    ? Number(budgetInput)
+    : defaultBudget;
+
+  const isPosition = customEntryEur !== null && Number.isFinite(Number(customEntryEur)) && Number(customEntryEur) > 0;
+  const p1 = isPosition ? Number(customEntryEur) : pNowEur;
+  const p2 = (bearEur && bearEur < p1 * 0.96 && bearEur > p1 * 0.55) ? bearEur : (p1 * 0.88);
+  const p3 = p2 * 0.88;
+
+  const m1 = budget * 0.35, m2 = budget * 0.35, m3 = budget * 0.30;
+  const s1 = p1 > 0 ? m1 / p1 : 0;
+  const s2 = p2 > 0 ? m2 / p2 : 0;
+  const s3 = p3 > 0 ? m3 / p3 : 0;
+  const totalShares = s1 + s2 + s3;
+  const avgEntryEur = isPosition ? Number(customEntryEur) : (totalShares > 0 ? budget / totalShares : p1);
+
+  const exit1Eur = (baseEur && baseEur > avgEntryEur * 1.15) ? baseEur : (avgEntryEur * 1.25);
+  const exit2Eur = baseEur ? Math.max(baseEur * 1.25, exit1Eur * 1.12) : (avgEntryEur * 1.45);
+  const exit1Pct = ((exit1Eur / avgEntryEur) - 1) * 100;
+  const exit2Pct = ((exit2Eur / avgEntryEur) - 1) * 100;
+
+  const stopLossEur = isPosition
+    ? (avgEntryEur * 0.82)
+    : Math.min(avgEntryEur * 0.82, p3 * 0.92);
+  const stopLossPct = ((stopLossEur / avgEntryEur) - 1) * 100;
+  const stopLossFromNowPct = ((stopLossEur / pNowEur) - 1) * 100;
+
+  const blendedExitEur = (exit1Eur * 0.5) + (exit2Eur * 0.5);
+  const estProfitEur = (blendedExitEur - avgEntryEur) * totalShares;
+  const maxRiskEur = Math.max(0, (avgEntryEur - stopLossEur) * totalShares);
+
+  const inBuyZone = c.status === 'OPORTUNIDAD' || (buyObjEur !== null && pNowEur <= buyObjEur);
+
+  return {
+    pNowEur, baseEur, bearEur, buyObjEur,
+    budget, m1, m2, m3, p1, p2, p3, s1, s2, s3, totalShares,
+    avgEntryEur, exit1Eur, exit2Eur, exit1Pct, exit2Pct,
+    stopLossEur, stopLossPct, stopLossFromNowPct,
+    estProfitEur, maxRiskEur, inBuyZone, isPosition
+  };
 }
 
 /* ===========================
@@ -2502,28 +2620,31 @@ function calcDcfJs(fcfPs, netCashPs, g1Pct, rPct){
 }
 
 function buildBuffettPrompt(c){
-  const dcf = c.dcf || {};
-  const warns = (c.data_warnings && c.data_warnings.length) ? `\n- Avisos de datos: ${c.data_warnings.join(' | ')}` : '';
-  const news = (c.recent_news && c.recent_news.length) ? `\nTitulares recientes:\n${c.recent_news.map(n => '- ' + n).join('\n')}\n` : '';
-  const pioCls = (c.piotroski_classic_score !== null && c.piotroski_classic_score !== undefined)
-    ? `${c.piotroski_classic_score}/${c.piotroski_classic_max} (${c.piotroski_classic_coverage || ''})` : 'N/D';
-  const quad = getQuadrantInfo(c).label;
-  return `Actúa como analista siguiendo estrictamente el método de Warren Buffett y Charlie Munger.
-Analiza ${c.name} (${c.ticker}), sector ${c.sector} (${c.region}).
-Datos del Radar Cocodrilo v10.5:
-- Precio actual: ${c.price} ${c.currency} (caída 52s: ${c.drawdown_52w_pct ?? 'N/D'}%)
-- Calidad: ${c.quality_score}/100 | Cuadrante: ${quad}
-- Piotroski Clásico: ${pioCls} | Adaptado: ${c.piotroski_score ?? 'N/D'}/${c.piotroski_max ?? 9}
-- ROIC: ${c.roic_pct ?? 'N/D'}% | Margen op: ${c.operating_margin_pct ?? 'N/D'}% | Deuda/EBITDA: ${c.net_debt_ebitda ?? 'N/D'}x
-- P/FCF (caja real): ${c.p_fcf ?? 'N/D'}x | PER Futuro: ${c.forward_pe ?? 'N/D'}x
-- DCF conservador: ${dcf.intrinsic_base ?? 'N/D'} ${c.currency} (Obj -25%: ${dcf.target_price ?? 'N/D'} ${c.currency})${warns}
+  const liveC = getLiveCompanyView(c);
+  const plan = computeTradePlanEur(liveC);
+  const dcf = liveC.dcf || {};
+  const warns = (liveC.data_warnings && liveC.data_warnings.length) ? `\n- Avisos de datos: ${liveC.data_warnings.join(' | ')}` : '';
+  const news = (liveC.recent_news && liveC.recent_news.length) ? `\nTitulares recientes:\n${liveC.recent_news.map(n => '- ' + n).join('\n')}\n` : '';
+  const pioCls = (liveC.piotroski_classic_score !== null && liveC.piotroski_classic_score !== undefined)
+    ? `${liveC.piotroski_classic_score}/${liveC.piotroski_classic_max} (${liveC.piotroski_classic_coverage || ''})` : 'N/D';
+  const quad = getQuadrantInfo(liveC).label;
+  const planTxt = plan
+    ? `\n- Plan en EUR (Trade Republic, bote ${plan.budget.toFixed(0)} €): Tramo 1 ${plan.m1.toFixed(0)} € a ${plan.p1.toFixed(2)} € | Salida 1 (50%): ${plan.exit1Eur.toFixed(2)} € (+${plan.exit1Pct.toFixed(0)}%) | Salida Total: ${plan.exit2Eur.toFixed(2)} € (+${plan.exit2Pct.toFixed(0)}%) | Stop Loss: ${plan.stopLossEur.toFixed(2)} € (${plan.stopLossPct.toFixed(0)}%)`
+    : '';
+  return `Actúa como analista siguiendo estrictamente el método de Warren Buffett y Charlie Munger. Invierto en EUR en Trade Republic.
+Analiza ${liveC.name} (${liveC.ticker}), sector ${liveC.sector} (${liveC.region}).
+Datos del Radar Cocodrilo v10.11 (convertidos a EUR):
+- Precio actual: ${fmtEur(liveC.price, liveC.currency)} (caída 52s: ${liveC.drawdown_52w_pct ?? 'N/D'}%)
+- Calidad: ${liveC.quality_score}/100 | Cuadrante: ${quad}
+- Piotroski Clásico: ${pioCls} | Adaptado: ${liveC.piotroski_score ?? 'N/D'}/${liveC.piotroski_max ?? 9}
+- ROIC: ${liveC.roic_pct ?? 'N/D'}% | Margen op: ${liveC.operating_margin_pct ?? 'N/D'}% | Deuda/EBITDA: ${liveC.net_debt_ebitda ?? 'N/D'}x
+- P/FCF (caja real): ${liveC.p_fcf ?? 'N/D'}x | PER Futuro: ${liveC.forward_pe ?? 'N/D'}x
+- DCF conservador: ${dcf.intrinsic_base ? fmtEur(dcf.intrinsic_base, liveC.currency) : 'N/D'} (Obj compra -25%: ${dcf.target_price ? fmtEur(dcf.target_price, liveC.currency) : 'N/D'})${planTxt}${warns}
 ${news}
-Responde en español directo sobre los 4 factores de Buffett:
-1. Negocio a 10-20 años
-2. Foso competitivo (Moat)
-3. Directiva y asignación de capital
-4. Clave del Cocodrilo: ¿problema TEMPORAL o PERMANENTE (trampa)?
-Cierra con los 3 mayores riesgos por los que NO debería comprarla.`;
+Responde en español directo, TODO en EUROS (€):
+1. Negocio a 10-20 años y foso competitivo (Moat)
+2. ¿Problema TEMPORAL o trampa PERMANENTE? + los 3 mayores riesgos
+3. Plan operativo exacto en EUR: con cuánto entrarías, a qué precios (tramos), a qué precio saldrías (Take Profit) y dónde pondrías el Stop Loss.`;
 }
 
 function copyPrompt(ticker){
@@ -2659,15 +2780,27 @@ function cardHTML(rawC, includeNote = false){
       <div class="val-row">
         <div>
           ${liveSessionBadge(eff)}
-          <span class="val-price ${eff.tickDir || ''}">${fmtMoney(curP, c.currency)}</span>${liveChangePill(eff.changePct)}
+          <span class="val-price ${eff.tickDir || ''}">${fmtEur(curP, c.currency)}</span>${liveChangePill(eff.changePct)}
         </div>
         <div style="text-align:right">
           <span class="val-dd" style="color:${ddColor}">${c.drawdown_52w_pct!==null ? c.drawdown_52w_pct+'% vs máx 52s' : '—'}</span>
           <div style="font-size:10.5px;color:var(--muted)">${liveDisc!==null ? (liveDisc>=0 ? `Descuento ${liveDisc}% DCF` : `Prima ${Math.abs(liveDisc)}% DCF`) : 'Sin DCF'}${c.owner_earnings_adjusted ? ' · -SBC' : ''}</div>
         </div>
       </div>
-      ${dcf ? `<div class="val-track"><div class="val-target-mark" title="Objetivo -25%"></div><div class="val-pin" style="left:${livePinPct.toFixed(1)}%"></div></div>
-        <div class="val-labels"><span>Objetivo: <b style="color:#60a5fa">${fmtMoney(dcf.target_price, c.currency)}</b></span><span>Valor Base: <b>${fmtMoney(dcf.intrinsic_base, c.currency)}</b></span></div>` : ''}
+      ${dcf ? `<div class="val-track"><div class="val-target-mark" title="Objetivo compra -25%"></div><div class="val-pin" style="left:${livePinPct.toFixed(1)}%"></div></div>
+        <div class="val-labels"><span>Compra ideal: <b style="color:#60a5fa">${fmtEur(dcf.target_price, c.currency)}</b></span><span>Valor justo: <b>${fmtEur(dcf.intrinsic_base, c.currency)}</b></span></div>` : ''}
+      ${(() => {
+        const pl = computeTradePlanEur(c);
+        if(!pl) return '';
+        const inLbl = pl.inBuyZone ? `Entrar (${pl.m1.toFixed(0)}€)` : 'Esperar ≤';
+        const inVal = pl.inBuyZone ? `${pl.p1.toFixed(2)} €` : (pl.buyObjEur ? `${pl.buyObjEur.toFixed(2)} €` : `${pl.p1.toFixed(2)} €`);
+        const inSub = pl.inBuyZone ? `35% de ${pl.budget.toFixed(0)}€` : `Hoy ${pl.pNowEur.toFixed(2)}€`;
+        return `<div class="plan-strip">
+          <div class="pcell in"><span>${inLbl}</span><b>${inVal}</b><small>${inSub}</small></div>
+          <div class="pcell out"><span>Salida (TP)</span><b>${pl.exit1Eur.toFixed(2)} €</b><small>+${pl.exit1Pct.toFixed(0)}% · Total ${pl.exit2Eur.toFixed(0)}€</small></div>
+          <div class="pcell sl"><span>Stop Loss</span><b>${pl.stopLossEur.toFixed(2)} €</b><small>${pl.stopLossPct.toFixed(0)}% vs medio</small></div>
+        </div>`;
+      })()}
     </div>
 
     <div class="mini5">
@@ -2772,29 +2905,38 @@ function getFiltered(){
 /* ===========================
    PORTFOLIO SIGNAL (FIXED)
    =========================== */
-function evaluatePortfolioSignal(pos, c, pnlPct){
-  if(!c) return { kind:'ok', label:'Sin datos en el escaneo actual — se actualizará al incluirse en un lote.', badge:'' };
-  if(!c.passes_quality && (c.quality_score < 65 || (c.hard_fails||[]).length > 0)){
-    return { kind:'sell', label:'🚨 TESIS ROTA: cayó la calidad o saltó alerta crítica — revisar fundamentales', badge:'<span class="pill red">🚨 TESIS ROTA</span>' };
+function evaluatePortfolioSignal(pos, c, pnlPct, levels){
+  const curEur = levels?.curPriceEur;
+  const slEur = levels?.stopLossEur;
+  const ex1Eur = levels?.exit1Eur;
+  const ex2Eur = levels?.exit2Eur;
+
+  if(c && !c.passes_quality && (c.quality_score < 65 || (c.hard_fails||[]).length > 0)){
+    return { kind:'sell', label:'🚨 SALIR / TESIS ROTA: cayó la calidad o saltó alerta crítica — revisar fundamentales', badge:'<span class="pill red">SALIR · TESIS ROTA</span>' };
   }
-  if(c.dcf && c.dcf.intrinsic_base > 0 && c.price >= c.dcf.intrinsic_base * 1.25){
-    const pct = Math.round(((c.price / c.dcf.intrinsic_base) - 1) * 100);
-    if(Number.isFinite(pnlPct) && pnlPct >= 15){
-      return { kind:'profit', label:`💰 ZONA DE VENTA: llevas +${pnlPct.toFixed(1)}% y cotiza +${pct}% sobre DCF conservador — valorar recoger beneficios`, badge:'<span class="pill gold">💰 RECOGER BENEFICIOS</span>' };
-    }
-    return { kind:'stretch', label:`⚖️ Prima de +${pct}% sobre DCF conservador (en crecimiento/IA el DCF tradicional suele quedarse corto; sin beneficio suficiente para recoger)`, badge:'<span class="pill blue">⚖️ PRIMA VS DCF</span>' };
+  if(curEur && slEur && curEur <= slEur){
+    return { kind:'sell', label:`🛑 STOP LOSS (${slEur.toFixed(2)} €) ALCANZADO: llevas ${pnlPct.toFixed(1)}% — cortar pérdidas o revalidar tesis hoy`, badge:'<span class="pill red">STOP LOSS</span>' };
+  }
+  if(curEur && ex2Eur && curEur >= ex2Eur && Number.isFinite(pnlPct) && pnlPct >= 12){
+    return { kind:'profit', label:`💰 SALIDA TOTAL (${ex2Eur.toFixed(2)} €): llevas +${pnlPct.toFixed(1)}% — recoger beneficios`, badge:'<span class="pill gold">SALIDA TOTAL</span>' };
+  }
+  if(curEur && ex1Eur && curEur >= ex1Eur && Number.isFinite(pnlPct) && pnlPct >= 15){
+    return { kind:'profit', label:`🎯 SALIDA PARCIAL 50% (${ex1Eur.toFixed(2)} €): alcanzó valor justo (+${pnlPct.toFixed(1)}%) — valorar vender la mitad`, badge:'<span class="pill gold">VENDER 50%</span>' };
+  }
+  if(!c){
+    return { kind:'ok', label:`Mantener · Salida ref. ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} · Stop Loss ${slEur ? slEur.toFixed(2) + ' €' : '—'}`, badge:'<span class="pill blue">MANTENER</span>' };
   }
   if(c.status === 'OPORTUNIDAD'){
-    return { kind:'add', label:'🟢 Sigue en zona atractiva (puedes mantener o ampliar en tramos)', badge:'<span class="pill">🟢 ZONA COMPRA</span>' };
+    return { kind:'add', label:`🟢 Zona atractiva (puedes ampliar) · Salida 1 en ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} · Stop Loss ${slEur ? slEur.toFixed(2) + ' €' : '—'}`, badge:'<span class="pill">ZONA COMPRA</span>' };
   }
-  return { kind:'ok', label:'✅ Negocio sano a precio razonable — mantener (Buffett)', badge:'<span class="pill blue">✅ MANTENER</span>' };
+  return { kind:'ok', label:`✅ Negocio sano — mantener hasta ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} (Stop Loss ${slEur ? slEur.toFixed(2) + ' €' : '—'})`, badge:'<span class="pill blue">MANTENER</span>' };
 }
 
 function computePositionView(pos){
   const tkr = (pos.ticker || '').toUpperCase();
   const c = findCompany(tkr);
   const lq = liveQuotes[tkr] || null;
-  const posCur = (pos.currency && pos.currency !== 'AUTO') ? pos.currency.toUpperCase() : ((lq?.currency || c?.currency || 'EUR').toUpperCase());
+  const posCur = (pos.currency && pos.currency !== 'AUTO') ? pos.currency.toUpperCase() : 'EUR';
   const stockCur = ((lq?.currency || c?.currency || posCur)).toUpperCase();
   const rawNativePrice = (lq && Number.isFinite(Number(lq.price)) && lq.price > 0)
     ? Number(lq.price)
@@ -2802,37 +2944,26 @@ function computePositionView(pos){
   const isLive = !!(lq && Number.isFinite(Number(lq.price)) && lq.price > 0);
   const changePct = isLive && Number.isFinite(Number(lq.changePct)) ? Number(lq.changePct) : null;
 
-  let curPriceInPosCur = pos.avgPrice;
-  let fxUsed = null;
-  let fxApprox = false;
+  const avgPriceEur = toEur(pos.avgPrice, posCur) ?? pos.avgPrice;
+  const curPriceEur = rawNativePrice !== null ? (toEur(rawNativePrice, stockCur) ?? avgPriceEur) : avgPriceEur;
 
-  if(rawNativePrice !== null){
-    const conv = convertAmount(rawNativePrice, stockCur, posCur);
-    if(conv.ok && conv.value !== null){
-      curPriceInPosCur = conv.value;
-      fxUsed = conv.rate;
-      fxApprox = conv.approx;
-    } else {
-      curPriceInPosCur = rawNativePrice;
-      fxApprox = true;
-    }
-  }
+  const costEur = avgPriceEur * pos.shares;
+  const valEur = curPriceEur * pos.shares;
+  const pnlEur = valEur - costEur;
+  const pnlPct = avgPriceEur > 0 ? ((curPriceEur / avgPriceEur) - 1) * 100 : 0;
 
-  const costInPosCur = pos.avgPrice * pos.shares;
-  const valInPosCur = curPriceInPosCur * pos.shares;
-  const pnlInPosCur = valInPosCur - costInPosCur;
-  const pnlPct = pos.avgPrice > 0 ? ((curPriceInPosCur / pos.avgPrice) - 1) * 100 : 0;
+  const liveComp = c ? { ...c, price: rawNativePrice ?? c.price } : null;
+  const plan = liveComp ? computeTradePlanEur(liveComp, costEur, avgPriceEur) : null;
+  const exit1Eur = plan ? plan.exit1Eur : (avgPriceEur * 1.25);
+  const exit2Eur = plan ? plan.exit2Eur : (avgPriceEur * 1.45);
+  const stopLossEur = plan ? plan.stopLossEur : (avgPriceEur * 0.82);
 
-  const costEurConv = convertAmount(costInPosCur, posCur, 'EUR');
-  const valEurConv = convertAmount(valInPosCur, posCur, 'EUR');
-  const sig = evaluatePortfolioSignal(pos, c ? { ...c, price: rawNativePrice ?? c.price } : null, pnlPct);
+  const sig = evaluatePortfolioSignal(pos, liveComp, pnlPct, { curPriceEur, exit1Eur, exit2Eur, stopLossEur });
 
   return {
-    c, lq, isLive, changePct, rawNativePrice, posCur, stockCur, curPriceInPosCur, fxUsed, fxApprox,
-    costInPosCur, valInPosCur, pnlInPosCur, pnlPct,
-    costEur: costEurConv.ok ? costEurConv.value : null,
-    valEur: valEurConv.ok ? valEurConv.value : null,
-    sig
+    c, lq, isLive, changePct, rawNativePrice, posCur: 'EUR', origPosCur: posCur, stockCur,
+    avgPriceEur, curPriceEur, costEur, valEur, pnlEur, pnlPct,
+    exit1Eur, exit2Eur, stopLossEur, sig
   };
 }
 
@@ -2997,7 +3128,7 @@ function renderMapView(){
   const dHost = $('topDropsHost');
   dHost.innerHTML = drops.length ? drops.map(c => `<div class="rank-item" data-open="${esc(c.ticker)}">
     <div><b>${esc(c.name)}</b> <span class="tkr">${esc(c.ticker)}</span><div style="font-size:11.5px;color:var(--muted)">Score ${c.quality_score}/100 · P/FCF ${c.p_fcf ?? '—'}x</div></div>
-    <div style="text-align:right"><b style="color:#4ade80;font-size:15px">${c.drawdown_52w_pct}%</b><div style="font-size:11px;color:var(--muted)">${fmtMoney(c.price, c.currency)}</div></div>
+    <div style="text-align:right"><b style="color:#4ade80;font-size:15px">${c.drawdown_52w_pct}%</b><div style="font-size:11px;color:var(--muted)">${fmtEur(c.price, c.currency)}</div></div>
   </div>`).join('') : '<div class="empty">Sin datos de caídas aún.</div>';
   dHost.querySelectorAll('[data-open]').forEach(el => el.onclick = () => openModal(el.dataset.open));
 
@@ -3041,10 +3172,7 @@ function renderFavsView(){
       if(pv.sig.kind === 'sell' || pv.sig.kind === 'profit') alertsCount++;
 
       const rowCls = pv.sig.kind === 'sell' ? 'sell-alert' : pv.sig.kind === 'profit' ? 'profit-alert' : '';
-      const pnlCol = pv.pnlPct >= 0 ? '#4ade80' : '#fb7185';
-      const origTxt = (pv.rawNativePrice !== null && pv.stockCur !== pv.posCur)
-        ? ` <span style="opacity:.72">(${pv.fxApprox?'≈ ':''}${pv.rawNativePrice.toFixed(2)} ${esc(pv.stockCur)})</span>`
-        : '';
+      const pnlCol = pv.pnlPct >= 0 ? '#4ade80' : '#f43f5e';
       const displayName = pv.c ? pv.c.name : (pv.lq?.name || pos.ticker);
 
       return `<div class="port-row ${rowCls}">
@@ -3053,21 +3181,26 @@ function renderFavsView(){
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
               <b>${esc(displayName)}</b>
               <span class="tkr">${esc(pos.ticker)}</span>
-              <span class="tkr" style="opacity:.75">${esc(pv.posCur)}</span>
               ${pv.isLive ? (pv.lq?.session==='PRE'?'<span class="live-tag pre"><i></i> PRE</span>':pv.lq?.session==='POST'?'<span class="live-tag post"><i></i> POST</span>':pv.lq?.session==='CLOSED'?'<span class="live-tag closed"><i></i> CIERRE</span>':'<span class="live-tag"><i></i> VIVO</span>') : ''}
             </div>
-            <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${pos.shares} acc. · Compra: <b>${pos.avgPrice.toFixed(2)} ${esc(pv.posCur)}</b>${liveChangePill(pv.changePct)}</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${pos.shares} acc. · Compra: <b>${pv.avgPriceEur.toFixed(2)} €</b>${liveChangePill(pv.changePct)}</div>
           </div>
           <div style="text-align:right;flex-shrink:0">
             <b style="color:${pnlCol};font-size:16px;font-variant-numeric:tabular-nums">${pv.pnlPct>=0?'+':''}${pv.pnlPct.toFixed(2)}%</b>
-            <div style="font-size:11px;color:${pnlCol};font-variant-numeric:tabular-nums">${pv.pnlInPosCur>=0?'+':''}${pv.pnlInPosCur.toFixed(2)} ${esc(pv.posCur)}</div>
+            <div style="font-size:11px;color:${pnlCol};font-variant-numeric:tabular-nums">${pv.pnlEur>=0?'+':''}${pv.pnlEur.toFixed(2)} €</div>
           </div>
         </div>
 
         <div class="port-metrics">
-          <div><span>Precio hoy (${esc(pv.posCur)})</span><b>${pv.curPriceInPosCur.toFixed(2)} ${esc(pv.posCur)}</b>${origTxt}</div>
-          <div><span>Valor actual</span><b>${pv.valInPosCur.toFixed(2)} ${esc(pv.posCur)}</b></div>
-          <div><span>Coste total</span><b>${pv.costInPosCur.toFixed(2)} ${esc(pv.posCur)}</b></div>
+          <div><span>Precio hoy</span><b>${pv.curPriceEur.toFixed(2)} €</b></div>
+          <div><span>Valor actual</span><b>${pv.valEur.toFixed(2)} €</b></div>
+          <div><span>Invertido</span><b>${pv.costEur.toFixed(2)} €</b></div>
+        </div>
+
+        <div class="port-levels">
+          <div><span>Salida 50%</span><b style="color:#93c5fd">${pv.exit1Eur.toFixed(2)} €</b></div>
+          <div><span>Salida Total</span><b style="color:#4ade80">${pv.exit2Eur.toFixed(2)} €</b></div>
+          <div><span>Stop Loss (-18%)</span><b style="color:#fda4af">${pv.stopLossEur.toFixed(2)} €</b></div>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px">
@@ -3188,7 +3321,7 @@ function renderHistoryView(){
             <b>${esc(e.name || e.ticker)}</b> <span class="tkr">${esc(e.ticker)}</span> ${badge}
           </div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:4px">
-            Alerta <b>${esc(e.alert_date)}</b> a <b>${fmtMoney(e.alert_price, e.currency)}</b> → Hoy: <b>${fmtMoney(liveLastP, e.currency)}</b>${lqH ? ' <span class="live-tag"><i></i></span>' : ''}
+            Alerta <b>${esc(e.alert_date)}</b> a <b>${fmtEur(e.alert_price, e.currency)}</b> → Hoy: <b>${fmtEur(liveLastP, e.currency)}</b>${lqH ? ' <span class="live-tag"><i></i></span>' : ''}
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -3318,8 +3451,7 @@ function openModal(ticker, skipLiveRefresh = false){
     ['ROIC / Capital', bd.roic], ['Margen Operativo', bd.margin], ['Caja Real (FCF)', bd.fcf],
     ['Balance / Deuda', bd.debt], ['Crecimiento', bd.growth], ['Recompras / Div.', bd.shareholder]
   ];
-  const priceEurConv = convertAmount(c.price, c.currency, 'EUR');
-  const priceEurHint = (c.currency !== 'EUR' && priceEurConv.ok) ? ` (≈ ${priceEurConv.value.toFixed(2)} €)` : '';
+  const priceEurHint = (c.currency && c.currency.toUpperCase() !== 'EUR') ? ` (${fmtMoney(c.price, c.currency)})` : '';
 
   $('mSub').textContent = `${c.ticker} · ${c.region} · ${c.sector}${c.market_cap_b ? ' · ' + c.market_cap_b + 'B USD' : ''}`;
   $('mTitle').textContent = c.name;
@@ -3349,7 +3481,7 @@ function openModal(ticker, skipLiveRefresh = false){
 
     <div class="quad-bar ${quad.cls}" style="margin-bottom:10px">
       <span>${quad.icon} Cuadrante: <b>${esc(quad.label)}</b></span>
-      <span style="font-size:10.5px;opacity:.9">${eff.isLive?'⚡ ':''}${fmtMoney(c.price, c.currency)}${liveChangePill(eff.changePct)}${priceEurHint}</span>
+      <span style="font-size:10.5px;opacity:.9">${eff.isLive?'⚡ ':''}<b>${fmtEur(c.price, c.currency)}</b>${liveChangePill(eff.changePct)}</span>
     </div>
 
     ${(c.earnings_days!==null && c.earnings_days!==undefined && c.earnings_days<=10) ? `<div class="notice bad"><b>📅 OJO RESULTADOS PRÓXIMOS:</b> presenta cuentas en <b>${c.earnings_days} días</b> (${esc(c.earnings_date)}). Evita meter todo el capital antes de resultados.</div>` : ''}
@@ -3389,16 +3521,16 @@ function openModal(ticker, skipLiveRefresh = false){
       return `<div class="sbar-item"><div class="sbar-top"><span>${lbl}</span><b style="color:${col}">${val!==null&&val!==undefined?v+'%':'N/D'}</b></div><div class="sbar-track"><div class="sbar-fill" style="width:${v}%;background:${col}"></div></div></div>`;
     }).join('')}</div>
 
-    <div class="eyebrow" style="margin:14px 0 6px">Valoración DCF 10 años${c.owner_earnings_adjusted?' (Caja real -SBC)':''} · Hoy: ${fmtMoney(c.price, c.currency)}${priceEurHint}</div>
+    <div class="eyebrow" style="margin:14px 0 6px">Valoración DCF 10 años en EUR${c.owner_earnings_adjusted?' (Caja real -SBC)':''} · Hoy: ${fmtEur(c.price, c.currency)}${priceEurHint}</div>
     ${dcf ? `
       <div class="dcf3">
-        <div class="dcf-card"><span>Conservador</span><b>${fmtMoney(dcf.intrinsic_bear, c.currency)}</b></div>
-        <div class="dcf-card base"><span>Base (g=${dcf.assumed_growth_pct}%)</span><b style="color:#60a5fa">${fmtMoney(dcf.intrinsic_base, c.currency)}</b><small style="color:#93c5fd;font-size:10.5px">Obj: <b>${fmtMoney(dcf.target_price, c.currency)}</b></small></div>
-        <div class="dcf-card"><span>Optimista</span><b>${fmtMoney(dcf.intrinsic_bull, c.currency)}</b></div>
+        <div class="dcf-card"><span>Conservador</span><b>${fmtEur(dcf.intrinsic_bear, c.currency)}</b></div>
+        <div class="dcf-card base"><span>Base (g=${dcf.assumed_growth_pct}%)</span><b style="color:#60a5fa">${fmtEur(dcf.intrinsic_base, c.currency)}</b><small style="color:#93c5fd;font-size:10.5px">Compra: <b>${fmtEur(dcf.target_price, c.currency)}</b></small></div>
+        <div class="dcf-card"><span>Optimista</span><b>${fmtEur(dcf.intrinsic_bull, c.currency)}</b></div>
       </div>
 
       <div class="tool-box">
-        <div class="eyebrow">🎛️ Simulador DCF interactivo</div>
+        <div class="eyebrow">Simulador DCF interactivo (EUR)</div>
         <div class="slider-row">
           <div class="slider-top"><span>Crecimiento años 1-5</span><b id="simGVal">${dcf.assumed_growth_pct}%</b></div>
           <input type="range" id="simG" min="0" max="25" step="0.5" value="${dcf.assumed_growth_pct}">
@@ -3412,16 +3544,16 @@ function openModal(ticker, skipLiveRefresh = false){
     ` : `<div class="notice warn">DCF estándar por FCF no aplicable a este negocio.</div>`}
 
     <div class="tool-box">
-      <div class="eyebrow">🪜 Plan de entrada escalonada (3 tramos en EUR)</div>
+      <div class="eyebrow">Plan Operativo en EUR (Entrada · Salida · Stop Loss)</div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
         <span style="font-size:12px;color:var(--muted);white-space:nowrap">Capital a invertir (€):</span>
-        <input class="finput" id="planBudget" type="number" min="40" step="20" value="${cashPot >= 80 ? Math.round(cashPot) : 500}" style="height:36px">
+        <input class="finput" id="planBudget" type="number" min="20" step="20" value="${cashPot >= 80 ? Math.round(cashPot) : 240}" style="height:36px">
       </div>
       <div id="planOut"></div>
     </div>
 
     <div class="mini4" style="margin-top:10px">
-      <div class="mcell"><span>Máx 52s</span><b>${fmtMoney(c.high_52w,'')}</b></div>
+      <div class="mcell"><span>Máx 52s</span><b>${fmtEur(c.high_52w, c.currency)}</b></div>
       <div class="mcell"><span>Fwd PER</span><b>${c.forward_pe ?? '—'}x</b></div>
       <div class="mcell"><span>FCF +</span><b>${c.fcf_years_pos ?? '—'}/${c.fcf_years_total ?? '—'}a</b></div>
       <div class="mcell"><span>Divid.</span><b>${c.dividend_yield_pct ?? 0}%</b></div>
@@ -3445,7 +3577,7 @@ function openModal(ticker, skipLiveRefresh = false){
       if(!val || val <= 0){ out.className = 'notice bad'; out.innerHTML = 'Con esos supuestos no sale valor positivo.'; return; }
       const obj = val * 0.75, disc = ((1 - (c.price / val)) * 100), ok = c.price <= obj;
       out.className = ok ? 'notice good' : c.price <= val ? 'notice warn' : 'notice bad';
-      out.innerHTML = `Valor justo: <b>${fmtMoney(val, c.currency)}</b> · Obj (-25%): <b>${fmtMoney(obj, c.currency)}</b><br>` +
+      out.innerHTML = `Valor justo: <b>${fmtEur(val, c.currency)}</b> · Compra (-25%): <b>${fmtEur(obj, c.currency)}</b><br>` +
         (ok ? `✅ Sigue barata con <b>+${disc.toFixed(1)}%</b> de descuento incluso con estos supuestos.`
           : c.price <= val ? `🟡 En precio razonable (${disc.toFixed(1)}% margen), sin gran descuento.`
           : `🔴 A estos supuestos estaría <b>${Math.abs(disc).toFixed(1)}% cara</b>.`);
@@ -3454,21 +3586,27 @@ function openModal(ticker, skipLiveRefresh = false){
   }
 
   const updatePlan = () => {
-    const budgetEur = Math.max(40, parseFloat($('planBudget').value) || 500);
-    const pEurConv = convertAmount(c.price, c.currency, 'EUR');
-    const p1Eur = (pEurConv.ok && pEurConv.value > 0) ? pEurConv.value : c.price;
-    const p2Eur = (dcf && dcf.intrinsic_bear && dcf.intrinsic_bear < c.price * 0.96 && dcf.intrinsic_bear > c.price * 0.55)
-      ? (convertAmount(dcf.intrinsic_bear, c.currency, 'EUR').value || p1Eur * 0.88)
-      : (p1Eur * 0.88);
-    const p3Eur = p2Eur * 0.88;
-    const m1 = budgetEur * 0.35, m2 = budgetEur * 0.35, m3 = budgetEur * 0.30;
-    const s1 = m1 / p1Eur, s2 = m2 / p2Eur, s3 = m3 / p3Eur;
-    const avgP = budgetEur / (s1 + s2 + s3);
-    $('planOut').innerHTML = `<div class="tranche-grid">
-      <div class="tcard"><span>Tramo 1 (35%) · Hoy</span><b>${m1.toFixed(0)} €</b><small style="color:var(--muted)">a ${p1Eur.toFixed(2)} € (${s1.toFixed(3)} acc.)</small></div>
-      <div class="tcard"><span>Tramo 2 (35%) · -12%</span><b>${m2.toFixed(0)} €</b><small style="color:var(--muted)">a ${p2Eur.toFixed(2)} € (${s2.toFixed(3)} acc.)</small></div>
-      <div class="tcard"><span>Tramo 3 (30%) · Pánico</span><b>${m3.toFixed(0)} €</b><small style="color:var(--muted)">a ${p3Eur.toFixed(2)} € (${s3.toFixed(3)} acc.)</small></div>
-    </div><div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">Si entran los 3 tramos, tu precio medio bajaría a <b style="color:#86efac">${avgP.toFixed(2)} €</b>.</div>`;
+    const budgetEur = Math.max(20, parseFloat($('planBudget').value) || (cashPot >= 80 ? Math.round(cashPot) : 240));
+    const pl = computeTradePlanEur(c, budgetEur);
+    if(!pl) return;
+    $('planOut').innerHTML = `
+      <div style="font-size:10.5px;color:var(--muted);margin-top:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">1 · Con cuánto entrar y a qué precio (3 tramos)</div>
+      <div class="tranche-grid" style="margin-top:6px">
+        <div class="tcard"><span>Tramo 1 (35%) · Hoy</span><b>${pl.m1.toFixed(0)} €</b><small style="color:var(--muted)">a ${pl.p1.toFixed(2)} € (${pl.s1.toFixed(3)} acc.)</small></div>
+        <div class="tcard"><span>Tramo 2 (35%) · -12%</span><b>${pl.m2.toFixed(0)} €</b><small style="color:var(--muted)">a ${pl.p2.toFixed(2)} € (${pl.s2.toFixed(3)} acc.)</small></div>
+        <div class="tcard"><span>Tramo 3 (30%) · Pánico</span><b>${pl.m3.toFixed(0)} €</b><small style="color:var(--muted)">a ${pl.p3.toFixed(2)} € (${pl.s3.toFixed(3)} acc.)</small></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">Precio medio si entran los 3 tramos: <b style="color:#93c5fd">${pl.avgEntryEur.toFixed(2)} €</b> (${pl.totalShares.toFixed(3)} acc.)</div>
+
+      <div style="font-size:10.5px;color:var(--muted);margin-top:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">2 · Cuándo salir (Take Profit) y Stop Loss</div>
+      <div class="exit-grid" style="margin-top:6px">
+        <div class="ecard tp1"><span>Salida 1 · Vender 50%</span><b>${pl.exit1Eur.toFixed(2)} €</b><small style="color:#bfdbfe">+${pl.exit1Pct.toFixed(1)}% (Valor justo)</small></div>
+        <div class="ecard tp2"><span>Salida Total · 100%</span><b>${pl.exit2Eur.toFixed(2)} €</b><small style="color:#bbf7d0">+${pl.exit2Pct.toFixed(1)}% (Est. +${pl.estProfitEur.toFixed(0)} €)</small></div>
+        <div class="ecard sl"><span>Stop Loss · Salida</span><b>${pl.stopLossEur.toFixed(2)} €</b><small style="color:#fecdd3">${pl.stopLossPct.toFixed(1)}% (Riesgo -${pl.maxRiskEur.toFixed(0)} €)</small></div>
+      </div>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.4;text-align:center">
+        El Stop Loss queda por debajo del Tramo 3 para evitar barridos por ruido. Sal también antes si se rompe la tesis (Score &lt; 65 o SEC MISMATCH).
+      </div>`;
   };
   $('planBudget').oninput = updatePlan; updatePlan();
 
@@ -3504,16 +3642,16 @@ function formatCompanyLineForAgent(rawC){
   const pioAdp = (c.piotroski_score !== null && c.piotroski_score !== undefined)
     ? `${c.piotroski_score}/${c.piotroski_max}` : 'N/D';
   const liveTag = c._eff?.isLive ? `[VIVO ${c._eff.session || 'REG'} ${c._eff.changePct !== null ? (c._eff.changePct >= 0 ? '+' : '') + c._eff.changePct + '%' : ''}]` : '[ESTÁTICO]';
-  const eurConv = convertAmount(c.price, c.currency, 'EUR');
-  const eurStr = (c.currency !== 'EUR' && eurConv.ok) ? ` (~${eurConv.value.toFixed(2)}€)` : '';
+  const pl = computeTradePlanEur(c);
   const bits = [
     `${c.ticker} (${c.name}) | ${c.region} | ${c.sector}`,
-    `Precio: ${c.price} ${c.currency}${eurStr} ${liveTag} | 52s: ${c.drawdown_52w_pct ?? 'N/D'}%`,
+    `Precio: ${fmtEur(c.price, c.currency)} (orig. ${c.price} ${c.currency}) ${liveTag} | 52s: ${c.drawdown_52w_pct ?? 'N/D'}%`,
     `Estado: ${c.oro_puro ? 'ORO_PURO/' : ''}${c.opportunity_tier || c.status} | Cuadrante: ${qv.label}`,
     `Score: ${c.quality_score}/100 | Piotroski Clásico: ${pioCls} | Adaptado: ${pioAdp}`,
     `ROIC: ${c.roic_pct ?? 'N/D'}% | MargenOp: ${c.operating_margin_pct ?? 'N/D'}% | Deuda/EBITDA: ${c.net_debt_ebitda ?? 'N/D'}x`,
     `P/FCF: ${c.p_fcf ?? 'N/D'}x | FwdPER: ${c.forward_pe ?? 'N/D'}x | FCF+: ${c.fcf_years_pos ?? '?'}/${c.fcf_years_total ?? '?'}a${c.owner_earnings_adjusted ? ' (-SBC)' : ''}`,
-    dcf.intrinsic_base ? `DCF Base: ${dcf.intrinsic_base} | Bear: ${dcf.intrinsic_bear ?? 'N/D'} | Obj(-25%): ${dcf.target_price} ${c.currency} | Desc: ${c.discount_vs_base_pct ?? 'N/D'}%` : 'DCF: N/A',
+    dcf.intrinsic_base ? `DCF EUR -> Base: ${fmtEur(dcf.intrinsic_base, c.currency)} | Bear: ${fmtEur(dcf.intrinsic_bear, c.currency)} | Compra(-25%): ${fmtEur(dcf.target_price, c.currency)} | Desc: ${c.discount_vs_base_pct ?? 'N/D'}%` : 'DCF: N/A',
+    pl ? `Plan EUR (bote ${pl.budget.toFixed(0)}€) -> Tramo1: ${pl.m1.toFixed(0)}€ a ${pl.p1.toFixed(2)}€ | Tramo2: ${pl.m2.toFixed(0)}€ a ${pl.p2.toFixed(2)}€ | Tramo3: ${pl.m3.toFixed(0)}€ a ${pl.p3.toFixed(2)}€ | Salida 50%: ${pl.exit1Eur.toFixed(2)}€ (+${pl.exit1Pct.toFixed(0)}%) | Salida Total: ${pl.exit2Eur.toFixed(2)}€ (+${pl.exit2Pct.toFixed(0)}%) | Stop Loss: ${pl.stopLossEur.toFixed(2)}€ (${pl.stopLossPct.toFixed(0)}%)` : null,
     `SEC: ${c.sec_status || 'N/D'}${c.sec_diff_pct !== undefined ? ' (' + c.sec_diff_pct + '%)' : ''} | Forward: ${c.forward_status || 'N/D'} (BPA ${c.forward_eps_growth_pct ?? 'N/D'}%, Ventas ${c.forward_rev_growth_pct ?? 'N/D'}%)`,
     (c.insider_buys_90d || 0) > 0 ? `Insiders 90d: ${c.insider_buys_90d} compras` : null,
     (c.earnings_days !== null && c.earnings_days !== undefined && c.earnings_days <= 14) ? `⚠️ RESULTADOS en ${c.earnings_days}d (${c.earnings_date})` : null,
@@ -3562,8 +3700,8 @@ function buildAgentSystemContext(userText = ''){
     portLines = portfolio.map(pos => {
       const pv = computePositionView(pos);
       if(pv.valEur !== null && pv.costEur !== null){ totVal += pv.valEur; totCost += pv.costEur; }
-      const cLine = pv.c ? ` | Score ${pv.c.quality_score} | DCF Base ${pv.c.dcf?.intrinsic_base ?? 'N/D'} ${pv.c.currency} | Piotroski Clás ${pv.c.piotroski_classic_score ?? 'N/D'}/${pv.c.piotroski_classic_max ?? 9}` : '';
-      return `- ${pos.ticker} (${pv.c?.name || pv.lq?.name || pos.ticker}): ${pos.shares} acc. · Compra ${pos.avgPrice.toFixed(2)} ${pv.posCur} · Hoy ${pv.curPriceInPosCur.toFixed(2)} ${pv.posCur} (${pv.isLive ? 'VIVO' : 'ESTÁTICO'}) · PnL ${pv.pnlPct >= 0 ? '+' : ''}${pv.pnlPct.toFixed(2)}% (${pv.pnlInPosCur >= 0 ? '+' : ''}${pv.pnlInPosCur.toFixed(2)} ${pv.posCur}) · Señal: ${pv.sig.label}${cLine}`;
+      const cLine = pv.c ? ` | Score ${pv.c.quality_score} | DCF Base ${fmtEur(pv.c.dcf?.intrinsic_base, pv.c.currency)} | Salida 50%: ${pv.exit1Eur.toFixed(2)}€ | Salida Total: ${pv.exit2Eur.toFixed(2)}€ | Stop Loss: ${pv.stopLossEur.toFixed(2)}€` : ` | Salida 50%: ${pv.exit1Eur.toFixed(2)}€ | Stop Loss: ${pv.stopLossEur.toFixed(2)}€`;
+      return `- ${pos.ticker} (${pv.c?.name || pv.lq?.name || pos.ticker}): ${pos.shares} acc. · Compra ${pv.avgPriceEur.toFixed(2)} € · Hoy ${pv.curPriceEur.toFixed(2)} € (${pv.isLive ? 'VIVO' : 'ESTÁTICO'}) · PnL ${pv.pnlPct >= 0 ? '+' : ''}${pv.pnlPct.toFixed(2)}% (${pv.pnlEur >= 0 ? '+' : ''}${pv.pnlEur.toFixed(2)} €) · Señal: ${pv.sig.label}${cLine}`;
     });
     const totPnl = totCost > 0 ? (((totVal / totCost) - 1) * 100).toFixed(2) : '0.00';
     portLines.unshift(`TOTAL CARTERA: Valor ${totVal.toFixed(2)} € | Invertido ${totCost.toFixed(2)} € | Resultado ${Number(totPnl) >= 0 ? '+' : ''}${totPnl}%`);
@@ -3597,7 +3735,7 @@ function buildAgentSystemContext(userText = ''){
         const ret = (lqH && e.alert_price > 0) ? (((lp / e.alert_price) - 1) * 100).toFixed(1) : (e.return_pct ?? 'N/D');
         const msci = e.benchmarks?.msci_world_pct;
         const sp = e.benchmarks?.sp500_pct;
-        return `- ${e.ticker} (${e.tier}) alerta ${e.alert_date} a ${e.alert_price} ${e.currency} -> Hoy ${lp} (${ret >= 0 ? '+' : ''}${ret}% | MSCI World: ${msci ?? 'N/D'}% | S&P500: ${sp ?? 'N/D'}%)`;
+        return `- ${e.ticker} (${e.tier}) alerta ${e.alert_date} a ${fmtEur(e.alert_price, e.currency)} -> Hoy ${fmtEur(lp, e.currency)} (${ret >= 0 ? '+' : ''}${ret}% | MSCI World: ${msci ?? 'N/D'}% | S&P500: ${sp ?? 'N/D'}%)`;
       })
     : ['(Sin historial de alertas aún)'];
 
@@ -3608,8 +3746,12 @@ TU MISIÓN Y REGLAS DE HIERRO (OBLIGATORIAS):
 2. NUNCA INVENTES DATOS NI GARANTICES RENTABILIDADES: usa EXCLUSIVAMENTE las cifras exactas que aparecen en el contexto en vivo de abajo. Si falta un dato (ej. Piotroski parcial 5/9 o SEC no verificado), señálalo abiertamente como limitación.
 3. SEPARA SIEMPRE CALIDAD DE PRECIO: distingue con claridad entre (a) Excelente a precio razonable/con margen, (b) Excelente pero cara, (c) Mediocre aparentemente barata (posible trampa de valor) y (d) Problemas fundamentales.
 4. INVERSIÓN INVERSA (CHARLIE MUNGER): antes de recomendar entrar en cualquier empresa, expón SIEMPRE el argumento bajista ("cómo podríamos perder dinero aquí") y los avisos reales (ej. FCF capado, resultados en <=10 días, Piotroski clásico bajo).
-5. GESTIÓN PRUDENTE DEL CAPITAL Y DEL BOTE DE PÓLVORA SECA: nunca recomiendes all-in en una sola orden ni ignorar la diversificación. Cuando propongas una entrada, da un VEREDICTO CLARO ("ENTRAR TRAMO 1", "ESPERAR A X €", "MANTENER", "DESCARTAR / TRAMPA") y un plan concreto en 3 tramos en EUR adaptado al bote disponible del usuario, más 2 comprobaciones rápidas de 5 minutos antes de pulsar comprar.
-6. COMUNICACIÓN: responde en español claro, directo, sincero y sin relleno; usa negritas, listas cortas y cifras exactas (en EUR y divisa original). Si el usuario pregunta en qué entrar, dale un ranking justificado con tu favorita #1 y explica por qué descartas las demás.
+5. GESTIÓN OPERATIVA EN EUR (TRADE REPUBLIC): el inversor opera SIEMPRE en EUROS (€) en Trade Republic. Nunca recomiendes all-in en una sola orden. Para CADA empresa analizada o recomendada, incluye SIEMPRE un bloque claro con:
+   - **Veredicto:** ENTRAR TRAMO 1 / ESPERAR A X € / MANTENER / SALIR / DESCARTAR.
+   - **Con cuánto entrar (€) y precios de entrada:** importe exacto en € por tramo (Tramo 1, 2 y 3) adaptado a su bote disponible.
+   - **Precio de salida (Take Profit en €):** Salida 1 (vender 50% en valor justo) y Salida Total (100% en +25% sobre DCF).
+   - **Stop Loss en €:** precio exacto de protección de capital (y condición de salida inmediata por tesis rota).
+6. COMUNICACIÓN: responde en español claro, directo, sincero y sin relleno; expresa TODOS los precios e importes en EUROS (€). Si el usuario pregunta en qué entrar, dale un ranking justificado con tu favorita #1 y explica por qué descartas las demás.
 
 === FOTO COMPLETA EN VIVO DE BESTRADE (${nowStr}) ===
 DATASET ACTIVO: ${activeSource.toUpperCase()} (${payload.universe_mode || 'N/D'}, ${payload.scanner_version || 'N/D'}, ${payload.total_ok || all.length} empresas, generado ${fmtShortDate(payload.generated_at) || 'N/D'})
@@ -3862,7 +4004,7 @@ async function sendAgentMessage(rawText){
 
 function askAgentAboutTicker(ticker, name){
   switchView('agent');
-  const q = `Analiza a fondo ${name} (${ticker}) con los datos en vivo de BesTrade: calidad del negocio, Piotroski clásico vs adaptado, SEC, riesgo de trampa, margen de seguridad y dime con claridad si debo entrar (y plan en 3 tramos con mi bote de ${cashPot.toFixed(0)} €) o esperar.`;
+  const q = `Analiza a fondo ${name} (${ticker}) TODO EN EUROS (€): calidad, Piotroski, SEC, riesgo de trampa y dime exactamente con cuánto dinero entrar (plan en 3 tramos con mi bote de ${cashPot.toFixed(0)} €), en qué precio salir (Take Profit 50% y 100%) y dónde poner el Stop Loss.`;
   sendAgentMessage(q);
 }
 
