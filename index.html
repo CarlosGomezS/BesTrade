@@ -1301,6 +1301,13 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
         <button class="btn sm" id="launchIntradayTestBtn" style="flex:1">🚀 Prueba intradía</button>
       </div>
       <div class="fcm-token-box" id="fcmTokenBox"></div>
+      <div id="fcmApkExtra" style="display:none;margin-top:8px">
+        <label class="flabel" style="margin-top:4px">Etiqueta / ID de suscripción en tu APK (FreeApp.push)</label>
+        <div style="display:flex;gap:6px">
+          <input class="finput" id="fcmApkTagInput" autocomplete="off" placeholder="ej. entrar_ya o tu ID" style="height:36px;font-size:12px">
+          <button class="btn sm gold" id="saveFcmApkTagBtn">Guardar</button>
+        </div>
+      </div>
       <div class="notice" id="fcmStatusBox" style="margin-top:9px">Alertas push pendientes de activar en este dispositivo.</div>
     </div>
 
@@ -1398,7 +1405,8 @@ const STORE = {
   GEMINI_KEY: 'cocodriloApp.geminiKey.v10',
   AGENT_CHAT: 'cocodriloApp.agentChat.v10',
   AGENT_MEMORY: 'cocodriloApp.agentMemory.v10',
-  FCM_TOKEN: 'cocodriloApp.fcmToken.v10'
+  FCM_TOKEN: 'cocodriloApp.fcmToken.v10',
+  FCM_APK_TAG: 'cocodriloApp.fcmApkTag.v10'
 };
 const DB_FILE = 'user-db.json';
 const WORKFLOWS = { daily: 'cocodrilo-diario.yml', weekly: 'cocodrilo-semanal-1000.yml', intraday: 'cocodrilo-intradia.yml' };
@@ -1528,6 +1536,7 @@ const FIREBASE_CONFIG = {
 };
 const FIREBASE_VAPID_KEY = 'BE2bSrsyiZ-gVQirODXuU-yIUw5gA4VfGKCakT0lpiWV9JghcYlnfzLfvUMYMr1NY0ABaQ47pxTyiGo1ao_2k9o';
 let fcmToken = (localStorage.getItem(STORE.FCM_TOKEN) || '').trim();
+let fcmApkTag = (localStorage.getItem(STORE.FCM_APK_TAG) || 'entrar_ya').trim();
 let fcmTokensCloud = [];
 let fcmMessaging = null;
 let deepLinkHandled = false;
@@ -3238,9 +3247,24 @@ function renderAppView(){
       : `⚠️ <b>Falta activar Gemini:</b> añade <code>GEMINI_API_KEY</code> como Secret en tu Cloudflare Worker o pégala arriba.`;
   }
   if($('fcmStatusBox')){
-    const perm = (window.FreeApp && window.FreeApp.push) ? 'APK nativa (FreeApp.push)' : (typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
+    const isApkPush = Boolean(window.FreeApp && window.FreeApp.push);
+    const perm = isApkPush ? 'APK nativa (FreeApp.push)' : (typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
     const box = $('fcmTokenBox');
-    if(fcmToken){
+    const apkExtra = $('fcmApkExtra');
+    if(apkExtra) apkExtra.style.display = isApkPush ? 'block' : 'none';
+    if($('fcmApkTagInput') && document.activeElement !== $('fcmApkTagInput')){
+      $('fcmApkTagInput').value = fcmApkTag || 'entrar_ya';
+    }
+    if(isApkPush){
+      const permOk = typeof window.FreeApp.push.permission === 'function' ? window.FreeApp.push.permission() : true;
+      $('fcmStatusBox').className = permOk ? 'notice good' : 'notice warn';
+      $('fcmStatusBox').innerHTML = `📱 <b>APK conectada a Firebase (<code>cocodrilopro-64220</code>)</b> · Permiso: <code>${permOk ? 'ACTIVO' : 'PENDIENTE'}</code><br><small>Etiqueta activa: <code>${esc(fcmApkTag || 'entrar_ya')}</code>${fcmToken ? ' · ID: <code>' + esc(fcmToken) + '</code>' : ''}. Para que la APK reciba los avisos de GitHub, envía las campañas/alertas a tu app Android o a la etiqueta <code>${esc(fcmApkTag || 'entrar_ya')}</code>.</small>`;
+      if(box){
+        if(fcmToken){ box.textContent = `ID dispositivo: ${fcmToken} | Etiqueta: ${fcmApkTag || 'entrar_ya'}`; box.classList.add('show'); }
+        else { box.classList.remove('show'); }
+      }
+      if($('enablePushBtn')) $('enablePushBtn').textContent = '🔄 Renovar suscripción APK';
+    } else if(fcmToken){
       $('fcmStatusBox').className = 'notice good';
       $('fcmStatusBox').innerHTML = `✅ <b>Push activado en este móvil</b> (permiso: <code>${esc(perm)}</code>).<br><small>Pega el token en GitHub → <code>BesTrade</code> → Secrets → <b>FIREBASE_DEVICE_TOKEN</b> para recibir alertas automáticas <b>ENTRAR YA</b>.</small>`;
       if(box){ box.textContent = fcmToken; box.classList.add('show'); }
@@ -3935,27 +3959,35 @@ async function getFreeAppPushToken(silent = false){
 async function enableFirebasePush(silent = false){
   // 1) Ruta nativa para tu APK de Free HTML to APK (FreeApp.push)
   if(window.FreeApp && window.FreeApp.push){
-    const res = await getFreeAppPushToken(silent);
-    if(res.token){
-      const changed = res.token !== fcmToken;
-      fcmToken = res.token;
+    const fp = window.FreeApp.push;
+    if(!silent && typeof fp.permission === 'function'){
+      try {
+        const p = fp.permission();
+        if(p === false && typeof fp.request === 'function') fp.request();
+      } catch(e){}
+    }
+    if(typeof fp.optIn === 'function'){ try { fp.optIn(); } catch(e){} }
+    const tagName = (fcmApkTag || 'entrar_ya').trim();
+    if(tagName && typeof fp.addTag === 'function'){
+      try { fp.addTag(tagName); } catch(e){}
+    }
+    let apkId = '';
+    if(typeof fp.getId === 'function'){
+      try { apkId = String(await Promise.resolve(fp.getId()) || '').trim(); } catch(e){}
+    }
+    if(apkId){
+      const changed = apkId !== fcmToken;
+      fcmToken = apkId;
       localStorage.setItem(STORE.FCM_TOKEN, fcmToken);
       if(!fcmTokensCloud.includes(fcmToken)) fcmTokensCloud.push(fcmToken);
       if(changed) saveLocalUserState(true);
       if(activeView === 'app') renderAppView();
-      if(!silent) toast('🔔 Token Android (APK) obtenido. Cópialo a FIREBASE_DEVICE_TOKEN en GitHub.');
+      if(!silent) toast(`🔔 APK vinculada (ID + etiqueta "${tagName}").`);
       return fcmToken;
     }
-    if(!silent){
-      const diag = res.keys && res.keys.length ? res.keys.join(', ') : 'sin métodos visibles';
-      const box = $('fcmStatusBox');
-      if(box){
-        box.className = 'notice info';
-        box.innerHTML = `📱 <b>APK detectada (FreeApp.push activo)</b>, pero aún no devolvió token.<br><small>Métodos detectados: <code>${esc(diag)}</code>. Asegúrate de haber aceptado el permiso de notificaciones de Android y pulsa de nuevo.</small>`;
-      }
-      toast('📱 APK detectada. Revisa el detalle en el recuadro de Alertas Push.');
-    }
-    return null;
+    if(activeView === 'app') renderAppView();
+    if(!silent) toast(`📱 APK conectada a etiqueta "${tagName}".`);
+    return tagName || null;
   }
 
   // 2) Ruta Web Push estándar (Chrome / PWA)
@@ -4399,6 +4431,14 @@ $('agentInput').addEventListener('keydown', (e) => {
   }
 });
 
+if($('saveFcmApkTagBtn')){
+  $('saveFcmApkTagBtn').onclick = () => {
+    fcmApkTag = ($('fcmApkTagInput')?.value || 'entrar_ya').trim() || 'entrar_ya';
+    localStorage.setItem(STORE.FCM_APK_TAG, fcmApkTag);
+    saveLocalUserState(true);
+    enableFirebasePush(false);
+  };
+}
 $('enablePushBtn').onclick = () => enableFirebasePush(false);
 $('copyFcmTokenBtn').onclick = () => {
   if(!fcmToken){ toast('Primero pulsa 🔔 Activar alertas push.'); return; }
