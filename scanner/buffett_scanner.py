@@ -62,6 +62,9 @@ URGENT_DOUBLE_PING = os.environ.get("URGENT_DOUBLE_PING", "true").strip().lower(
 
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+FIREBASE_SERVICE_ACCOUNT = os.environ.get("FIREBASE_SERVICE_ACCOUNT", "").strip()
+FIREBASE_DEVICE_TOKEN = os.environ.get("FIREBASE_DEVICE_TOKEN", "").strip()
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://carlosgomezs.github.io/BesTrade").strip().rstrip("/")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -1092,6 +1095,129 @@ def send_telegram(html_text: str) -> None:
             raise last_exc
 
 
+def _get_fcm_access_token(sa_info: Dict[str, Any]) -> str:
+    """Obtiene token OAuth2 para Firebase Cloud Messaging HTTP v1 usando google-auth."""
+    from google.auth.transport.requests import Request as GoogleAuthRequest
+    from google.oauth2 import service_account
+
+    creds = service_account.Credentials.from_service_account_info(
+        sa_info,
+        scopes=["https://www.googleapis.com/auth/firebase.messaging"],
+    )
+    creds.refresh(GoogleAuthRequest())
+    if not creds.token:
+        raise RuntimeError("No se pudo obtener access_token OAuth2 de Firebase")
+    return str(creds.token)
+
+
+def send_fcm_push(
+    title: str,
+    body: str,
+    ticker: Optional[str] = None,
+    tier: str = "ENTRADA_YA",
+) -> int:
+    """Envía notificación push nativa vía Firebase Cloud Messaging (HTTP v1) a los dispositivos configurados."""
+    if not FIREBASE_SERVICE_ACCOUNT or not FIREBASE_DEVICE_TOKEN:
+        return 0
+
+    tokens = [
+        tok.strip()
+        for tok in re.split(r"[,;\s]+", FIREBASE_DEVICE_TOKEN)
+        if tok.strip()
+    ]
+    if not tokens:
+        return 0
+
+    try:
+        sa_info = json.loads(FIREBASE_SERVICE_ACCOUNT)
+        project_id = str(sa_info.get("project_id") or "").strip()
+        if not project_id:
+            raise ValueError("FIREBASE_SERVICE_ACCOUNT sin project_id")
+        access_token = _get_fcm_access_token(sa_info)
+    except Exception as exc:
+        print(f"⚠️ Error autenticando Firebase FCM: {exc}")
+        return 0
+
+    url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
+    rel_link = f"./?ticker={urllib.parse.quote(ticker)}" if ticker else "./?filter=ENTRADA_YA"
+    abs_link = f"{APP_BASE_URL}/?ticker={urllib.parse.quote(ticker)}" if ticker else f"{APP_BASE_URL}/?filter=ENTRADA_YA"
+
+    sent_ok = 0
+    for dev_token in tokens[:10]:
+        message_payload = {
+            "message": {
+                "token": dev_token,
+                "notification": {
+                    "title": title[:120],
+                    "body": body[:240],
+                },
+                "data": {
+                    "ticker": str(ticker or ""),
+                    "tier": str(tier or "ENTRADA_YA"),
+                    "url": rel_link,
+                    "title": title[:120],
+                    "body": body[:240],
+                },
+                "webpush": {
+                    "headers": {
+                        "Urgency": "high",
+                        "TTL": "3600",
+                    },
+                    "notification": {
+                        "title": title[:120],
+                        "body": body[:240],
+                        "tag": f"cocodrilo-entrar-ya-{ticker or 'alert'}",
+                        "renotify": True,
+                        "requireInteraction": True,
+                    },
+                    "fcm_options": {
+                        "link": abs_link,
+                    },
+                },
+            }
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(message_payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json; charset=utf-8",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                if 200 <= resp.status < 300:
+                    sent_ok += 1
+        except Exception as exc:
+            print(f"⚠️ Error enviando push FCM al dispositivo ({dev_token[:10]}...): {exc}")
+
+    if sent_ok > 0:
+        print(f"🔔 Push Firebase FCM enviado a {sent_ok}/{len(tokens)} dispositivo(s).")
+    return sent_ok
+
+
+def send_fcm_urgent_alerts(entradas_ya: List[Dict[str, Any]]) -> int:
+    """Envía un push prioritario de Firebase por cada oportunidad ENTRAR YA detectada (máx. 3)."""
+    if not entradas_ya or not FIREBASE_SERVICE_ACCOUNT or not FIREBASE_DEVICE_TOKEN:
+        return 0
+    total_sent = 0
+    for r in entradas_ya[:3]:
+        tkr = r.get("ticker") or ""
+        name = (r.get("name") or tkr)[:28]
+        price_txt = f"{r.get('price')} {r.get('currency', '')}".strip()
+        dd_txt = f"{r['drawdown_52w_pct']}%" if r.get("drawdown_52w_pct") is not None else "—"
+        disc_txt = f"+{r['discount_vs_base_pct']}%" if r.get("discount_vs_base_pct") is not None else "—"
+        oro_prefix = "👑 ORO PURO · " if r.get("oro_puro") else ""
+        title = f"🚨 ENTRAR YA: {tkr} ({name})"
+        body = (
+            f"{oro_prefix}{price_txt} (52s: {dd_txt}) · Score {r.get('quality_score', '—')}/100 "
+            f"· Desc. DCF {disc_txt} · IA: {r.get('ai_verdict') or 'OK'}"
+        )
+        total_sent += send_fcm_push(title=title, body=body, ticker=tkr, tier="ENTRADA_YA")
+    return total_sent
+
+
 def extract_ai_verdict(ai_text: Optional[str]) -> Optional[str]:
     """Fallback estricto: solo acepta un veredicto exacto al final de la línea VEREDICTO."""
     if not ai_text:
@@ -1833,6 +1959,7 @@ def main() -> None:
         if entradas_ya:
             urgent_msg = build_urgent_telegram_alert(entradas_ya, gap_pts)
             send_telegram(urgent_msg)
+            send_fcm_urgent_alerts(entradas_ya)
             print(f"🚨 ALERTA MÁXIMA enviada ({len(entradas_ya)} empresas ENTRAR YA).")
             if URGENT_DOUBLE_PING:
                 time.sleep(25)
@@ -1841,6 +1968,12 @@ def main() -> None:
         elif TEST_MODE:
             send_telegram(
                 f"🛡️ <b>Vigilante Intradía OK</b> ({len(results)} analizadas): ahora mismo no hay ninguna empresa en nivel 🚨 ENTRAR YA."
+            )
+            send_fcm_push(
+                title="🛡️ Cocodrilo Intradía OK (Prueba)",
+                body=f"{len(results)} empresas revisadas: ahora mismo no hay ninguna en ENTRAR YA.",
+                ticker=None,
+                tier="TEST",
             )
             print("✅ Chequeo intradía OK (sin alertas urgentes).")
         else:
@@ -1896,6 +2029,7 @@ def main() -> None:
 
     if entradas_ya and UNIVERSE_MODE != "custom":
         send_telegram(build_urgent_telegram_alert(entradas_ya, gap_pts))
+        send_fcm_urgent_alerts(entradas_ya)
         time.sleep(2)
 
     msg = build_telegram_report(results, failed, ai_status, total_scanned, market_ctx)
