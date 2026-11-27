@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-26T17:59:59.671922+00:00",
+  "updated_at": "2026-11-27T03:42:43.795252+00:00",
   "entries": [
     {
       "ticker": "GDDY",
@@ -87,7 +87,7 @@
       "ai_verdict": "TEMPORAL",
       "last_price": 232.83,
       "return_pct": -0.3,
-      "last_checked": "2026-11-26",
+      "last_checked": "2026-11-27",
       "current_status": "GANGA",
       "milestones_pct": {
         "d30": null,
@@ -112,7 +112,7 @@
       "ai_verdict": "TEMPORAL",
       "last_price": 85.56,
       "return_pct": 0.4,
-      "last_checked": "2026-11-26",
+      "last_checked": "2026-11-27",
       "current_status": "GANGA",
       "milestones_pct": {
         "d30": null,
