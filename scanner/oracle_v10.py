@@ -1,10 +1,14 @@
-"""Radar Cocodrilo v10.4 — Módulo Francotirador (Oráculo Anti-Trampas Tolerancia Cero).
+"""Radar Cocodrilo v10.5 — Módulo Francotirador (Oráculo Anti-Trampas Tolerancia Cero).
 
-Correcciones v10.4:
-1) Piotroski clásico (9 señales originales, activos medios (A_t + A_{t-1})/2, tolerancia cero a ausencias)
-   junto al Piotroski adaptado y su cobertura explícita (k/9).
+Características v10.5:
+1) Piotroski clásico (9 señales originales con activos medios (A_t + A_{t-1})/2, tolerancia cero a ausencias
+   y cobertura explícita k/9) en paralelo al Piotroski adaptado sin reescalar.
+   - Convención dilución: utiliza acciones medias ponderadas (Diluted/Basic Average Shares) si no hay recuento directo.
 2) Clasificación explícita Calidad vs. Valoración / Margen de Seguridad en 4 cuadrantes.
-3) Mantiene las garantías v10.3: Forward Check real, entero estricto en riesgo_trampa y SEC MATCH (<=15%).
+3) Forward Check real (ingresos futuros 0y/+1y y BPA futuro); si faltan datos, bloquea ORO PURO y ENTRADA_YA.
+4) Validación estricta de entero en riesgo_trampa (rechaza decimales y booleanos).
+5) SEC EDGAR en 3 niveles: MATCH (<=15%, obligatorio para ORO PURO), ACCEPTABLE (15-30%) y MISMATCH (>30%),
+   con soporte 10-K/A, años de 53 semanas y exclusión de CapitalExpendituresIncurredButNotYetPaid.
 """
 
 from __future__ import annotations
@@ -21,8 +25,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-ORACLE_VERSION = "v10.4-oraculo"
-SEC_USER_AGENT = "RadarCocodriloPro/10.4 (contact: carlosgomezs.radar@gmail.com)"
+ORACLE_VERSION = "v10.5-oraculo"
+SEC_USER_AGENT = "RadarCocodriloPro/10.5 (contact: carlosgomezs.radar@gmail.com)"
 VALID_VERDICTS = ("TEMPORAL", "DUDOSO", "PERMANENTE", "EVIDENCIA_INSUFICIENTE")
 
 _sec_cik_map: Optional[Dict[str, str]] = None
@@ -82,7 +86,13 @@ def _row(df: Optional[pd.DataFrame], names: List[str]) -> Optional[pd.Series]:
 
 
 def extract_forward_revenue_growth(t: Any, info: Dict[str, Any]) -> Tuple[Optional[float], str]:
-    """Extrae crecimiento previsto de ingresos futuros (0y / +1y) desde t.revenue_estimate."""
+    """Extrae crecimiento previsto de ingresos futuros (0y / +1y) desde t.revenue_estimate.
+
+    Devuelve (porcentaje_crecimiento_previsto_o_None, estado):
+    - OK: previsión obtenida (si existen 0y y +1y, toma el más conservador para detectar frenazos).
+    - MISSING: Yahoo no devuelve estimaciones anuales de ingresos.
+    - ERROR: fallo consultando t.revenue_estimate.
+    """
     direct = _sf(info.get("forwardRevenueGrowth"))
     if direct is not None:
         return round(direct * 100.0, 1), "OK"
@@ -125,7 +135,7 @@ def extract_forward_revenue_growth(t: Any, info: Dict[str, Any]) -> Tuple[Option
 
 
 def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> Dict[str, Any]:
-    """Calcula Piotroski adaptado, Piotroski clásico (activos medios), intereses, márgenes y Forward Check."""
+    """Calcula Piotroski (sin reescalar), cobertura de intereses, estabilidad de márgenes y Forward Check real."""
     out: Dict[str, Any] = {
         "oracle_version": ORACLE_VERSION,
         "piotroski_score": None,
@@ -153,7 +163,7 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
     except Exception:
         fin = bs = cf = None
 
-    # --- 1A) PIOTROSKI F-SCORE ADAPTADO (puntuación bruta real, SIN reescalar) ---
+    # --- 1) PIOTROSKI F-SCORE (puntuación bruta real, SIN reescalar) ---
     ni = _row(fin, ["Net Income", "Net Income Common Stockholders"])
     rev = _row(fin, ["Total Revenue", "Operating Revenue"])
     gp = _row(fin, ["Gross Profit"])
@@ -249,38 +259,47 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
     c_roa0 = (ni0 / avg_a0) if (ni0 is not None and avg_a0) else None
     c_roa1 = (ni1 / avg_a1) if (ni1 is not None and avg_a1) else None
 
+    # 1. ROA > 0 (activos medios)
     if c_roa0 is not None:
         c_max += 1
         if c_roa0 > 0:
             c_pts += 1
+    # 2. CFO > 0
     if ocf0 is not None:
         c_max += 1
         if ocf0 > 0:
             c_pts += 1
+    # 3. Delta ROA > 0
     if c_roa0 is not None and c_roa1 is not None:
         c_max += 1
         if c_roa0 > c_roa1:
             c_pts += 1
+    # 4. Accrual: CFO > Net Income
     if ocf0 is not None and ni0 is not None:
         c_max += 1
         if ocf0 > ni0:
             c_pts += 1
+    # 5. Delta apalancamiento a largo plazo (Deuda LP / Activos medios) < 0 estricto
     if d0 is not None and d1 is not None and avg_a0 and avg_a1:
         c_max += 1
         if (d0 / avg_a0) < (d1 / avg_a1):
             c_pts += 1
+    # 6. Delta liquidez corriente (Current Ratio) > 0 estricto
     if all(x is not None for x in (ca0, ca1, cl0, cl1)) and cl0 > 0 and cl1 > 0:
         c_max += 1
         if (ca0 / cl0) > (ca1 / cl1):
             c_pts += 1
+    # 7. Sin emisión neta de acciones (acciones actuales <= anteriores)
     if sh0 is not None and sh1 is not None:
         c_max += 1
         if sh0 <= sh1:
             c_pts += 1
+    # 8. Delta margen bruto > 0 estricto
     if all(x is not None for x in (gp0, gp1, r0, r1)) and r0 > 0 and r1 > 0:
         c_max += 1
         if (gp0 / r0) > (gp1 / r1):
             c_pts += 1
+    # 9. Delta rotación de activos (Ingresos / Activos medios) > 0 estricto
     if r0 is not None and r1 is not None and avg_a0 and avg_a1:
         c_max += 1
         if (r0 / avg_a0) > (r1 / avg_a1):
@@ -337,6 +356,7 @@ def compute_oracle_checks(t: Any, info: Dict[str, Any], rec: Dict[str, Any]) -> 
             forward_failed = True
             flags.append(f"BPA futuro previsto a la baja ({eps_chg:.1f}%)")
 
+    # Solo consultar t.revenue_estimate en candidatas relevantes (o tests sin status) para evitar 429 masivos
     status_val = rec.get("status")
     if status_val in (None, "OPORTUNIDAD", "VIGILAR"):
         fwd_rev_pct, fwd_rev_st = extract_forward_revenue_growth(t, info)
@@ -416,7 +436,12 @@ def _extract_annual_10k_by_end(
     tags: List[str],
     unit: str = "USD",
 ) -> Dict[str, float]:
-    """Extrae valores de ejercicio fiscal completo (10-K y 10-K/A, 330-385 días incl. años de 53 semanas)."""
+    """Extrae valores de ejercicio fiscal completo (10-K y 10-K/A, 330-385 días incl. años de 53 semanas).
+
+    Combina todas las etiquetas válidas entre ejercicios distintos y, para un mismo cierre fiscal,
+    prioriza la presentación más reciente (10-K/A enmendado por delante del 10-K original) y la etiqueta primaria.
+    """
+    # end_s -> (filed_s, is_amend, -tag_idx, val)
     by_end: Dict[str, Tuple[str, int, int, float]] = {}
     for tag_idx, tag in enumerate(tags):
         node = facts_us_gaap.get(tag)
@@ -441,6 +466,7 @@ def _extract_annual_10k_by_end(
                 d_start, d_end = _parse_iso_date(start_s), _parse_iso_date(end_s)
                 if d_start and d_end:
                     days = (d_end - d_start).days
+                    # 330-385 días cubre ejercicios de 52 semanas (364d), normales (365-366d) y 53 semanas (370-371d)
                     if days < 330 or days > 385:
                         continue
             filed_s = str(x.get("filed") or "")
@@ -486,6 +512,7 @@ def verify_with_sec_edgar(rec: Dict[str, Any]) -> Dict[str, Any]:
                 "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
             ],
         )
+        # Solo pagos reales de CapEx en efectivo (se excluye CapitalExpendituresIncurredButNotYetPaid)
         capex_map = _extract_annual_10k_by_end(
             us_gaap,
             [
@@ -783,29 +810,34 @@ def run_tribunal_ia(
 
 
 def is_oro_puro(rec: Dict[str, Any]) -> bool:
-    """Filtro francotirador final v10.4 (tolerancia cero real): NINGUNA ausencia de datos aprueba."""
+    """Filtro francotirador final v10.5 (tolerancia cero real): NINGUNA ausencia de datos aprueba."""
     if rec.get("status") != "OPORTUNIDAD":
         return False
     if rec.get("opportunity_tier") not in ("ENTRADA_YA", "GANGA"):
         return False
 
+    # 1) Doble verificación oficial SEC EDGAR obligatoria con alineación fiscal
     if rec.get("sec_verified") is not True or rec.get("sec_status") != "MATCH":
         return False
 
+    # 2) Anti-cíclicas y Forward Check real verificado (BPA futuro + ingresos futuros previstos)
     if rec.get("is_cyclical_risk") or rec.get("forward_ok") is not True:
         return False
 
+    # 3) Piotroski BRUTO (sin reescalar): al menos 7 señales verificadas y 7 puntos reales obtenidos
     p_score = rec.get("piotroski_score")
     p_max = rec.get("piotroski_max") or 0
     if p_score is None or p_max < 7 or p_score < 7:
         return False
 
+    # 4) Cobertura de intereses: si tiene deuda neta > 0.2x EBITDA, debe superar 8x obligatoriamente
     cov = rec.get("interest_coverage")
     nde = rec.get("net_debt_ebitda")
     if nde is None or nde > 0.2:
         if cov is None or cov < 8.0:
             return False
 
+    # 5) Tribunal IA completo obligatorio: veredicto TEMPORAL + nota de riesgo entero estricto <= 4/10
     if rec.get("ai_verdict") != "TEMPORAL":
         return False
     risk = rec.get("trap_risk_score")
