@@ -1,9 +1,13 @@
-"""Radar Cocodrilo Pro v10.4 — Oráculo Blindado (Warren Buffett & Charlie Munger).
+"""Radar Cocodrilo Pro v10.5 — Oráculo Blindado (Warren Buffett & Charlie Munger).
 
-Novedades v10.4:
-- Integra Piotroski clásico (activos medios y cobertura explícita) junto al adaptado.
-- Clasifica cada empresa en 4 cuadrantes de Calidad vs. Valoración / Margen de Seguridad.
-- Seguimiento prospectivo de alertas preservando siempre fecha y precio originales de las emitidas.
+Novedades v9:
+- Owner Earnings reales: descuenta Stock-Based Compensation (SBC) del FCF para evitar trampas en tech.
+- Buscador inteligente por nombre en modo 'custom' (ej. 'Alphabet' -> GOOGL, 'Inditex' -> ITX.MC).
+- Aviso de presentación de resultados próximos (<= 10 días) para no comprar a ciegas antes de earnings.
+- Radar de compras de directivos (Insider Buying últimos 90 días) en candidatas top.
+- Termómetro de mercado (VIX, Bono EE. UU. 10A y distancia S&P 500 a máximos) en Telegram y web.
+- Diario automático de aciertos (data/history.json) con seguimiento de rentabilidad real de alertas.
+- Mantiene Nivel 0 'ENTRADA_YA', sharding paralelo (6 bloques), rotación diaria y Gemini 3 escéptico.
 """
 
 from __future__ import annotations
@@ -262,6 +266,7 @@ def classify_sector_profile(sector: str, industry: str) -> str:
 
 
 def extract_next_earnings(info: Dict[str, Any]) -> Tuple[Optional[str], Optional[int]]:
+    """Extrae fecha próxima de resultados y días restantes sin peticiones extra."""
     now = datetime.now(timezone.utc)
     for key in ("earningsTimestampStart", "earningsTimestamp"):
         ts = safe_float(info.get(key))
@@ -303,6 +308,7 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
     except Exception:
         fin = bs = cf = None
 
+    # 1) Free Cash Flow y Stock-Based Compensation (Owner Earnings reales)
     fcf_series = get_row_series(cf, ["Free Cash Flow"])
     if fcf_series is None:
         ocf = get_row_series(cf, ["Operating Cash Flow", "Total Cash From Operating Activities"])
@@ -361,10 +367,25 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
                     out["owner_earnings_adjusted"] = True
 
             out["fcf_latest"] = use_vals[0]
+            ni_check = get_row_series(fin, ["Net Income", "Net Income Common Stockholders"])
+            ni_latest = safe_float(ni_check.values[0]) if (ni_check is not None and len(ni_check) >= 1) else None
+            sustained_growth = (
+                len(use_vals) >= 3
+                and use_vals[0] > 0
+                and use_vals[1] > 0
+                and use_vals[2] > 0
+                and use_vals[0] >= use_vals[1] * 0.95
+                and use_vals[1] > use_vals[2] * 1.05
+            )
+            backed_by_ni = ni_latest is not None and ni_latest > 0 and use_vals[0] <= ni_latest * 1.35
+
             pos_vals = [v for v in use_vals[:4] if v > 0]
-            if len(pos_vals) >= 2 and use_vals[0] > 0:
+            if sustained_growth and backed_by_ni:
+                # Crecimiento real y sostenido respaldado por beneficio neto: no recortar el FCF
+                out["fcf_normalized"] = use_vals[0]
+            elif len(pos_vals) >= 2 and use_vals[0] > 0:
                 med_fcf = statistics.median(pos_vals)
-                cap_fcf = med_fcf * 1.15
+                cap_fcf = med_fcf * 1.25
                 if use_vals[0] > cap_fcf:
                     out["fcf_normalized"] = cap_fcf
                     out["fcf_spike_capped"] = True
@@ -381,6 +402,7 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
         out["fcf_latest"] = fallback_fcf
         out["fcf_normalized"] = fallback_fcf
 
+    # 2) Crecimiento de Beneficio Neto
     ni_series = get_row_series(fin, ["Net Income", "Net Income Common Stockholders"])
     if ni_series is not None and len(ni_series) >= 3:
         vals = [safe_float(v) for v in ni_series.values]
@@ -388,12 +410,14 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
         if len(vals) >= 3 and vals[0] > 0 and vals[-1] > 0:
             out["eps_cagr_pct"] = ((vals[0] / vals[-1]) ** (1.0 / (len(vals) - 1)) - 1.0) * 100.0
 
+    # 3) Recompras vs Dilución
     sh_series = get_row_series(fin, ["Diluted Average Shares", "Basic Average Shares"])
     if sh_series is not None and len(sh_series) >= 2:
         vals = [safe_float(v) for v in sh_series.values if safe_float(v) and safe_float(v) > 0]
         if len(vals) >= 2:
             out["share_change_pct"] = ((vals[0] / vals[-1]) - 1.0) * 100.0
 
+    # 4) ROIC real = NOPAT / Capital Invertido (mediana)
     ebit_s = get_row_series(fin, ["EBIT", "Operating Income"])
     tax_s = get_row_series(fin, ["Tax Provision"])
     pretax_s = get_row_series(fin, ["Pretax Income"])
@@ -428,6 +452,7 @@ def compute_roic_and_statements(t: yf.Ticker, info: Dict[str, Any]) -> Dict[str,
         if roe is not None:
             out["roic_pct"] = roe * 100.0
 
+    # 5) Caja Neta y Deuda Neta / EBITDA
     total_debt = safe_float(info.get("totalDebt"))
     total_cash = safe_float(info.get("totalCash"))
     ebitda = safe_float(info.get("ebitda"))
@@ -632,6 +657,17 @@ def score_company(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _warmup_yf_session() -> None:
+    """Inicializa cookie/crumb de yfinance en un solo hilo antes de lanzar el pool paralelo."""
+    for sym in ("AAPL", "MSFT"):
+        try:
+            _ = yf.Ticker(sym).history(period="5d")
+            time.sleep(0.5)
+            return
+        except Exception:
+            time.sleep(1.5)
+
+
 def analyze_ticker_with_retry(ticker: str, retries: int = 3) -> Optional[Dict[str, Any]]:
     for attempt in range(retries + 1):
         try:
@@ -641,12 +677,14 @@ def analyze_ticker_with_retry(ticker: str, retries: int = 3) -> Optional[Dict[st
             return None
         except Exception as exc:
             msg = str(exc).lower()
-            transient = any(
+            is_auth = any(k in msg for k in ("401", "crumb", "unauthorized"))
+            transient = is_auth or any(
                 k in msg
                 for k in ("429", "too many", "timeout", "timed out", "rate", "502", "503", "504", "connection", "json")
             )
             if attempt < retries and transient:
-                time.sleep(2.5 * (attempt + 1) + random.uniform(0.4, 1.5))
+                base_wait = 4.0 if is_auth else 2.5
+                time.sleep(base_wait * (attempt + 1) + random.uniform(0.5, 1.8))
                 continue
             return None
     return None
@@ -807,7 +845,7 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
         drawdown_52w is not None
         and drawdown_52w <= -MIN_DRAWDOWN_ALERT
         and ((p_fcf is not None and p_fcf <= 20) or (record["forward_pe"] is not None and record["forward_pe"] <= 18))
-        and (dcf is None or price <= dcf["intrinsic_base"] * 105 / 100.0)
+        and (dcf is None or price <= dcf["intrinsic_base"] * 1.05)
     )
 
     if record["passes_quality"] and (in_dcf_zone or deep_panic_cheap):
@@ -835,9 +873,8 @@ def analyze_ticker(ticker: str) -> Optional[Dict[str, Any]]:
     record.update(compute_oracle_checks(t, info, record))
     record["quality_valuation"] = classify_quality_valuation_quadrant(record)
     return record
-
-
 def check_insider_buying(ticker: str) -> Tuple[Optional[int], str]:
+    """Cuenta compras reales de directivos en 90d distinguiendo 0 real vs ERROR de Yahoo."""
     try:
         df = yf.Ticker(ticker).insider_transactions
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
@@ -871,6 +908,7 @@ def check_insider_buying(ticker: str) -> Tuple[Optional[int], str]:
 
 
 def extract_recent_news(ticker: str, limit: int = 5) -> Tuple[List[str], str]:
+    """Extrae titulares recientes distinguiendo sin noticias vs ERROR de Yahoo."""
     headlines: List[str] = []
     try:
         raw_news = yf.Ticker(ticker).news
@@ -917,6 +955,7 @@ def clean_ai_text(text: str) -> str:
 
 
 def optional_gemini_buffett_check(rec: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Filtro IA escéptico con salida JSON estricta. Devuelve (texto, veredicto_enum, error)."""
     if not GEMINI_API_KEY:
         return None, None, "GEMINI_API_KEY no configurada"
 
@@ -1054,6 +1093,7 @@ def send_telegram(html_text: str) -> None:
 
 
 def extract_ai_verdict(ai_text: Optional[str]) -> Optional[str]:
+    """Fallback estricto: solo acepta un veredicto exacto al final de la línea VEREDICTO."""
     if not ai_text:
         return None
     m = re.search(r"(?im)^\s*(?:\d\)\s*)?veredicto\s*:\s*(TEMPORAL|DUDOSO|PERMANENTE|EVIDENCIA_INSUFICIENTE)\b", ai_text)
@@ -1207,13 +1247,20 @@ def format_detailed_opp(r: Dict[str, Any], header_line: str) -> str:
         block.append(f"• Claves: {esc_html(' · '.join(r['strengths'][:3]))}")
     if r.get("hard_fails"):
         block.append(f"• ❌ <i>Fallos críticos:</i> {esc_html(' · '.join(r['hard_fails']))}")
-    if r.get("piotroski_score") is not None:
+    if r.get("piotroski_score") is not None or r.get("piotroski_classic_score") is not None:
         cov_txt = f" | Cob.Int: {r['interest_coverage']}x" if r.get("interest_coverage") is not None else ""
-        cls_txt = ""
-        if r.get("piotroski_classic_score") is not None:
-            cls_txt = f" | Clásico: <b>{r['piotroski_classic_score']}/{r['piotroski_classic_max']}</b>"
-        block.append(f"• 🛡️ Oráculo: Piotroski <b>{r['piotroski_score']}/{r['piotroski_max']}</b>{cls_txt}{cov_txt}")
-    if r.get("quality_valuation"):
+        cls_txt = (
+            f" | Clásico: <b>{r['piotroski_classic_score']}/{r['piotroski_classic_max']}</b>"
+            if r.get("piotroski_classic_score") is not None
+            else ""
+        )
+        adp_txt = (
+            f"Adaptado <b>{r['piotroski_score']}/{r['piotroski_max']}</b>"
+            if r.get("piotroski_score") is not None
+            else "Adaptado N/D"
+        )
+        block.append(f"• 🛡️ Oráculo: Piotroski {adp_txt}{cls_txt}{cov_txt}")
+    if r.get("quality_valuation") and r["quality_valuation"].get("quadrant_label"):
         block.append(f"• 🧭 Cuadrante: <b>{esc_html(r['quality_valuation']['quadrant_label'])}</b>")
     if r.get("sec_note") and r.get("sec_status") not in (None, "NO_US"):
         sec_ic = "✅" if r.get("sec_verified") is True else "🚨" if r.get("sec_verified") is False else "ℹ️"
@@ -1234,7 +1281,7 @@ def build_urgent_telegram_alert(entradas_ya: List[Dict[str, Any]], gap_pts: Opti
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     lines = [
         "🚨🔥🚨 <b>ALERTA MÁXIMA: ENTRAR YA</b> 🚨🔥🚨",
-        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.4</i>",
+        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.5</i>",
     ]
     if gap_pts is not None and gap_pts >= 12:
         lines.append(f"⚡ <b>MUY DESPLAZADA DEL RESTO:</b> saca <b>+{gap_pts:.0f} pts</b> de ventaja al siguiente valor.")
@@ -1261,7 +1308,7 @@ def build_telegram_report(
 
     if UNIVERSE_MODE == "custom":
         lines = [
-            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.4 — {date_str}</b>",
+            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.5 — {date_str}</b>",
             f"<i>Empresas analizadas: {len(results)}/{total_scanned}</i>",
         ]
         for r in results[:10]:
@@ -1288,7 +1335,7 @@ def build_telegram_report(
     ya_txt = f"🚨 {len(entradas_ya)} ENTRAR YA · " if entradas_ya else ""
     tier_summary = f"{ya_txt}🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
-        f"🐊 <b>RADAR COCODRILO PRO v10.4 — {date_str}</b>",
+        f"🐊 <b>RADAR COCODRILO PRO v10.5 — {date_str}</b>",
         f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
     if market_ctx and (market_ctx.get("vix") is not None or market_ctx.get("us10y_pct") is not None):
@@ -1375,8 +1422,45 @@ def build_telegram_report(
     return "\n".join(lines)
 
 
+def _period_return_pct(symbol: str, start_date_str: str) -> Optional[float]:
+    """Calcula rentabilidad % desde start_date_str hasta hoy usando historial ajustado (incluye dividendos)."""
+    try:
+        d0 = datetime.strptime(start_date_str[:10], "%Y-%m-%d")
+        h = yf.Ticker(symbol).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=True)
+        if h is None or h.empty or "Close" not in h:
+            return None
+        closes = h["Close"].dropna()
+        if len(closes) < 2:
+            return None
+        p_start = safe_float(closes.iloc[0])
+        p_end = safe_float(closes.iloc[-1])
+        if p_start and p_end and p_start > 0:
+            return round(((p_end / p_start) - 1.0) * 100.0, 1)
+    except Exception:
+        return None
+    return None
+
+
+def _total_return_with_dividends_pct(ticker: str, init_price: float, cur_price: float, alert_date_str: str) -> float:
+    """Calcula rentabilidad total % incluyendo dividendos pagados desde alert_date_str."""
+    base_ret = ((cur_price / init_price) - 1.0) * 100.0
+    divs_sum = 0.0
+    try:
+        d0 = datetime.strptime(alert_date_str[:10], "%Y-%m-%d")
+        div_s = yf.Ticker(ticker).dividends
+        if div_s is not None and not div_s.empty:
+            idx_naive = pd.to_datetime(div_s.index).tz_localize(None)
+            mask = idx_naive >= pd.Timestamp(d0)
+            vals = [safe_float(x) for x in div_s[mask].values]
+            divs_sum = sum(v for v in vals if v is not None and v > 0)
+    except Exception:
+        divs_sum = 0.0
+    total_ret = (((cur_price + divs_sum) / init_price) - 1.0) * 100.0 if divs_sum > 0 else base_ret
+    return round(total_ret, 1)
+
+
 def update_alert_history(results: List[Dict[str, Any]]) -> None:
-    """Registra nuevas alertas ENTRADA_YA / GANGA / ORO PURO y actualiza seguimiento sin alterar origen."""
+    """Registra nuevas alertas y actualiza rentabilidad total (con dividendos) + benchmarks aunque falten en lote."""
     now_dt = datetime.now(timezone.utc)
     today = now_dt.strftime("%Y-%m-%d")
     now_iso = now_dt.isoformat()
@@ -1395,27 +1479,51 @@ def update_alert_history(results: List[Dict[str, Any]]) -> None:
 
     for entry in history:
         tkr = entry.get("ticker")
+        init_p = safe_float(entry.get("alert_price"))
+        alert_d = str(entry.get("alert_date") or today)[:10]
+        if not tkr or not init_p or init_p <= 0:
+            continue
+
         rec = price_map.get(tkr)
-        if rec and rec.get("price") is not None and entry.get("alert_price"):
-            cur_p = float(rec["price"])
-            init_p = float(entry["alert_price"])
-            if init_p > 0:
-                ret_pct = round(((cur_p / init_p) - 1.0) * 100.0, 1)
-                entry["last_price"] = round(cur_p, 2)
-                entry["return_pct"] = ret_pct
-                entry["last_checked"] = today
+        cur_p = safe_float(rec.get("price")) if rec else None
+        if cur_p is None:
+            try:
+                hist_t = yf.Ticker(tkr).history(period="5d")
+                if hist_t is not None and not hist_t.empty and "Close" in hist_t:
+                    cur_p = safe_float(hist_t["Close"].dropna().iloc[-1])
+            except Exception:
+                cur_p = None
+
+        if cur_p is not None and cur_p > 0:
+            price_ret_pct = round(((cur_p / init_p) - 1.0) * 100.0, 1)
+            tot_ret_pct = _total_return_with_dividends_pct(tkr, init_p, cur_p, alert_d)
+            entry["last_price"] = round(cur_p, 2)
+            entry["price_return_pct"] = price_ret_pct
+            entry["return_pct"] = tot_ret_pct
+            entry["last_checked"] = today
+            entry["last_checked_at"] = now_iso
+            if rec:
                 entry["current_status"] = rec.get("opportunity_tier") or rec.get("status")
-                entry.setdefault("milestones_pct", {"d30": None, "d90": None, "d180": None, "d365": None})
-                entry.setdefault("benchmarks", {"msci_world_pct": None, "sp500_pct": None})
-                entry.setdefault("status", "ACTIVA")
-                try:
-                    d0 = datetime.strptime(str(entry.get("alert_date", today))[:10], "%Y-%m-%d")
-                    elapsed_days = (now_dt.date() - d0.date()).days
-                    for horizon, key in ((30, "d30"), (90, "d90"), (180, "d180"), (365, "d365")):
-                        if elapsed_days >= horizon and entry["milestones_pct"].get(key) is None:
-                            entry["milestones_pct"][key] = ret_pct
-                except Exception:
-                    pass
+            entry.setdefault("milestones_pct", {"d30": None, "d90": None, "d180": None, "d365": None})
+            entry.setdefault("milestone_dates", {"d30": None, "d90": None, "d180": None, "d365": None})
+            entry.setdefault("status", "ACTIVA")
+            try:
+                d0 = datetime.strptime(alert_d, "%Y-%m-%d")
+                elapsed_days = (now_dt.date() - d0.date()).days
+                for horizon, key in ((30, "d30"), (90, "d90"), (180, "d180"), (365, "d365")):
+                    if elapsed_days >= horizon and entry["milestones_pct"].get(key) is None:
+                        entry["milestones_pct"][key] = tot_ret_pct
+                        entry["milestone_dates"][key] = today
+            except Exception:
+                pass
+
+        sp_pct = _period_return_pct("^GSPC", alert_d)
+        msci_pct = _period_return_pct("URTH", alert_d)
+        entry["benchmarks"] = {
+            "sp500_pct": sp_pct,
+            "msci_world_pct": msci_pct,
+            "benchmark_as_of": today,
+        }
 
     for r in results:
         tier = r.get("opportunity_tier")
@@ -1473,6 +1581,8 @@ def update_alert_history(results: List[Dict[str, Any]]) -> None:
 
 def run_scan_batch(tickers: List[str]) -> Tuple[List[Dict[str, Any]], int]:
     t0 = time.time()
+    if len(tickers) > 5:
+        _warmup_yf_session()
     results: List[Dict[str, Any]] = []
     failed = 0
     done = 0
@@ -1498,6 +1608,7 @@ def run_scan_batch(tickers: List[str]) -> Tuple[List[Dict[str, Any]], int]:
 
 
 def load_merged_shards(merge_dir: Path) -> Tuple[List[Dict[str, Any]], int, int, int]:
+    """Fusiona shards exigiendo integridad completa (rechaza publicaciones parciales salvo override)."""
     shard_files = sorted(merge_dir.rglob("shard-*.json"))
     if not shard_files:
         raise RuntimeError(f"No se encontraron archivos shard-*.json en {merge_dir}")
@@ -1559,6 +1670,7 @@ def load_merged_shards(merge_dir: Path) -> Tuple[List[Dict[str, Any]], int, int,
 
 
 def build_fx_rates_to_eur(results: List[Dict[str, Any]]) -> Dict[str, float]:
+    """Mapa de tipos de cambio hacia EUR para que la web calcule Mi Cartera sin mezclar divisas."""
     currencies = {"EUR", "USD", "GBP", "CHF", "CAD", "JPY"}
     for r in results:
         c = (r.get("currency") or "").upper()
@@ -1587,7 +1699,7 @@ def main() -> None:
     t0 = time.time()
 
     if MERGE_DIR:
-        print(f"🧩 Cocodrilo Pro v10.4 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
+        print(f"🧩 Cocodrilo Pro v10.5 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
         results, total_scanned, failed, shard_elapsed = load_merged_shards(Path(MERGE_DIR))
         elapsed_total = max(shard_elapsed, round(time.time() - t0))
     else:
@@ -1601,7 +1713,7 @@ def main() -> None:
         if SHARD_TOTAL > 1:
             tickers = [sym for idx, sym in enumerate(all_tickers) if idx % SHARD_TOTAL == SHARD_INDEX]
             print(
-                f"🐊 Cocodrilo Pro v10.4 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
+                f"🐊 Cocodrilo Pro v10.5 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
                 f"| Empresas: {len(tickers)} (total universo: {len(all_tickers)})"
             )
             results, failed = run_scan_batch(tickers)
@@ -1624,7 +1736,7 @@ def main() -> None:
                 raise RuntimeError(f"Shard {SHARD_INDEX} devolvió 0 empresas válidas.")
             return
 
-        print(f"🐊 Escáner Cocodrilo Pro v10.4 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
+        print(f"🐊 Escáner Cocodrilo Pro v10.5 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
         total_scanned = len(all_tickers)
         results, failed = run_scan_batch(all_tickers)
         elapsed_total = round(time.time() - t0)
@@ -1640,6 +1752,7 @@ def main() -> None:
         r["conviction_score"] = compute_conviction_score(r)
     results.sort(key=lambda r: (status_order.get(r["status"], 9), -(r["conviction_score"] or 0)))
 
+    # Compras de directivos (Insider Buying) + Auditoría oficial SEC EDGAR en candidatas top
     insider_targets = results[:12] if UNIVERSE_MODE == "custom" else [r for r in results if r["status"] == "OPORTUNIDAD"][:15]
     for r in insider_targets:
         buys, ins_status = check_insider_buying(r["ticker"])
@@ -1751,7 +1864,7 @@ def main() -> None:
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
-        "scanner_version": "v10.4-oraculo",
+        "scanner_version": "v10.5-oraculo",
         "fx_rates_eur": fx_rates_eur,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe_mode": UNIVERSE_MODE,
