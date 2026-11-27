@@ -771,5 +771,66 @@ class TestOracleV103(unittest.TestCase):
         self.assertEqual(out["ticker"], "NVDA")
         self.assertEqual(calls["n"], 2)
 
+    # --- 12) NOTIFICACIONES PUSH FIREBASE FCM (HTTP v1) ---
+    def test_fcm_urgent_push_payload_and_dispatch(self):
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+
+        captured = []
+
+        class FakeResp:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return b'{"name":"projects/cocodrilopro-64220/messages/1"}'
+
+        def fake_urlopen(req, timeout=15):
+            captured.append((req.full_url, dict(req.header_items()), json.loads(req.data.decode("utf-8"))))
+            return FakeResp()
+
+        fake_sa = json.dumps({"project_id": "cocodrilopro-64220", "client_email": "bot@test.iam.gserviceaccount.com"})
+        sample_rec = {
+            "ticker": "DECK",
+            "name": "Deckers Outdoor Corporation",
+            "price": 86.08,
+            "currency": "USD",
+            "drawdown_52w_pct": -30.0,
+            "quality_score": 100,
+            "discount_vs_base_pct": 57.8,
+            "ai_verdict": "TEMPORAL",
+            "oro_puro": True,
+        }
+
+        with (
+            patch.object(bs, "FIREBASE_SERVICE_ACCOUNT", fake_sa),
+            patch.object(bs, "FIREBASE_DEVICE_TOKEN", "tok_phone_1, tok_phone_2"),
+            patch.object(bs, "_get_fcm_access_token", return_value="fake_oauth_bearer"),
+            patch.object(bs.urllib.request, "urlopen", side_effect=fake_urlopen),
+        ):
+            sent = bs.send_fcm_urgent_alerts([sample_rec])
+
+        self.assertEqual(sent, 2)
+        self.assertEqual(len(captured), 2)
+        url0, hdrs0, body0 = captured[0]
+        self.assertIn("/projects/cocodrilopro-64220/messages:send", url0)
+        self.assertEqual(body0["message"]["token"], "tok_phone_1")
+        self.assertIn("DECK", body0["message"]["notification"]["title"])
+        self.assertEqual(body0["message"]["data"]["ticker"], "DECK")
+        self.assertEqual(body0["message"]["data"]["url"], "./?ticker=DECK")
+
 if __name__ == "__main__":
     unittest.main()
