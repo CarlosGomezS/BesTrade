@@ -513,6 +513,7 @@ class TestOracleV103(unittest.TestCase):
                 patch.object(bs, "OUT_DAILY_JSON", tmp_dir / "daily-scan.json"),
                 patch.object(bs, "OUT_WEEKLY_JSON", tmp_dir / "weekly-scan.json"),
                 patch.object(bs, "OUT_HISTORY_JSON", tmp_dir / "history.json"),
+                patch.object(bs, "OUT_COOLDOWN_JSON", tmp_dir / "alert-cooldown.json"),
                 patch.object(bs, "UNIVERSE_MODE", "rotacion_diaria"),
                 patch.object(bs, "SHARD_TOTAL", 1),
                 patch.object(bs, "MERGE_DIR", ""),
@@ -831,6 +832,56 @@ class TestOracleV103(unittest.TestCase):
         self.assertIn("DECK", body0["message"]["notification"]["title"])
         self.assertEqual(body0["message"]["data"]["ticker"], "DECK")
         self.assertEqual(body0["message"]["data"]["url"], "./?ticker=DECK")
+
+    # --- 13) ANTI-SPAM COOLDOWN (7 DÍAS O CAÍDA ADICIONAL >= 5%) Y FALLBACK TOPIC FCM ---
+    def test_alert_cooldown_suppresses_repeat_and_retriggers_on_drop_or_expiry(self):
+        from datetime import datetime, timedelta, timezone
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+
+        t0 = datetime(2026, 11, 20, 14, 0, tzinfo=timezone.utc)
+        rec_initial = {"ticker": "DECK", "price": 100.0, "currency": "USD", "opportunity_tier": "ENTRADA_YA"}
+
+        with tempfile.TemporaryDirectory() as td:
+            cd_file = Path(td) / "alert-cooldown.json"
+            cd_map = bs.load_alert_cooldown(cd_file)
+            to_send, suppressed = bs.filter_new_urgent_alerts([rec_initial], cd_map, now_dt=t0)
+            self.assertEqual(len(to_send), 1)
+            self.assertEqual(suppressed, [])
+
+            bs.save_alert_cooldown(to_send, cd_map, now_dt=t0, path=cd_file)
+            cd_loaded = bs.load_alert_cooldown(cd_file)
+
+            # 2 horas después con caída de solo -2% -> silenciada
+            rec_small_move = dict(rec_initial, price=98.0)
+            to_send2, suppressed2 = bs.filter_new_urgent_alerts([rec_small_move], cd_loaded, now_dt=t0 + timedelta(hours=2))
+            self.assertEqual(to_send2, [])
+            self.assertEqual(suppressed2, ["DECK"])
+
+            # 2 horas después con caída adicional de -6% (nuevo tramo) -> vuelve a avisar
+            rec_deep_drop = dict(rec_initial, price=94.0)
+            to_send3, suppressed3 = bs.filter_new_urgent_alerts([rec_deep_drop], cd_loaded, now_dt=t0 + timedelta(hours=2))
+            self.assertEqual(len(to_send3), 1)
+            self.assertEqual(suppressed3, [])
+
+            # 8 días después al mismo precio (expiró cooldown de 7 días) -> vuelve a avisar
+            to_send4, suppressed4 = bs.filter_new_urgent_alerts([rec_initial], cd_loaded, now_dt=t0 + timedelta(days=8))
+            self.assertEqual(len(to_send4), 1)
+            self.assertEqual(suppressed4, [])
 
 if __name__ == "__main__":
     unittest.main()
