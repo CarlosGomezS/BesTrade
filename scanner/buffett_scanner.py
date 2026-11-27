@@ -64,6 +64,7 @@ TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 FIREBASE_SERVICE_ACCOUNT = os.environ.get("FIREBASE_SERVICE_ACCOUNT", "").strip()
 FIREBASE_DEVICE_TOKEN = os.environ.get("FIREBASE_DEVICE_TOKEN", "").strip()
+FIREBASE_TOPIC = os.environ.get("FIREBASE_TOPIC", "entrar_ya").strip()
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://carlosgomezs.github.io/BesTrade").strip().rstrip("/")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
@@ -1116,16 +1117,17 @@ def send_fcm_push(
     ticker: Optional[str] = None,
     tier: str = "ENTRADA_YA",
 ) -> int:
-    """Envía notificación push nativa vía Firebase Cloud Messaging (HTTP v1) a los dispositivos configurados."""
-    if not FIREBASE_SERVICE_ACCOUNT or not FIREBASE_DEVICE_TOKEN:
+    """Envía notificación push nativa vía Firebase Cloud Messaging (HTTP v1) a tokens o al topic de la APK."""
+    if not FIREBASE_SERVICE_ACCOUNT:
         return 0
 
     tokens = [
         tok.strip()
-        for tok in re.split(r"[,;\s]+", FIREBASE_DEVICE_TOKEN)
+        for tok in re.split(r"[,;\s]+", FIREBASE_DEVICE_TOKEN or "")
         if tok.strip()
     ]
-    if not tokens:
+    topic = (FIREBASE_TOPIC or "").strip()
+    if not tokens and not topic:
         return 0
 
     try:
@@ -1142,11 +1144,13 @@ def send_fcm_push(
     rel_link = f"./?ticker={urllib.parse.quote(ticker)}" if ticker else "./?filter=ENTRADA_YA"
     abs_link = f"{APP_BASE_URL}/?ticker={urllib.parse.quote(ticker)}" if ticker else f"{APP_BASE_URL}/?filter=ENTRADA_YA"
 
+    targets: List[Tuple[str, str]] = [("token", tok) for tok in tokens[:10]]
+    if topic:
+        targets.append(("topic", topic))
+
     sent_ok = 0
-    for dev_token in tokens[:10]:
-        message_payload = {
-            "message": {
-                "token": dev_token,
+    for target_kind, target_val in targets:
+        base_msg: Dict[str, Any] = {
                 "notification": {
                     "title": title[:120],
                     "body": body[:240],
@@ -1176,6 +1180,8 @@ def send_fcm_push(
                 },
             }
         }
+        base_msg[target_kind] = target_val
+        message_payload = {"message": base_msg}
         req = urllib.request.Request(
             url,
             data=json.dumps(message_payload).encode("utf-8"),
@@ -1199,7 +1205,7 @@ def send_fcm_push(
 
 def send_fcm_urgent_alerts(entradas_ya: List[Dict[str, Any]]) -> int:
     """Envía un push prioritario de Firebase por cada oportunidad ENTRAR YA detectada (máx. 3)."""
-    if not entradas_ya or not FIREBASE_SERVICE_ACCOUNT or not FIREBASE_DEVICE_TOKEN:
+    if not entradas_ya or not FIREBASE_SERVICE_ACCOUNT or (not FIREBASE_DEVICE_TOKEN and not FIREBASE_TOPIC):
         return 0
     total_sent = 0
     for r in entradas_ya[:3]:
