@@ -971,7 +971,7 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
       <div class="logo">🐊</div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v10.9</span></small>
+        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v10.9.1</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -3238,7 +3238,7 @@ function renderAppView(){
       : `⚠️ <b>Falta activar Gemini:</b> añade <code>GEMINI_API_KEY</code> como Secret en tu Cloudflare Worker o pégala arriba.`;
   }
   if($('fcmStatusBox')){
-    const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+    const perm = (window.FreeApp && window.FreeApp.push) ? 'APK nativa (FreeApp.push)' : (typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
     const box = $('fcmTokenBox');
     if(fcmToken){
       $('fcmStatusBox').className = 'notice good';
@@ -3875,7 +3875,90 @@ function initFirebaseMessagingClient(){
   }
 }
 
+async function getFreeAppPushToken(silent = false){
+  const fp = window.FreeApp && window.FreeApp.push;
+  if(!fp) return { supported: false };
+
+  const keys = [];
+  try {
+    for(const k in fp) keys.push(k);
+    Object.getOwnPropertyNames(fp).forEach(k => { if(!keys.includes(k)) keys.push(k); });
+  } catch(e){}
+
+  // Intentar pedir permiso si el puente expone un método de permiso y no es silencioso
+  if(!silent){
+    for(const permFn of ['requestPermission', 'askPermission', 'enable', 'init']){
+      if(typeof fp[permFn] === 'function'){
+        try { await Promise.resolve(fp[permFn]()); } catch(e){}
+      }
+    }
+  }
+
+  // Intentar obtener el token FCM nativo de Android por los métodos habituales de FreeApp.push
+  const tokenCandidates = ['getToken', 'getFcmToken', 'getRegistrationToken', 'token', 'fcmToken', 'deviceToken'];
+  for(const name of tokenCandidates){
+    try {
+      const val = typeof fp[name] === 'function' ? await Promise.resolve(fp[name]()) : fp[name];
+      if(typeof val === 'string' && val.trim().length > 20){
+        return { supported: true, token: val.trim(), method: name, keys };
+      }
+      if(val && typeof val === 'object'){
+        const nested = val.token || val.fcmToken || val.deviceToken;
+        if(typeof nested === 'string' && nested.trim().length > 20){
+          return { supported: true, token: nested.trim(), method: name, keys };
+        }
+      }
+    } catch(e){}
+  }
+
+  // Soporte para callback estilo FreeApp.push.onToken(cb)
+  if(typeof fp.onToken === 'function'){
+    const cbTok = await new Promise((resolve) => {
+      let done = false;
+      const timer = setTimeout(() => { if(!done){ done = true; resolve(null); } }, 1800);
+      try {
+        fp.onToken((t) => {
+          if(!done && typeof t === 'string' && t.trim().length > 20){
+            done = true; clearTimeout(timer); resolve(t.trim());
+          }
+        });
+      } catch(e){
+        clearTimeout(timer); resolve(null);
+      }
+    });
+    if(cbTok) return { supported: true, token: cbTok, method: 'onToken', keys };
+  }
+
+  return { supported: true, token: null, keys };
+}
+
 async function enableFirebasePush(silent = false){
+  // 1) Ruta nativa para tu APK de Free HTML to APK (FreeApp.push)
+  if(window.FreeApp && window.FreeApp.push){
+    const res = await getFreeAppPushToken(silent);
+    if(res.token){
+      const changed = res.token !== fcmToken;
+      fcmToken = res.token;
+      localStorage.setItem(STORE.FCM_TOKEN, fcmToken);
+      if(!fcmTokensCloud.includes(fcmToken)) fcmTokensCloud.push(fcmToken);
+      if(changed) saveLocalUserState(true);
+      if(activeView === 'app') renderAppView();
+      if(!silent) toast('🔔 Token Android (APK) obtenido. Cópialo a FIREBASE_DEVICE_TOKEN en GitHub.');
+      return fcmToken;
+    }
+    if(!silent){
+      const diag = res.keys && res.keys.length ? res.keys.join(', ') : 'sin métodos visibles';
+      const box = $('fcmStatusBox');
+      if(box){
+        box.className = 'notice info';
+        box.innerHTML = `📱 <b>APK detectada (FreeApp.push activo)</b>, pero aún no devolvió token.<br><small>Métodos detectados: <code>${esc(diag)}</code>. Asegúrate de haber aceptado el permiso de notificaciones de Android y pulsa de nuevo.</small>`;
+      }
+      toast('📱 APK detectada. Revisa el detalle en el recuadro de Alertas Push.');
+    }
+    return null;
+  }
+
+  // 2) Ruta Web Push estándar (Chrome / PWA)
   if(typeof Notification === 'undefined' || !('serviceWorker' in navigator)){
     if(!silent) toast('Este navegador no soporta Push Web. En iPhone añade la web a pantalla de inicio primero.');
     return null;
@@ -3928,6 +4011,17 @@ async function enableFirebasePush(silent = false){
 }
 
 async function sendLocalTestNotification(){
+  if(window.FreeApp && window.FreeApp.push){
+    if(typeof window.FreeApp.push.show === 'function'){
+      try {
+        window.FreeApp.push.show('🚨 PRUEBA ENTRAR YA: DECK', 'Notificación nativa desde tu APK funcionando.');
+        toast('🔔 Aviso nativo enviado en tu APK.');
+        return;
+      } catch(e){}
+    }
+    toast('📱 En tu APK usa "🚀 Prueba intradía" para recibir un push real desde Firebase.');
+    return;
+  }
   if(typeof Notification === 'undefined'){ toast('Tu navegador no soporta notificaciones.'); return; }
   if(Notification.permission !== 'granted'){
     await enableFirebasePush(false);
@@ -4319,7 +4413,7 @@ fetchData(false);
 refreshWorkflowStatus(true);
 if(ghToken) cloudPull(false, false);
 if(proxyUrl) testProxyConnection(false);
-if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
+if((window.FreeApp && window.FreeApp.push) || (typeof Notification !== 'undefined' && Notification.permission === 'granted')){
   enableFirebasePush(true);
 }
 })();
