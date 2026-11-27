@@ -8,7 +8,7 @@
     "JPY": 0.005731,
     "USD": 0.9143
   },
-  "generated_at": "2026-11-27T21:10:00.833598+00:00",
+  "generated_at": "2026-11-27T21:10:37.513820+00:00",
   "universe_mode": "custom",
   "total_scanned": 1,
   "total_ok": 1,
@@ -107,8 +107,8 @@
       "in_dcf_zone": false,
       "below_bear": false,
       "status": "DESCARTADA",
-      "ai_check": "FISCAL: La compañía quema efectivo a un ritmo alarmante con un ROIC del -192%, carece de datos SEC auditados bajo US-GAAP y su PER futuro es un delirio especulativo de 179x.\nABOGADO: Si la inteligencia artificial generativa monopoliza el software empresarial en la próxima década, su liderazgo tecnológico podría justificar con creces las pérdidas actuales.\nCOMPROBAR (5 min): Revisar los estados financieros auditados para verificar la tasa real de consumo de efectivo (burn rate) y examinar los compromisos de gasto en potencia de cómputo con proveedores.\nRIESGO_TRAMPA: 9/10\nVEREDICTO: EVIDENCIA_INSUFICIENTE",
-      "ai_verdict": "EVIDENCIA_INSUFICIENTE",
+      "ai_check": "FISCAL: La compañía quema efectivo a un ritmo alarmante con un ROIC del -192%, carece de historial SEC auditado y cotiza a un múltiplo de PER futuro absurdo de 179x sin generar flujo de caja libre positivo.\nABOGADO: En la próxima década, el liderazgo en IA generativa de Anthropic podría consolidarse como infraestructura crítica global, justificando las pérdidas actuales si logran monetizar masivamente su tecnología.\nCOMPROBAR (5 min): 1. Revisar los estados financieros auditados para verificar la tasa real de consumo de efectivo (burn rate). 2. Analizar la sostenibilidad de los acuerdos de financiación y la dilución accionarial.\nRIESGO_TRAMPA: 9/10\nVEREDICTO: DUDOSO",
+      "ai_verdict": "DUDOSO",
       "trap_risk_score": 9,
       "oro_puro": false,
       "oracle_version": "v10.5-oraculo",
@@ -135,7 +135,7 @@
         "quality_tier": "DEBIL",
         "valuation_tier": "NO_EVALUABLE_O_DETERIORADO"
       },
-      "conviction_score": 6.0,
+      "conviction_score": 2.0,
       "sec_status": "NO_GAAP",
       "sec_verified": null,
       "sec_fiscal_end": null,
