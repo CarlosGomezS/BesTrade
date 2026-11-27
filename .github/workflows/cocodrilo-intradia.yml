@@ -7,12 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       test_mode:
-        description: 'Enviar push/Telegram de prueba aunque no haya ENTRAR YA (true/false)'
+        description: 'Enviar push/Telegram de prueba aunque no haya novedades ENTRAR YA (true/false)'
         required: false
         default: 'true'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: cocodrilo-intradia
@@ -39,6 +39,8 @@ jobs:
           UNIVERSE_MODE: rotacion_diaria
           URGENT_ONLY: 'true'
           URGENT_DOUBLE_PING: 'false'
+          ALERT_COOLDOWN_DAYS: '7'
+          ALERT_RETRIGGER_DROP_PCT: '5'
           TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -46,3 +48,22 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           FIREBASE_DEVICE_TOKEN: ${{ secrets.FIREBASE_DEVICE_TOKEN }}
         run: python scanner/buffett_scanner.py
+
+      - name: Guardar registro anti-spam (alert-cooldown.json)
+        run: |
+          if [ -f data/alert-cooldown.json ]; then
+            cp data/alert-cooldown.json /tmp/alert-cooldown.json
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p data
+            cp /tmp/alert-cooldown.json data/alert-cooldown.json
+            git add data/alert-cooldown.json
+            if ! git diff --cached --quiet; then
+              git commit -m "Update alert cooldown anti-spam"
+              git push
+            else
+              echo "Sin cambios en alert-cooldown.json"
+            fi
+          fi
