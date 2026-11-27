@@ -41,6 +41,7 @@ OUT_DAILY_JSON = DATA_DIR / "daily-scan.json"
 OUT_WEEKLY_JSON = DATA_DIR / "weekly-scan.json"
 OUT_CUSTOM_JSON = DATA_DIR / "custom-scan.json"
 OUT_HISTORY_JSON = DATA_DIR / "history.json"
+OUT_COOLDOWN_JSON = DATA_DIR / "alert-cooldown.json"
 
 UNIVERSE_MODE = os.environ.get("UNIVERSE_MODE", "rotacion_diaria").strip().lower()
 CUSTOM_TICKERS = os.environ.get("CUSTOM_TICKERS", "").strip()
@@ -59,12 +60,15 @@ ALLOW_PARTIAL_MERGE = os.environ.get("ALLOW_PARTIAL_MERGE", "false").strip().low
 MAX_DISCARDED_IN_WEB_JSON = int(os.environ.get("MAX_DISCARDED_IN_WEB_JSON", "250"))
 URGENT_ONLY = os.environ.get("URGENT_ONLY", "false").strip().lower() == "true"
 URGENT_DOUBLE_PING = os.environ.get("URGENT_DOUBLE_PING", "true").strip().lower() == "true"
+ALERT_COOLDOWN_DAYS = float(os.environ.get("ALERT_COOLDOWN_DAYS", "7"))
+ALERT_RETRIGGER_DROP_PCT = float(os.environ.get("ALERT_RETRIGGER_DROP_PCT", "5.0"))
 
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 FIREBASE_SERVICE_ACCOUNT = os.environ.get("FIREBASE_SERVICE_ACCOUNT", "").strip()
 FIREBASE_DEVICE_TOKEN = os.environ.get("FIREBASE_DEVICE_TOKEN", "").strip()
 FIREBASE_TOPIC = os.environ.get("FIREBASE_TOPIC", "entrar_ya").strip()
+FIREBASE_SEND_BOTH = os.environ.get("FIREBASE_SEND_BOTH", "false").strip().lower() == "true"
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://carlosgomezs.github.io/BesTrade").strip().rstrip("/")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
@@ -1145,7 +1149,7 @@ def send_fcm_push(
     abs_link = f"{APP_BASE_URL}/?ticker={urllib.parse.quote(ticker)}" if ticker else f"{APP_BASE_URL}/?filter=ENTRADA_YA"
 
     targets: List[Tuple[str, str]] = [("token", tok) for tok in tokens[:10]]
-    if topic:
+    if topic and (not targets or FIREBASE_SEND_BOTH):
         targets.append(("topic", topic))
 
     sent_ok = 0
@@ -1195,10 +1199,10 @@ def send_fcm_push(
                 if 200 <= resp.status < 300:
                     sent_ok += 1
         except Exception as exc:
-            print(f"⚠️ Error enviando push FCM al dispositivo ({dev_token[:10]}...): {exc}")
+            print(f"⚠️ Error enviando push FCM ({target_kind}={target_val[:14]}...): {exc}")
 
     if sent_ok > 0:
-        print(f"🔔 Push Firebase FCM enviado a {sent_ok}/{len(tokens)} dispositivo(s).")
+        print(f"🔔 Push Firebase FCM enviado ({sent_ok}/{len(targets)} destino(s)).")
     return sent_ok
 
 
@@ -1221,6 +1225,128 @@ def send_fcm_urgent_alerts(entradas_ya: List[Dict[str, Any]]) -> int:
         )
         total_sent += send_fcm_push(title=title, body=body, ticker=tkr, tier="ENTRADA_YA")
     return total_sent
+
+
+def load_alert_cooldown(path: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+    """Carga el registro anti-spam de alertas ENTRAR YA desde data/alert-cooldown.json."""
+    target = path or OUT_COOLDOWN_JSON
+    if not target.exists():
+        return {}
+    try:
+        raw = json.loads(target.read_text(encoding="utf-8"))
+        entries = raw.get("tickers") if isinstance(raw, dict) else None
+        if isinstance(entries, dict):
+            return {str(k).upper(): v for k, v in entries.items() if isinstance(v, dict)}
+    except Exception as exc:
+        print(f"⚠️ No se pudo leer {target.name}: {exc}")
+    return {}
+
+
+def filter_new_urgent_alerts(
+    entradas_ya: List[Dict[str, Any]],
+    cooldown_map: Dict[str, Dict[str, Any]],
+    now_dt: Optional[datetime] = None,
+) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Filtra alertas repetidas: solo avisa si es nueva, pasaron ALERT_COOLDOWN_DAYS o cayó >= ALERT_RETRIGGER_DROP_PCT%."""
+    now = now_dt or datetime.now(timezone.utc)
+    to_notify: List[Dict[str, Any]] = []
+    suppressed: List[str] = []
+
+    for r in entradas_ya:
+        tkr = str(r.get("ticker") or "").upper()
+        if not tkr:
+            continue
+        prev = cooldown_map.get(tkr)
+        if not prev:
+            to_notify.append(r)
+            continue
+
+        elapsed_days: Optional[float] = None
+        last_iso = str(prev.get("last_alert_at") or "").strip()
+        if last_iso:
+            try:
+                prev_dt = datetime.fromisoformat(last_iso.replace("Z", "+00:00"))
+                if prev_dt.tzinfo is None:
+                    prev_dt = prev_dt.replace(tzinfo=timezone.utc)
+                elapsed_days = (now - prev_dt).total_seconds() / 86400.0
+            except Exception:
+                elapsed_days = None
+
+        last_price = safe_float(prev.get("last_alert_price"))
+        cur_price = safe_float(r.get("price"))
+        extra_drop_pct = None
+        if last_price and cur_price and last_price > 0:
+            extra_drop_pct = ((cur_price / last_price) - 1.0) * 100.0
+
+        expired = elapsed_days is None or elapsed_days >= ALERT_COOLDOWN_DAYS
+        dropped_more = extra_drop_pct is not None and extra_drop_pct <= -ALERT_RETRIGGER_DROP_PCT
+
+        if expired or dropped_more:
+            to_notify.append(r)
+        else:
+            suppressed.append(tkr)
+            days_txt = f"{elapsed_days:.1f}d" if elapsed_days is not None else "?"
+            chg_txt = f"{extra_drop_pct:+.1f}%" if extra_drop_pct is not None else "N/D"
+            print(
+                f"🔇 Cooldown anti-spam activo para {tkr} (avisada hace {days_txt}, var. {chg_txt}; "
+                f"se silencia hasta {ALERT_COOLDOWN_DAYS:g}d o caída <= -{ALERT_RETRIGGER_DROP_PCT:g}%)."
+            )
+
+    return to_notify, suppressed
+
+
+def save_alert_cooldown(
+    notified: List[Dict[str, Any]],
+    cooldown_map: Dict[str, Dict[str, Any]],
+    now_dt: Optional[datetime] = None,
+    path: Optional[Path] = None,
+) -> None:
+    """Guarda fecha y precio del último aviso ENTRAR YA para evitar notificaciones repetidas."""
+    if not notified:
+        return
+    now = now_dt or datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    updated = dict(cooldown_map)
+
+    for r in notified:
+        tkr = str(r.get("ticker") or "").upper()
+        if not tkr:
+            continue
+        prev = updated.get(tkr) or {}
+        updated[tkr] = {
+            "last_alert_at": now_iso,
+            "last_alert_price": safe_float(r.get("price")),
+            "currency": r.get("currency") or "",
+            "tier": r.get("opportunity_tier") or "ENTRADA_YA",
+            "count": int(prev.get("count") or 0) + 1,
+        }
+
+    # Limpieza de registros con más de 90 días para mantener ligero el JSON
+    pruned: Dict[str, Dict[str, Any]] = {}
+    for tkr, info in updated.items():
+        keep = True
+        ts = str(info.get("last_alert_at") or "")
+        if ts:
+            try:
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if (now - dt).days > 90:
+                    keep = False
+            except Exception:
+                pass
+        if keep:
+            pruned[tkr] = info
+
+    target = path or OUT_COOLDOWN_JSON
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload_cd = {
+        "updated_at": now_iso,
+        "cooldown_days": ALERT_COOLDOWN_DAYS,
+        "retrigger_drop_pct": ALERT_RETRIGGER_DROP_PCT,
+        "tickers": pruned,
+    }
+    target.write_text(json.dumps(payload_cd, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def extract_ai_verdict(ai_text: Optional[str]) -> Optional[str]:
@@ -1961,28 +2087,32 @@ def main() -> None:
         gap_pts = round((opps_all[0].get("conviction_score") or 0) - (opps_all[1].get("conviction_score") or 0), 1)
 
     if URGENT_ONLY:
-        if entradas_ya:
-            urgent_msg = build_urgent_telegram_alert(entradas_ya, gap_pts)
+        cooldown_map = load_alert_cooldown()
+        new_entradas, suppressed_tkrs = filter_new_urgent_alerts(entradas_ya, cooldown_map)
+        if new_entradas:
+            urgent_msg = build_urgent_telegram_alert(new_entradas, gap_pts)
             send_telegram(urgent_msg)
-            send_fcm_urgent_alerts(entradas_ya)
-            print(f"🚨 ALERTA MÁXIMA enviada ({len(entradas_ya)} empresas ENTRAR YA).")
+            send_fcm_urgent_alerts(new_entradas)
+            save_alert_cooldown(new_entradas, cooldown_map)
+            print(f"🚨 ALERTA MÁXIMA enviada ({len(new_entradas)} nuevas ENTRAR YA).")
             if URGENT_DOUBLE_PING:
                 time.sleep(25)
-                tickers_str = ", ".join(r["ticker"] for r in entradas_ya[:3])
+                tickers_str = ", ".join(r["ticker"] for r in new_entradas[:3])
                 send_telegram(f"🔔🚨 <b>RECORDATORIO URGENTE COCODRILO:</b> revisa <b>{esc_html(tickers_str)}</b> ahora mismo (zona ENTRAR YA).")
         elif TEST_MODE:
+            sil_txt = f" (silenciadas por cooldown: {', '.join(suppressed_tkrs)})" if suppressed_tkrs else ""
             send_telegram(
-                f"🛡️ <b>Vigilante Intradía OK</b> ({len(results)} analizadas): ahora mismo no hay ninguna empresa en nivel 🚨 ENTRAR YA."
+                f"🛡️ <b>Vigilante Intradía OK</b> ({len(results)} analizadas): sin novedades en 🚨 ENTRAR YA{esc_html(sil_txt)}."
             )
             send_fcm_push(
                 title="🛡️ Cocodrilo Intradía OK (Prueba)",
-                body=f"{len(results)} empresas revisadas: ahora mismo no hay ninguna en ENTRAR YA.",
+                body=f"{len(results)} revisadas: sin novedades en ENTRAR YA{sil_txt}.",
                 ticker=None,
                 tier="TEST",
             )
-            print("✅ Chequeo intradía OK (sin alertas urgentes).")
+            print(f"✅ Chequeo intradía OK (sin novedades{sil_txt}).")
         else:
-            print("😴 Intradía sin nivel ENTRAR YA. Silencio total.")
+            print(f"😴 Intradía sin novedades ENTRAR YA (silenciadas: {suppressed_tkrs or 'ninguna'}). Silencio total.")
         return
 
     counts = {
@@ -2033,9 +2163,13 @@ def main() -> None:
         )
 
     if entradas_ya and UNIVERSE_MODE != "custom":
-        send_telegram(build_urgent_telegram_alert(entradas_ya, gap_pts))
-        send_fcm_urgent_alerts(entradas_ya)
-        time.sleep(2)
+        cooldown_map = load_alert_cooldown()
+        new_entradas, _ = filter_new_urgent_alerts(entradas_ya, cooldown_map)
+        if new_entradas:
+            send_telegram(build_urgent_telegram_alert(new_entradas, gap_pts))
+            send_fcm_urgent_alerts(new_entradas)
+            save_alert_cooldown(new_entradas, cooldown_map)
+            time.sleep(2)
 
     msg = build_telegram_report(results, failed, ai_status, total_scanned, market_ctx)
     if msg:
