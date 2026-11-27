@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<title>Radar Cocodrilo Pro v10.5 — Oráculo Blindado</title>
+<title>Radar Cocodrilo Pro v10.6 — Oráculo En Vivo</title>
 <style>
 :root{
   --bg:#040806;
@@ -608,6 +608,49 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
   box-shadow:0 14px 36px rgba(0,0,0,.6);display:none;z-index:90;max-width:90vw;text-align:center;
 }
 @media(max-width:520px){.subbars{grid-template-columns:1fr}.dcf3{grid-template-columns:1fr}}
+
+/* AUTOCOMPLETE UNIVERSAL (>= 2 LETRAS) */
+.ac-wrap{position:relative;flex:1;min-width:0}
+.ac-drop{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:85;
+  background:rgba(8,15,11,.98);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  border:1px solid var(--line-bright);border-radius:16px;overflow:hidden;
+  box-shadow:0 18px 48px rgba(0,0,0,.78);max-height:310px;overflow-y:auto;display:none;
+}
+.ac-drop.show{display:block;animation:fadeUp .14s ease}
+.ac-item{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);transition:background .12s;
+}
+.ac-item:last-of-type{border-bottom:0}
+.ac-item:hover,.ac-item.hi{background:rgba(74,222,128,.12)}
+.ac-left{min-width:0;flex:1}
+.ac-top{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+.ac-name{font-size:12.5px;font-weight:750;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-sub{font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-right{text-align:right;flex-shrink:0}
+.ac-price{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--text)}
+.ac-badge{
+  display:inline-block;font-size:9px;font-weight:800;padding:1.5px 6px;border-radius:99px;
+  background:rgba(74,222,128,.15);color:#86efac;border:1px solid rgba(74,222,128,.3);margin-top:2px;
+}
+.ac-badge.world{background:var(--blueBg);color:#93c5fd;border-color:rgba(96,165,250,.32)}
+.ac-foot{
+  padding:7px 12px;font-size:10.5px;color:var(--muted);background:rgba(255,255,255,.025);
+  border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;
+}
+.live-chg{
+  display:inline-flex;align-items:center;padding:1.5px 6px;border-radius:6px;
+  font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;margin-left:5px;vertical-align:middle;
+}
+.live-chg.up{background:rgba(74,222,128,.16);color:#86efac}
+.live-chg.dn{background:rgba(251,113,133,.16);color:#fda4af}
+.live-tag{
+  display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:800;
+  color:#86efac;letter-spacing:.04em;
+}
+.live-tag i{width:5.5px;height:5.5px;border-radius:50%;background:#4ade80;box-shadow:0 0 7px #4ade80;display:inline-block}
+
 </style>
 </head>
 <body>
@@ -618,7 +661,7 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
       <div class="logo">🐊</div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO BUFFETT <span class="ver-tag">v10.5</span></small>
+        <small id="appSubtitle">ORÁCULO BUFFETT <span class="ver-tag">v10.6</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -681,7 +724,9 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
           </button>
         </div>
         <div class="custom-scan-box" id="customScanBox">
-          <input id="customTickersInput" placeholder="Nombre o ticker: Alphabet, Inditex, DECK">
+          <div class="ac-wrap">
+            <input id="customTickersInput" autocomplete="off" placeholder="Escribe 2+ letras: NVDA, Inditex, Apple…">
+          </div>
           <button class="btn sm primary" id="launchCustomBtn">Analizar</button>
         </div>
       </div>
@@ -722,7 +767,7 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
     <div class="search-row">
       <div class="search-box">
         <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></span>
-        <input id="searchInput" placeholder="Buscar empresa, ticker o sector…">
+        <input id="searchInput" autocomplete="off" placeholder="Escribe 2+ letras: cualquier acción del mundo…">
       </div>
       <select class="sort-sel" id="sortSelect">
         <option value="smart">Mejor señal</option>
@@ -742,6 +787,9 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
     <div class="panel">
       <div class="eyebrow">Decide cuando solo puedes comprar una</div>
       <h3 style="margin:4px 0 10px">⚖️ Comparador 1 contra 1</h3>
+      <div class="ac-wrap" style="margin-bottom:9px">
+        <input class="finput" id="cmpSearchInput" autocomplete="off" placeholder="🔍 Escribe 2+ letras para añadir al comparador o ver precio en vivo…">
+      </div>
       <div class="cmp-grid">
         <select class="cmp-sel" id="cmpA"></select>
         <select class="cmp-sel" id="cmpB"></select>
@@ -796,9 +844,9 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
     <div class="panel">
       <div class="eyebrow">Control de compras con conversión FX real</div>
       <h3 style="margin:4px 0 6px">💼 Mi Cartera</h3>
-      <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">Introduce tu precio medio en <b>EUR</b> (o en la divisa en que compraste): la app convierte automáticamente el precio del mercado desde USD/GBP usando el tipo de cambio del escáner.</p>
+      <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">Escribe 2 letras del ticker o empresa: la app carga su <b>precio realista actual</b> convertido a tu divisa automáticamente y recalcula tu rentabilidad en tiempo real.</p>
       <div class="port-form">
-        <input class="finput" id="portTickerIn" placeholder="Ticker (NVDA)">
+        <div class="ac-wrap"><input class="finput" id="portTickerIn" autocomplete="off" placeholder="Buscar (2+ letras)"></div>
         <input class="finput" id="portPriceIn" type="number" step="0.01" placeholder="Precio medio">
         <input class="finput" id="portSharesIn" type="number" step="any" placeholder="Acciones">
         <select class="finput" id="portCurIn" style="padding:0 6px"><option value="EUR">EUR</option><option value="USD">USD</option><option value="AUTO">Auto</option><option value="GBP">GBP</option><option value="CHF">CHF</option><option value="CAD">CAD</option></select>
@@ -853,6 +901,19 @@ input.finput:focus,select.finput:focus{border-color:var(--emerald)}
         <button class="btn sm" id="cloudPushBtn" style="flex:1">⬆️ Subir a GitHub</button>
       </div>
       <div class="notice" id="ghTokenStatus" style="margin-top:10px">Sin token guardado todavía.</div>
+    </div>
+
+    <div class="panel" id="liveProxyPanel" style="border-color:rgba(74,222,128,.28)">
+      <div class="eyebrow">Cotizaciones en tiempo real + Buscador mundial (0 €)</div>
+      <h3 style="margin:4px 0 6px">⚡ Precios en Vivo (Cloudflare Worker)</h3>
+      <p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">Pega la URL de tu micro-proxy gratuito en Cloudflare Workers para activar <b>precios actualizados cada 60 s</b> (acciones + divisas EUR) y <b>autocompletado mundial desde 2 letras</b> en todos los buscadores.</p>
+      <label class="flabel">URL del Worker (ej. https://cocodrilo-live.tu-usuario.workers.dev)</label>
+      <input class="finput" id="proxyUrlInput" autocomplete="off" placeholder="https://cocodrilo-live.tu-usuario.workers.dev">
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn primary sm" id="saveProxyBtn" style="flex:1">Guardar y probar en vivo</button>
+        <button class="btn danger sm" id="clearProxyBtn">Desactivar</button>
+      </div>
+      <div class="notice" id="proxyStatusBox" style="margin-top:10px">Sin proxy configurado: usando último escaneo de GitHub.</div>
     </div>
 
     <div class="panel">
@@ -938,7 +999,8 @@ const STORE = {
   GH_TOKEN: 'cocodriloApp.ghToken.v8',
   UPDATED_AT: 'cocodriloApp.updatedAt.v9',
   BACKUP: 'cocodriloApp.backup.v10',
-  PENDING: 'cocodriloApp.pendingSync.v10'
+  PENDING: 'cocodriloApp.pendingSync.v10',
+  PROXY_URL: 'cocodriloApp.proxyUrl.v10'
 };
 const DB_FILE = 'user-db.json';
 const WORKFLOWS = { daily: 'cocodrilo-diario.yml', weekly: 'cocodrilo-semanal-1000.yml' };
@@ -1040,6 +1102,12 @@ let cloudSha = null;
 let cloudSaveTimer = null;
 let cloudState = { status: 'local', msg: 'Solo en este dispositivo' };
 let pendingSync = localStorage.getItem(STORE.PENDING) === '1';
+let proxyUrl = (localStorage.getItem(STORE.PROXY_URL) || '').trim().replace(/\/+$/, '');
+let liveQuotes = {};
+let liveFxEur = {};
+let liveLastUpdate = 0;
+let liveStatus = { ok: false, msg: 'Sin proxy en vivo configurado' };
+let livePollTimer = null;
 
 const $ = id => document.getElementById(id);
 function readJSON(k, def){ try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : def; } catch(e){ return def; } }
@@ -1082,9 +1150,412 @@ function getLiveFxMap(){
     ...(datasets.weekly?.fx_rates_eur || {}),
     ...(datasets.daily?.fx_rates_eur || {}),
     ...(datasets.latest?.fx_rates_eur || {}),
-    ...(payload?.fx_rates_eur || {})
+    ...(payload?.fx_rates_eur || {}),
+    ...(liveFxEur || {})
   };
   return { live, merged: { ...FALLBACK_FX_EUR, ...live, EUR: 1.0 } };
+}
+
+function getEffectivePrice(c){
+  if(!c) return { price: null, prevClose: null, changePct: null, isLive: false, currency: 'USD', marketTime: null };
+  const tkr = (c.ticker || '').toUpperCase();
+  const lq = liveQuotes[tkr];
+  if(lq && Number.isFinite(Number(lq.price)) && Number(lq.price) > 0){
+    return {
+      price: Number(lq.price),
+      prevClose: lq.prevClose ?? null,
+      changePct: Number.isFinite(Number(lq.changePct)) ? Number(lq.changePct) : null,
+      isLive: true,
+      currency: (lq.currency || c.currency || 'USD').toUpperCase(),
+      marketTime: lq.marketTime || null
+    };
+  }
+  return {
+    price: Number.isFinite(Number(c.price)) ? Number(c.price) : null,
+    prevClose: null,
+    changePct: null,
+    isLive: false,
+    currency: (c.currency || 'USD').toUpperCase(),
+    marketTime: null
+  };
+}
+
+function liveChangePill(changePct){
+  if(changePct === null || changePct === undefined || !Number.isFinite(Number(changePct))) return '';
+  const v = Number(changePct);
+  const cls = v >= 0 ? 'up' : 'dn';
+  return `<span class="live-chg ${cls}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span>`;
+}
+
+function getAllKnownCompanies(){
+  const byTkr = new Map();
+  const pools = [payload?.companies, datasets.daily?.companies, datasets.weekly?.companies, datasets.latest?.companies, datasets.manual?.companies];
+  for(const arr of pools){
+    if(!Array.isArray(arr)) continue;
+    for(const c of arr){
+      const k = (c?.ticker || '').toUpperCase();
+      if(k && !byTkr.has(k)) byTkr.set(k, c);
+    }
+  }
+  return Array.from(byTkr.values());
+}
+
+function searchLocalCompanies(query, limit = 7){
+  const q = (query || '').trim().toLowerCase();
+  if(q.length < 2) return [];
+  const all = getAllKnownCompanies();
+  const scored = [];
+  for(const c of all){
+    const tkr = (c.ticker || '').toLowerCase();
+    const name = (c.name || '').toLowerCase();
+    const sec = (c.sector || '').toLowerCase();
+    let rank = 0;
+    if(tkr === q) rank = 100;
+    else if(tkr.startsWith(q)) rank = 85;
+    else if(name.startsWith(q)) rank = 70;
+    else if(tkr.includes(q)) rank = 55;
+    else if(name.includes(q)) rank = 45;
+    else if(sec.includes(q)) rank = 20;
+    if(rank > 0){
+      scored.push({
+        rank,
+        symbol: (c.ticker || '').toUpperCase(),
+        name: c.name || c.ticker,
+        exchange: c.region || '',
+        sector: c.sector || '',
+        inRadar: true,
+        company: c
+      });
+    }
+  }
+  scored.sort((a, b) => b.rank - a.rank || (b.company.quality_score || 0) - (a.company.quality_score || 0));
+  return scored.slice(0, limit);
+}
+
+async function fetchLiveQuotes(symbols, withFx = false){
+  if(!proxyUrl) return {};
+  const clean = Array.from(new Set((symbols || []).map(s => String(s || '').trim().toUpperCase()).filter(Boolean)));
+  if(!clean.length && !withFx) return {};
+  const out = {};
+  const chunks = [];
+  for(let i = 0; i < clean.length; i += 20) chunks.push(clean.slice(i, i + 20));
+  if(!chunks.length && withFx) chunks.push([]);
+
+  for(let ci = 0; ci < chunks.length; ci++){
+    const chunk = chunks[ci];
+    const params = new URLSearchParams();
+    if(chunk.length) params.set('symbols', chunk.join(','));
+    if(withFx && ci === 0) params.set('fx', '1');
+    try {
+      const r = await fetch(`${proxyUrl}/quote?${params.toString()}`, { cache: 'no-store' });
+      if(!r.ok) continue;
+      const data = await r.json();
+      if(data && data.ok){
+        if(data.quotes && typeof data.quotes === 'object'){
+          const nowTs = Date.now();
+          Object.entries(data.quotes).forEach(([sym, q]) => {
+            if(q && Number.isFinite(Number(q.price)) && Number(q.price) > 0){
+              const k = sym.toUpperCase();
+              liveQuotes[k] = { ...q, fetchedAt: nowTs };
+              out[k] = liveQuotes[k];
+            }
+          });
+        }
+        if(data.fx_eur && typeof data.fx_eur === 'object'){
+          liveFxEur = { ...liveFxEur, ...data.fx_eur, EUR: 1.0 };
+        }
+        liveLastUpdate = Date.now();
+        liveStatus = { ok: true, msg: `Precios en vivo activos · ${fmtShortDate(new Date().toISOString())}` };
+      }
+    } catch(e){
+      liveStatus = { ok: false, msg: 'Proxy temporalmente inaccesible (usando datos guardados)' };
+    }
+  }
+  return out;
+}
+
+async function refreshActiveLivePrices(silent = true){
+  if(!proxyUrl) return;
+  const syms = new Set();
+  portfolio.forEach(p => { if(p && p.ticker) syms.add(p.ticker.toUpperCase()); });
+  favs.forEach(t => { if(t) syms.add(String(t).toUpperCase()); });
+  if(historyData && Array.isArray(historyData.entries)){
+    historyData.entries.slice(0, 15).forEach(e => { if(e && e.ticker) syms.add(e.ticker.toUpperCase()); });
+  }
+  getFiltered().slice(0, 12).forEach(c => { if(c && c.ticker) syms.add(c.ticker.toUpperCase()); });
+
+  await fetchLiveQuotes(Array.from(syms), true);
+  // Evitar interrumpir si el usuario está escribiendo en un campo de texto
+  const activeTag = document.activeElement?.tagName;
+  if(activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && activeTag !== 'SELECT'){
+    renderAll();
+  } else {
+    updateLiveBadgeOnly();
+  }
+  if(!silent && liveStatus.ok) toast('⚡ Precios en vivo y FX actualizados.');
+}
+
+function updateLiveBadgeOnly(){
+  const badge = $('modeBadge');
+  if(!badge) return;
+  if(proxyUrl && liveStatus.ok){
+    badge.className = 'live-pill';
+    badge.innerHTML = '<i class="dot"></i> Vivo ⚡';
+  } else if(payload.is_demo){
+    badge.className = 'live-pill demo';
+    badge.innerHTML = '<i class="dot"></i> Demo';
+  } else {
+    badge.className = 'live-pill';
+    badge.innerHTML = '<i class="dot"></i> En vivo';
+  }
+}
+
+function startLivePolling(){
+  if(livePollTimer) clearInterval(livePollTimer);
+  if(!proxyUrl) return;
+  livePollTimer = setInterval(() => {
+    if(document.visibilityState === 'visible') refreshActiveLivePrices(true);
+  }, 60000);
+}
+
+async function testProxyConnection(showToastMsg = true){
+  if(!proxyUrl){
+    liveStatus = { ok: false, msg: 'Sin proxy configurado: usando último escaneo de GitHub.' };
+    if(activeView === 'app') renderAppView();
+    return false;
+  }
+  try {
+    const r = await fetch(`${proxyUrl}/health?t=${Date.now()}`, { cache: 'no-store' });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    if(!j || !j.ok) throw new Error('Respuesta inesperada');
+    liveStatus = { ok: true, msg: `Conectado a ${proxyUrl}` };
+    await refreshActiveLivePrices(true);
+    startLivePolling();
+    if(activeView === 'app') renderAppView();
+    if(showToastMsg) toast('⚡ Proxy en vivo conectado: precios reales y buscador mundial activos.');
+    return true;
+  } catch(e){
+    liveStatus = { ok: false, msg: `No responde (${String(e?.message || 'Error de red')}). Revisa la URL del Worker.` };
+    if(activeView === 'app') renderAppView();
+    if(showToastMsg) toast(`⚠️ Error conectando al proxy: ${e?.message || 'red'}`);
+    return false;
+  }
+}
+
+/* ===========================
+   AUTOCOMPLETADO UNIVERSAL (>= 2 LETRAS)
+   =========================== */
+function attachTickerAutocomplete(inputEl, opts = {}){
+  if(!inputEl || inputEl.dataset.acBound) return;
+  inputEl.dataset.acBound = '1';
+  const parent = inputEl.parentElement;
+  if(!parent) return;
+  if(getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+
+  const drop = document.createElement('div');
+  drop.className = 'ac-drop';
+  parent.appendChild(drop);
+
+  let items = [];
+  let hiIdx = -1;
+  let debounceTimer = null;
+  let abortCtrl = null;
+
+  const getQueryToken = () => {
+    const raw = inputEl.value || '';
+    if(opts.multiComma){
+      const parts = raw.split(',');
+      return (parts[parts.length - 1] || '').trim();
+    }
+    return raw.trim();
+  };
+
+  const closeDrop = () => {
+    drop.classList.remove('show');
+    hiIdx = -1;
+  };
+
+  const renderDrop = (loadingRemote = false) => {
+    const q = getQueryToken();
+    if(q.length < 2){ closeDrop(); return; }
+    if(!items.length && !loadingRemote){
+      drop.innerHTML = `<div class="ac-foot"><span>Sin coincidencias para "${esc(q)}"</span>${!proxyUrl ? '<span style="color:var(--gold)">Activa Proxy en Método</span>' : ''}</div>`;
+      drop.classList.add('show');
+      return;
+    }
+    const rows = items.map((it, idx) => {
+      const c = it.company || findCompany(it.symbol);
+      const eff = c ? getEffectivePrice(c) : (liveQuotes[it.symbol] ? { price: liveQuotes[it.symbol].price, currency: liveQuotes[it.symbol].currency, changePct: liveQuotes[it.symbol].changePct } : null);
+      const priceStr = (eff && eff.price !== null) ? fmtMoney(eff.price, eff.currency) : '';
+      const badgeHtml = it.inRadar
+        ? `<span class="ac-badge">🐊 Radar · ${c?.quality_score ?? '—'} pts</span>`
+        : `<span class="ac-badge world">🌍 Mercado en vivo</span>`;
+      const meta = [it.exchange, it.sector].filter(Boolean).join(' · ') || (it.type || 'Acción');
+      return `<div class="ac-item ${idx === hiIdx ? 'hi' : ''}" data-ac-idx="${idx}">
+        <div class="ac-left">
+          <div class="ac-top"><span class="tkr">${esc(it.symbol)}</span><span class="ac-name">${esc(it.name)}</span></div>
+          <div class="ac-sub">${esc(meta)}</div>
+        </div>
+        <div class="ac-right">
+          ${priceStr ? `<div class="ac-price">${esc(priceStr)}</div>` : ''}
+          ${badgeHtml}
+        </div>
+      </div>`;
+    }).join('');
+    const footLeft = loadingRemote ? 'Buscando en mercados mundiales…' : (proxyUrl ? '⚡ Local + Yahoo Mundial en vivo' : 'Solo universo local (~2.000 emp.)');
+    const footRight = !proxyUrl ? '<span style="color:var(--gold);font-weight:700">Configurar Proxy</span>' : `${items.length} resultados`;
+    drop.innerHTML = rows + `<div class="ac-foot"><span>${footLeft}</span><span>${footRight}</span></div>`;
+    drop.classList.add('show');
+
+    drop.querySelectorAll('.ac-item').forEach(el => {
+      el.onpointerdown = (ev) => {
+        ev.preventDefault();
+        const picked = items[Number(el.dataset.acIdx)];
+        if(picked){
+          closeDrop();
+          if(typeof opts.onSelect === 'function') opts.onSelect(picked);
+        }
+      };
+    });
+  };
+
+  const runSearch = () => {
+    const q = getQueryToken();
+    if(q.length < 2){ items = []; closeDrop(); return; }
+    const localHits = searchLocalCompanies(q, 6);
+    items = localHits;
+    hiIdx = -1;
+    renderDrop(!!proxyUrl);
+
+    if(!proxyUrl) return;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      if(abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+      try {
+        const r = await fetch(`${proxyUrl}/search?q=${encodeURIComponent(q)}`, { signal: abortCtrl.signal, cache: 'no-store' });
+        if(!r.ok){ renderDrop(false); return; }
+        const data = await r.json();
+        const remote = Array.isArray(data?.results) ? data.results : [];
+        const seen = new Set(localHits.map(x => x.symbol));
+        const merged = [...localHits];
+        for(const rem of remote){
+          const sym = (rem.symbol || '').toUpperCase();
+          if(!sym || seen.has(sym)) continue;
+          seen.add(sym);
+          const inLocal = findCompany(sym);
+          merged.push({
+            symbol: sym,
+            name: rem.name || sym,
+            exchange: rem.exchange || '',
+            sector: rem.sector || '',
+            type: rem.type || 'EQUITY',
+            inRadar: !!inLocal,
+            company: inLocal || null
+          });
+        }
+        items = merged.slice(0, 8);
+        renderDrop(false);
+      } catch(e){
+        if(e?.name !== 'AbortError') renderDrop(false);
+      }
+    }, 220);
+  };
+
+  inputEl.addEventListener('input', runSearch);
+  inputEl.addEventListener('focus', () => { if(getQueryToken().length >= 2) runSearch(); });
+  inputEl.addEventListener('blur', () => setTimeout(closeDrop, 180));
+  inputEl.addEventListener('keydown', (e) => {
+    if(!drop.classList.contains('show') || !items.length) return;
+    if(e.key === 'ArrowDown'){ e.preventDefault(); hiIdx = (hiIdx + 1) % items.length; renderDrop(false); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); hiIdx = (hiIdx - 1 + items.length) % items.length; renderDrop(false); }
+    else if(e.key === 'Escape'){ closeDrop(); }
+    else if(e.key === 'Enter' && hiIdx >= 0 && items[hiIdx]){
+      e.preventDefault();
+      const picked = items[hiIdx];
+      closeDrop();
+      if(typeof opts.onSelect === 'function') opts.onSelect(picked);
+    }
+  });
+}
+
+async function openLiveQuickModal(item){
+  const sym = (item.symbol || '').toUpperCase();
+  const existing = findCompany(sym);
+  if(existing){ openModal(sym); return; }
+
+  $('mSub').textContent = `${sym} · COTIZACIÓN EN VIVO`;
+  $('mTitle').textContent = item.name || sym;
+  $('mBody').innerHTML = `<div class="notice info">⚡ Consultando precio real en directo para <b>${esc(sym)}</b>…</div>`;
+  $('detailModal').classList.add('show');
+
+  await fetchLiveQuotes([sym], true);
+  const q = liveQuotes[sym];
+  if(!q){
+    $('mBody').innerHTML = `
+      <div class="notice warn">No se pudo obtener el precio en vivo de <b>${esc(sym)}</b> ahora mismo.</div>
+      <div class="ext-links">
+        <button class="btn primary full" id="lqScanBtn">🚀 Lanzar análisis Buffett completo</button>
+        <a class="btn sm full" target="_blank" rel="noopener" href="https://finance.yahoo.com/quote/${encodeURIComponent(sym)}">Ver en Yahoo Finance ↗</a>
+      </div>`;
+    $('lqScanBtn').onclick = () => { $('detailModal').classList.remove('show'); triggerWorkflow('custom', sym); };
+    return;
+  }
+
+  const eurConv = convertAmount(q.price, q.currency, 'EUR');
+  const eurTxt = (q.currency !== 'EUR' && eurConv.ok) ? `≈ ${eurConv.value.toFixed(2)} €` : `${q.price.toFixed(2)} €`;
+  const dd52 = (q.high52w && q.high52w > 0) ? (((q.price / q.high52w) - 1) * 100).toFixed(1) : null;
+
+  $('mSub').textContent = `${sym} · ${q.exchange || item.exchange || 'Mercado Global'}${item.sector ? ' · ' + item.sector : ''}`;
+  $('mTitle').textContent = q.name || item.name || sym;
+  $('mBody').innerHTML = `
+    <div class="val-box" style="margin-bottom:12px">
+      <div class="val-row" style="margin-bottom:0">
+        <div>
+          <span class="live-tag"><i></i> PRECIO EN VIVO</span>
+          <div class="val-price" style="margin-top:3px">${fmtMoney(q.price, q.currency)} ${liveChangePill(q.changePct)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Equivalente actual: <b style="color:var(--text)">${esc(eurTxt)}</b></div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--muted)">Cierre previo</div>
+          <b>${fmtMoney(q.prevClose, q.currency)}</b>
+          ${dd52 !== null ? `<div style="font-size:11px;color:${Number(dd52)<=-15?'#4ade80':'var(--muted)'};margin-top:3px">${dd52}% vs máx 52s</div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="mini4" style="margin-bottom:12px">
+      <div class="mcell"><span>Divisa</span><b>${esc(q.currency)}</b></div>
+      <div class="mcell"><span>Máx 52s</span><b>${q.high52w ? q.high52w.toFixed(2) : '—'}</b></div>
+      <div class="mcell"><span>Mín 52s</span><b>${q.low52w ? q.low52w.toFixed(2) : '—'}</b></div>
+      <div class="mcell"><span>Estado</span><b>${esc(q.marketState || 'LIVE')}</b></div>
+    </div>
+
+    <div class="notice info">
+      Esta acción aún no está en el último lote analizado de BesTrade. Puedes <b>añadirla ya a Mi Cartera</b> con su precio real en EUR o lanzar un <b>análisis Buffett + SEC + Piotroski</b> completo en GitHub Actions.
+    </div>
+
+    <div class="ext-links">
+      <button class="btn primary full" id="lqScanBtn">🚀 Lanzar análisis Buffett completo (${esc(sym)})</button>
+      <button class="btn sm gold" style="flex:1" id="lqPortBtn">💼 Añadir a Mi Cartera</button>
+      <a class="btn sm" style="flex:1" target="_blank" rel="noopener" href="https://finance.yahoo.com/quote/${encodeURIComponent(sym)}">Yahoo Finance ↗</a>
+    </div>
+  `;
+
+  $('lqScanBtn').onclick = () => {
+    $('detailModal').classList.remove('show');
+    triggerWorkflow('custom', sym);
+  };
+  $('lqPortBtn').onclick = () => {
+    $('detailModal').classList.remove('show');
+    switchView('favs');
+    $('portTickerIn').value = sym;
+    $('portPriceIn').value = (eurConv.ok && eurConv.value) ? eurConv.value.toFixed(2) : q.price.toFixed(2);
+    if($('portCurIn')) $('portCurIn').value = eurConv.ok ? 'EUR' : q.currency;
+    $('portSharesIn').focus();
+    toast(`⚡ ${sym} precargada a ${$('portPriceIn').value} ${$('portCurIn').value}. Introduce tus acciones.`);
+  };
 }
 
 function convertAmount(amount, fromCur, toCur){
@@ -1163,7 +1634,8 @@ function mergeUserStates(remote, local){
     portfolio: Array.from(portMap.values()),
     notes: mergedNotes,
     checks: mergedChecks,
-    cash_pot: mergedPot
+    cash_pot: mergedPot,
+    proxy_url: (local.proxy_url || remote.proxy_url || '')
   };
 }
 
@@ -1229,7 +1701,8 @@ async function cloudPull(forceApply = false, showMsg = false){
     const remoteTs = Number(decoded.updated_at || 0);
     if(pendingSync && !forceApply){
       snapshotLocalBackup();
-      const merged = mergeUserStates(decoded, { favs, portfolio, notes, checks, cash_pot: cashPot, updated_at: localUpdatedAt });
+      const merged = mergeUserStates(decoded, { favs, portfolio, notes, checks, cash_pot: cashPot, proxy_url: proxyUrl, updated_at: localUpdatedAt });
+      if(merged.proxy_url && !proxyUrl){ proxyUrl = merged.proxy_url.trim().replace(/\/+$/, ''); localStorage.setItem(STORE.PROXY_URL, proxyUrl); }
       favs = merged.favs; portfolio = merged.portfolio; notes = merged.notes; checks = merged.checks; cashPot = merged.cash_pot;
       localUpdatedAt = Date.now();
       persistLocalOnly();
@@ -1243,6 +1716,7 @@ async function cloudPull(forceApply = false, showMsg = false){
       notes = decoded.notes;
       portfolio = decoded.portfolio;
       if(decoded.cash_pot !== undefined && Number.isFinite(Number(decoded.cash_pot))) cashPot = Number(decoded.cash_pot);
+      if(decoded.proxy_url && typeof decoded.proxy_url === 'string' && !proxyUrl){ proxyUrl = decoded.proxy_url.trim().replace(/\/+$/, ''); localStorage.setItem(STORE.PROXY_URL, proxyUrl); }
       checks = (decoded.checks && typeof decoded.checks === 'object') ? decoded.checks : {};
       localUpdatedAt = remoteTs || Date.now();
       persistLocalOnly();
@@ -1272,6 +1746,7 @@ async function cloudPush(showMsg = false, retryCount = 0){
       favs,
       portfolio,
       cash_pot: cashPot,
+      proxy_url: proxyUrl,
       notes,
       checks
     };
@@ -1545,6 +2020,10 @@ async function triggerWorkflow(kind, customRaw = ''){
    =========================== */
 function cardHTML(c, includeNote = false){
   const dcf = c.dcf || null;
+  const eff = getEffectivePrice(c);
+  const curP = eff.price ?? c.price;
+  const liveDisc = (dcf && dcf.intrinsic_base > 0 && curP) ? Number(((1 - (curP / dcf.intrinsic_base)) * 100).toFixed(1)) : c.discount_vs_base_pct;
+  const livePinPct = (dcf && dcf.intrinsic_base > 0 && curP) ? Math.max(4, Math.min(96, (((curP / dcf.intrinsic_base) - 0.5) / 1.0) * 100)) : valPosPct(c);
   const fav = isFav(c.ticker);
   const warns = c.data_warnings || [];
   const quad = getQuadrantInfo(c);
@@ -1586,13 +2065,16 @@ function cardHTML(c, includeNote = false){
 
     <div class="val-box">
       <div class="val-row">
-        <div><span style="font-size:9.5px;letter-spacing:.06em;color:var(--muted);display:block;font-weight:700">PRECIO ACTUAL</span><span class="val-price">${fmtMoney(c.price, c.currency)}</span></div>
+        <div>
+          ${eff.isLive ? '<span class="live-tag"><i></i> EN VIVO</span>' : '<span style="font-size:9.5px;letter-spacing:.06em;color:var(--muted);display:block;font-weight:700">PRECIO ACTUAL</span>'}
+          <span class="val-price">${fmtMoney(curP, c.currency)}</span>${liveChangePill(eff.changePct)}
+        </div>
         <div style="text-align:right">
           <span class="val-dd" style="color:${ddColor}">${c.drawdown_52w_pct!==null ? c.drawdown_52w_pct+'% vs máx 52s' : '—'}</span>
-          <div style="font-size:10.5px;color:var(--muted)">${c.discount_vs_base_pct!==null ? (c.discount_vs_base_pct>=0 ? `Descuento ${c.discount_vs_base_pct}% DCF` : `Prima ${Math.abs(c.discount_vs_base_pct)}% DCF`) : 'Sin DCF'}${c.owner_earnings_adjusted ? ' · -SBC' : ''}</div>
+          <div style="font-size:10.5px;color:var(--muted)">${liveDisc!==null ? (liveDisc>=0 ? `Descuento ${liveDisc}% DCF` : `Prima ${Math.abs(liveDisc)}% DCF`) : 'Sin DCF'}${c.owner_earnings_adjusted ? ' · -SBC' : ''}</div>
         </div>
       </div>
-      ${dcf ? `<div class="val-track"><div class="val-target-mark" title="Objetivo -25%"></div><div class="val-pin" style="left:${valPosPct(c).toFixed(1)}%"></div></div>
+      ${dcf ? `<div class="val-track"><div class="val-target-mark" title="Objetivo -25%"></div><div class="val-pin" style="left:${livePinPct.toFixed(1)}%"></div></div>
         <div class="val-labels"><span>🎯 Obj: <b style="color:#86efac">${fmtMoney(dcf.target_price, c.currency)}</b></span><span>Valor Base: <b>${fmtMoney(dcf.intrinsic_base, c.currency)}</b></span></div>` : ''}
     </div>
 
@@ -1715,22 +2197,29 @@ function evaluatePortfolioSignal(pos, c, pnlPct){
 }
 
 function computePositionView(pos){
-  const c = findCompany(pos.ticker);
-  const posCur = (pos.currency && pos.currency !== 'AUTO') ? pos.currency.toUpperCase() : (c?.currency || 'EUR').toUpperCase();
-  const stockCur = (c?.currency || posCur).toUpperCase();
+  const tkr = (pos.ticker || '').toUpperCase();
+  const c = findCompany(tkr);
+  const lq = liveQuotes[tkr] || null;
+  const posCur = (pos.currency && pos.currency !== 'AUTO') ? pos.currency.toUpperCase() : ((lq?.currency || c?.currency || 'EUR').toUpperCase());
+  const stockCur = ((lq?.currency || c?.currency || posCur)).toUpperCase();
+  const rawNativePrice = (lq && Number.isFinite(Number(lq.price)) && lq.price > 0)
+    ? Number(lq.price)
+    : ((c && Number.isFinite(Number(c.price))) ? Number(c.price) : null);
+  const isLive = !!(lq && Number.isFinite(Number(lq.price)) && lq.price > 0);
+  const changePct = isLive && Number.isFinite(Number(lq.changePct)) ? Number(lq.changePct) : null;
 
   let curPriceInPosCur = pos.avgPrice;
   let fxUsed = null;
   let fxApprox = false;
 
-  if(c && Number.isFinite(Number(c.price))){
-    const conv = convertAmount(c.price, stockCur, posCur);
+  if(rawNativePrice !== null){
+    const conv = convertAmount(rawNativePrice, stockCur, posCur);
     if(conv.ok && conv.value !== null){
       curPriceInPosCur = conv.value;
       fxUsed = conv.rate;
       fxApprox = conv.approx;
     } else {
-      curPriceInPosCur = c.price;
+      curPriceInPosCur = rawNativePrice;
       fxApprox = true;
     }
   }
@@ -1742,10 +2231,10 @@ function computePositionView(pos){
 
   const costEurConv = convertAmount(costInPosCur, posCur, 'EUR');
   const valEurConv = convertAmount(valInPosCur, posCur, 'EUR');
-  const sig = evaluatePortfolioSignal(pos, c, pnlPct);
+  const sig = evaluatePortfolioSignal(pos, c ? { ...c, price: rawNativePrice ?? c.price } : null, pnlPct);
 
   return {
-    c, posCur, stockCur, curPriceInPosCur, fxUsed, fxApprox,
+    c, lq, isLive, changePct, rawNativePrice, posCur, stockCur, curPriceInPosCur, fxUsed, fxApprox,
     costInPosCur, valInPosCur, pnlInPosCur, pnlPct,
     costEur: costEurConv.ok ? costEurConv.value : null,
     valEur: valEurConv.ok ? valEurConv.value : null,
@@ -1787,9 +2276,8 @@ function renderRadarView(){
   if(sellAlerts > 0){ bFav.className = 'nav-badge red show'; bFav.textContent = `!${sellAlerts}`; }
   else { bFav.className = `nav-badge gold ${portfolio.length + favs.length > 0 ? 'show' : ''}`; bFav.textContent = portfolio.length + favs.length; }
 
-  const badge = $('modeBadge');
-  if(payload.is_demo){ badge.className = 'live-pill demo'; badge.innerHTML = '<i class="dot"></i> Demo'; $('demoBar').classList.add('show'); }
-  else { badge.className = 'live-pill'; badge.innerHTML = '<i class="dot"></i> En vivo'; $('demoBar').classList.remove('show'); }
+  updateLiveBadgeOnly();
+  $('demoBar').classList.toggle('show', !!payload.is_demo);
 
   const ai = payload.ai_status, aiEl = $('aiMiniBadge');
   if(ai && ai.enabled){
@@ -1960,19 +2448,21 @@ function renderFavsView(){
 
       const rowCls = pv.sig.kind === 'sell' ? 'sell-alert' : pv.sig.kind === 'profit' ? 'profit-alert' : '';
       const pnlCol = pv.pnlPct >= 0 ? '#4ade80' : '#fb7185';
-      const origTxt = (pv.c && pv.stockCur !== pv.posCur)
-        ? ` <span style="opacity:.72">(${pv.fxApprox?'≈ ':''}${pv.c.price.toFixed(2)} ${esc(pv.stockCur)})</span>`
+      const origTxt = (pv.rawNativePrice !== null && pv.stockCur !== pv.posCur)
+        ? ` <span style="opacity:.72">(${pv.fxApprox?'≈ ':''}${pv.rawNativePrice.toFixed(2)} ${esc(pv.stockCur)})</span>`
         : '';
+      const displayName = pv.c ? pv.c.name : (pv.lq?.name || pos.ticker);
 
       return `<div class="port-row ${rowCls}">
         <div class="port-top">
           <div style="min-width:0">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-              <b>${esc(pv.c ? pv.c.name : pos.ticker)}</b>
+              <b>${esc(displayName)}</b>
               <span class="tkr">${esc(pos.ticker)}</span>
               <span class="tkr" style="opacity:.75">${esc(pv.posCur)}</span>
+              ${pv.isLive ? '<span class="live-tag"><i></i> VIVO</span>' : ''}
             </div>
-            <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${pos.shares} acc. · Compra: <b>${pos.avgPrice.toFixed(2)} ${esc(pv.posCur)}</b></div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${pos.shares} acc. · Compra: <b>${pos.avgPrice.toFixed(2)} ${esc(pv.posCur)}</b>${liveChangePill(pv.changePct)}</div>
           </div>
           <div style="text-align:right;flex-shrink:0">
             <b style="color:${pnlCol};font-size:16px;font-variant-numeric:tabular-nums">${pv.pnlPct>=0?'+':''}${pv.pnlPct.toFixed(2)}%</b>
@@ -2069,7 +2559,9 @@ function renderHistoryView(){
   }
 
   host.innerHTML = entries.map(e => {
-    const r = Number(e.return_pct || 0);
+    const lqH = liveQuotes[(e.ticker || '').toUpperCase()];
+    const liveLastP = (lqH && Number.isFinite(Number(lqH.price)) && lqH.price > 0) ? Number(lqH.price) : e.last_price;
+    const r = (lqH && e.alert_price > 0) ? Number((((liveLastP / e.alert_price) - 1) * 100).toFixed(1)) : Number(e.return_pct || 0);
     const col = r > 0 ? '#4ade80' : r < 0 ? '#fb7185' : '#859f8f';
     const badge = e.tier === 'ORO_PURO' ? '<span class="pill ganga">👑 ORO PURO</span>'
       : e.tier === 'ENTRADA_YA' ? '<span class="pill entrar-ya">🚨 ENTRAR YA</span>'
@@ -2096,7 +2588,7 @@ function renderHistoryView(){
             <b>${esc(e.name || e.ticker)}</b> <span class="tkr">${esc(e.ticker)}</span> ${badge}
           </div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:4px">
-            Alerta <b>${esc(e.alert_date)}</b> a <b>${fmtMoney(e.alert_price, e.currency)}</b> → Hoy: <b>${fmtMoney(e.last_price, e.currency)}</b>
+            Alerta <b>${esc(e.alert_date)}</b> a <b>${fmtMoney(e.alert_price, e.currency)}</b> → Hoy: <b>${fmtMoney(liveLastP, e.currency)}</b>${lqH ? ' <span class="live-tag"><i></i></span>' : ''}
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -2139,6 +2631,13 @@ function renderAppView(){
     ? `<div class="notice good">✅ <b>4/4 superados:</b> disciplina Buffett cumplida.</div>`
     : `<div class="notice warn">Llevas <b>${doneN}/4</b> filtros confirmados.</div>`;
 
+  if($('proxyUrlInput')) $('proxyUrlInput').value = proxyUrl;
+  if($('proxyStatusBox')){
+    $('proxyStatusBox').className = proxyUrl ? (liveStatus.ok ? 'notice good' : 'notice warn') : 'notice';
+    $('proxyStatusBox').innerHTML = proxyUrl
+      ? `<b>${liveStatus.ok ? '⚡ En vivo activo' : '⚠️ Estado Proxy'}:</b> ${esc(liveStatus.msg)}<br><small>Cotizaciones en caché: <b>${Object.keys(liveQuotes).length}</b> · FX EUR/USD: <b>${getLiveFxMap().merged.USD ? (1/getLiveFxMap().merged.USD).toFixed(4) : '—'}</b></small>`
+      : `ℹ️ <b>Sin proxy configurado:</b> los buscadores buscan en tus ~2.000 empresas guardadas y los precios provienen del último escaneo de GitHub.`;
+  }
   $('remoteUrlInput').value = remoteUrl;
   const dTxt = datasets.daily ? `${datasets.daily.total_ok || datasets.daily.companies.length} emp. · ${fmtVer(datasets.daily.scanner_version)} (${fmtShortDate(datasets.daily.generated_at)})` : 'Pendiente';
   const wTxt = datasets.weekly ? `${datasets.weekly.total_ok || datasets.weekly.companies.length} emp. · ${fmtVer(datasets.weekly.scanner_version)} (${fmtShortDate(datasets.weekly.generated_at)})` : 'Pendiente';
@@ -2152,10 +2651,22 @@ function renderAppView(){
 /* ===========================
    MODAL: INFORME + ORÁCULO v10.5 + SIMULADOR + PLAN 3 TRAMOS
    =========================== */
-function openModal(ticker){
-  const c = findCompany(ticker);
-  if(!c) return;
+function openModal(ticker, skipLiveRefresh = false){
+  const baseC = findCompany(ticker);
+  if(!baseC) return;
+  const eff = getEffectivePrice(baseC);
+  const c = eff.isLive ? { ...baseC, price: eff.price } : baseC;
   const dcf = c.dcf || null;
+  if(!skipLiveRefresh && proxyUrl){
+    const prevQ = liveQuotes[(c.ticker || '').toUpperCase()];
+    if(!prevQ || (Date.now() - (prevQ.fetchedAt || 0)) > 45000){
+      fetchLiveQuotes([c.ticker], true).then(() => {
+        if($('detailModal').classList.contains('show') && $('mTitle').textContent === baseC.name){
+          openModal(c.ticker, true);
+        }
+      });
+    }
+  }
   const fav = isFav(c.ticker);
   const bd = c.score_breakdown || {};
   const warns = c.data_warnings || [];
@@ -2196,7 +2707,7 @@ function openModal(ticker){
 
     <div class="quad-bar ${quad.cls}" style="margin-bottom:10px">
       <span>${quad.icon} Cuadrante: <b>${esc(quad.label)}</b></span>
-      <span style="font-size:10.5px;opacity:.9">${fmtMoney(c.price, c.currency)}${priceEurHint}</span>
+      <span style="font-size:10.5px;opacity:.9">${eff.isLive?'⚡ ':''}${fmtMoney(c.price, c.currency)}${liveChangePill(eff.changePct)}${priceEurHint}</span>
     </div>
 
     ${(c.earnings_days!==null && c.earnings_days!==undefined && c.earnings_days<=10) ? `<div class="notice bad"><b>📅 OJO RESULTADOS PRÓXIMOS:</b> presenta cuentas en <b>${c.earnings_days} días</b> (${esc(c.earnings_date)}). Evita meter todo el capital antes de resultados.</div>` : ''}
@@ -2403,6 +2914,7 @@ async function fetchData(showToast = false){
 
     selectActivePayload();
     renderAll();
+    if(proxyUrl) refreshActiveLivePrices(true);
     if(showToast) toast(payload.is_demo ? 'Sin datos remotos aún (Demo)' : `Sincronizado (${payload.total_ok || payload.companies.length} empresas)`);
   } finally {
     if(btn) setTimeout(() => btn.classList.remove('spinning'), 350);
@@ -2416,7 +2928,7 @@ document.querySelectorAll('#quickChips .fchip').forEach(ch => ch.onclick = () =>
 document.querySelectorAll('[data-quick]').forEach(el => el.onclick = () => { activeFilter = el.dataset.quick; visibleLimit = PAGE_SIZE; renderRadarView(); });
 $('searchInput').oninput = () => { visibleLimit = PAGE_SIZE; renderRadarView(); };
 $('sortSelect').onchange = () => { visibleLimit = PAGE_SIZE; renderRadarView(); };
-$('refreshBtn').onclick = () => { fetchData(true); refreshWorkflowStatus(true); cloudPull(false, false); };
+$('refreshBtn').onclick = () => { fetchData(true); refreshWorkflowStatus(true); cloudPull(false, false); if(proxyUrl) refreshActiveLivePrices(false); };
 $('cloudPill').onclick = () => { if(ghToken) cloudPull(true, true); else switchView('app'); };
 $('goConfigBtn').onclick = () => switchView('app');
 $('heroTitle').onclick = () => {
@@ -2503,9 +3015,113 @@ $('jsonFileInput').onchange = e => {
   fr.readAsText(f);
 };
 
+$('saveProxyBtn').onclick = async () => {
+  const val = $('proxyUrlInput').value.trim().replace(/\/+$/, '');
+  if(!val || !/^https?:\/\//i.test(val)){ toast('Introduce una URL válida (https://...workers.dev)'); return; }
+  proxyUrl = val;
+  localStorage.setItem(STORE.PROXY_URL, proxyUrl);
+  saveLocalUserState(true);
+  await testProxyConnection(true);
+};
+$('clearProxyBtn').onclick = () => {
+  proxyUrl = '';
+  liveQuotes = {};
+  liveFxEur = {};
+  if(livePollTimer){ clearInterval(livePollTimer); livePollTimer = null; }
+  localStorage.removeItem(STORE.PROXY_URL);
+  liveStatus = { ok: false, msg: 'Proxy desactivado: usando último escaneo de GitHub.' };
+  saveLocalUserState(true);
+  renderAll();
+  toast('Proxy en vivo desactivado.');
+};
+
+// Autocompletado automático (>= 2 letras) en TODOS los buscadores de la app
+attachTickerAutocomplete($('searchInput'), {
+  onSelect: (item) => {
+    $('searchInput').value = item.symbol;
+    if(item.inRadar && findCompany(item.symbol)){
+      openModal(item.symbol);
+    } else {
+      openLiveQuickModal(item);
+    }
+  }
+});
+
+attachTickerAutocomplete($('customTickersInput'), {
+  multiComma: true,
+  onSelect: (item) => {
+    const raw = $('customTickersInput').value || '';
+    const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if(parts.length > 0) parts[parts.length - 1] = item.symbol;
+    else parts.push(item.symbol);
+    $('customTickersInput').value = parts.join(', ');
+    $('customTickersInput').focus();
+  }
+});
+
+attachTickerAutocomplete($('portTickerIn'), {
+  onSelect: async (item) => {
+    const sym = item.symbol;
+    $('portTickerIn').value = sym;
+    const selCur = $('portCurIn') ? $('portCurIn').value : 'EUR';
+    let priceToFill = null;
+    let srcCur = item.company?.currency || 'USD';
+
+    if(proxyUrl){
+      toast(`⚡ Cargando precio real de ${sym}…`);
+      await fetchLiveQuotes([sym], true);
+      if(liveQuotes[sym]){
+        priceToFill = liveQuotes[sym].price;
+        srcCur = liveQuotes[sym].currency || srcCur;
+      }
+    }
+    if(priceToFill === null && item.company && Number.isFinite(Number(item.company.price))){
+      priceToFill = Number(item.company.price);
+    }
+    if(priceToFill !== null){
+      const targetCur = selCur !== 'AUTO' ? selCur : srcCur;
+      const conv = convertAmount(priceToFill, srcCur, targetCur);
+      const finalP = (conv.ok && conv.value) ? conv.value : priceToFill;
+      $('portPriceIn').value = finalP.toFixed(2);
+      toast(`⚡ ${sym}: ${finalP.toFixed(2)} ${targetCur} cargado. Pon tus acciones.`);
+    }
+    $('portSharesIn').focus();
+  }
+});
+
+attachTickerAutocomplete($('cmpSearchInput'), {
+  onSelect: (item) => {
+    $('cmpSearchInput').value = '';
+    const found = findCompany(item.symbol);
+    if(found){
+      const sA = $('cmpA');
+      if(sA){
+        if(!Array.from(sA.options).some(o => o.value === found.ticker)){
+          const opt = document.createElement('option');
+          opt.value = found.ticker;
+          opt.textContent = `${found.ticker} — ${(found.name || '').slice(0,22)}`;
+          sA.prepend(opt);
+        }
+        sA.value = found.ticker;
+        sA.dispatchEvent(new Event('change'));
+        toast(`⚖️ ${found.ticker} cargado en el comparador.`);
+      }
+    } else {
+      openLiveQuickModal(item);
+    }
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && proxyUrl && (Date.now() - liveLastUpdate) > 45000){
+    refreshActiveLivePrices(true);
+  }
+});
+
 fetchData(false);
 refreshWorkflowStatus(true);
 if(ghToken) cloudPull(false, false);
+if(proxyUrl) testProxyConnection(false);
 })();
 </script>
 </body>
