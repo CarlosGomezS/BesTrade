@@ -1179,7 +1179,6 @@ def send_fcm_push(
                     },
                 },
             }
-        }
         base_msg[target_kind] = target_val
         message_payload = {"message": base_msg}
         req = urllib.request.Request(
