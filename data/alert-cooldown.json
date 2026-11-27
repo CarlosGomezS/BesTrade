@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-27T20:54:17.988767+00:00",
+  "updated_at": "2026-11-27T21:39:43.903886+00:00",
   "cooldown_days": 7.0,
   "retrigger_drop_pct": 5.0,
   "tickers": {
@@ -13,6 +13,13 @@
     "ADBE": {
       "last_alert_at": "2026-11-27T20:54:17.988767+00:00",
       "last_alert_price": 234.79,
+      "currency": "USD",
+      "tier": "ENTRADA_YA",
+      "count": 1
+    },
+    "EXPE": {
+      "last_alert_at": "2026-11-27T21:39:43.903886+00:00",
+      "last_alert_price": 246.62,
       "currency": "USD",
       "tier": "ENTRADA_YA",
       "count": 1

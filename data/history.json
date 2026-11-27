@@ -1,6 +1,42 @@
 {
-  "updated_at": "2026-11-27T21:32:22.759811+00:00",
+  "updated_at": "2026-11-27T21:39:40.768533+00:00",
   "entries": [
+    {
+      "ticker": "NTES",
+      "name": "NetEase, Inc.",
+      "currency": "USD",
+      "tier": "GANGA",
+      "alert_date": "2026-11-27",
+      "alert_timestamp": "2026-11-27T21:39:40.768533+00:00",
+      "alert_price": 106.85,
+      "quality_score": 100,
+      "ai_verdict": "TEMPORAL",
+      "fundamentals_snapshot": {
+        "piotroski_classic_score": 8,
+        "piotroski_classic_max": 9,
+        "piotroski_adapted_score": 8,
+        "piotroski_adapted_max": 9,
+        "sec_status": "NO_US",
+        "net_debt_ebitda": -3.84,
+        "fcf_latest_date": "2025-12-31",
+        "quadrant": "EXCELENTE_PRECIO_RAZONABLE"
+      },
+      "milestones_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      },
+      "benchmarks": {
+        "msci_world_pct": null,
+        "sp500_pct": null
+      },
+      "status": "ACTIVA",
+      "last_price": 106.85,
+      "return_pct": 0.0,
+      "last_checked": "2026-11-27",
+      "current_status": "GANGA"
+    },
     {
       "ticker": "GDDY",
       "name": "GoDaddy Inc.",
@@ -27,7 +63,7 @@
       },
       "status": "ACTIVA",
       "price_return_pct": -2.0,
-      "last_checked_at": "2026-11-27T21:32:22.759811+00:00",
+      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -47,7 +83,7 @@
       "last_price": 28.17,
       "return_pct": 0.1,
       "last_checked": "2026-11-27",
-      "current_status": "GANGA",
+      "current_status": "MUY_BUENA",
       "milestones_pct": {
         "d30": null,
         "d90": null,
@@ -61,7 +97,7 @@
       },
       "status": "ACTIVA",
       "price_return_pct": 0.1,
-      "last_checked_at": "2026-11-27T21:32:22.759811+00:00",
+      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -95,7 +131,7 @@
       },
       "status": "ACTIVA",
       "price_return_pct": 2.2,
-      "last_checked_at": "2026-11-27T21:32:22.759811+00:00",
+      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -129,7 +165,7 @@
       },
       "status": "ACTIVA",
       "price_return_pct": 0.5,
-      "last_checked_at": "2026-11-27T21:32:22.759811+00:00",
+      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -163,7 +199,7 @@
       },
       "status": "ACTIVA",
       "price_return_pct": 2.1,
-      "last_checked_at": "2026-11-27T21:32:22.759811+00:00",
+      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
