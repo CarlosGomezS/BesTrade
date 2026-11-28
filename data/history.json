@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-27T21:39:40.768533+00:00",
+  "updated_at": "2026-11-28T03:23:47.531782+00:00",
   "entries": [
     {
       "ticker": "NTES",
@@ -28,14 +28,23 @@
         "d365": null
       },
       "benchmarks": {
+        "sp500_pct": null,
         "msci_world_pct": null,
-        "sp500_pct": null
+        "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "last_price": 106.85,
-      "return_pct": 0.0,
-      "last_checked": "2026-11-27",
-      "current_status": "GANGA"
+      "return_pct": -0.0,
+      "last_checked": "2026-11-28",
+      "current_status": "GANGA",
+      "price_return_pct": -0.0,
+      "last_checked_at": "2026-11-28T03:23:47.531782+00:00",
+      "milestone_dates": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      }
     },
     {
       "ticker": "GDDY",
@@ -48,7 +57,7 @@
       "ai_verdict": null,
       "last_price": 103.07,
       "return_pct": -2.0,
-      "last_checked": "2026-11-27",
+      "last_checked": "2026-11-28",
       "current_status": "GANGA",
       "milestones_pct": {
         "d30": null,
@@ -59,11 +68,11 @@
       "benchmarks": {
         "sp500_pct": null,
         "msci_world_pct": null,
-        "benchmark_as_of": "2026-11-27"
+        "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": -2.0,
-      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
+      "last_checked_at": "2026-11-28T03:23:47.531782+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -81,8 +90,8 @@
       "quality_score": 95,
       "ai_verdict": "TEMPORAL",
       "last_price": 28.17,
-      "return_pct": 0.1,
-      "last_checked": "2026-11-27",
+      "return_pct": 0.7,
+      "last_checked": "2026-11-28",
       "current_status": "MUY_BUENA",
       "milestones_pct": {
         "d30": null,
@@ -93,11 +102,11 @@
       "benchmarks": {
         "sp500_pct": null,
         "msci_world_pct": null,
-        "benchmark_as_of": "2026-11-27"
+        "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": 0.1,
-      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
+      "last_checked_at": "2026-11-28T03:23:47.531782+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -116,7 +125,7 @@
       "ai_verdict": "TEMPORAL",
       "last_price": 246.62,
       "return_pct": 2.2,
-      "last_checked": "2026-11-27",
+      "last_checked": "2026-11-28",
       "current_status": "ENTRADA_YA",
       "milestones_pct": {
         "d30": null,
@@ -127,11 +136,11 @@
       "benchmarks": {
         "sp500_pct": null,
         "msci_world_pct": null,
-        "benchmark_as_of": "2026-11-27"
+        "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": 2.2,
-      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
+      "last_checked_at": "2026-11-28T03:23:47.531782+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -150,7 +159,7 @@
       "ai_verdict": "TEMPORAL",
       "last_price": 234.79,
       "return_pct": 0.5,
-      "last_checked": "2026-11-27",
+      "last_checked": "2026-11-28",
       "current_status": "ENTRADA_YA",
       "milestones_pct": {
         "d30": null,
@@ -161,11 +170,11 @@
       "benchmarks": {
         "sp500_pct": 1.6,
         "msci_world_pct": 1.6,
-        "benchmark_as_of": "2026-11-27"
+        "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": 0.5,
-      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
+      "last_checked_at": "2026-11-28T03:23:47.531782+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -184,7 +193,7 @@
       "ai_verdict": "TEMPORAL",
       "last_price": 86.94,
       "return_pct": 2.1,
-      "last_checked": "2026-11-27",
+      "last_checked": "2026-11-28",
       "current_status": "ENTRADA_YA",
       "milestones_pct": {
         "d30": null,
@@ -195,11 +204,11 @@
       "benchmarks": {
         "sp500_pct": 1.6,
         "msci_world_pct": 1.6,
-        "benchmark_as_of": "2026-11-27"
+        "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": 2.1,
-      "last_checked_at": "2026-11-27T21:39:40.768533+00:00",
+      "last_checked_at": "2026-11-28T03:23:47.531782+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
