@@ -4305,9 +4305,14 @@ function renderHistoryView(){
         chips.push(`<span class="bench-chip"${dtHint}>${lbl}: ${valM>=0?'+':''}${valM}%</span>`);
       }
     });
-    const alertPriceDisp = (Number.isFinite(Number(e.alert_price_eur)) && Number(e.alert_price_eur) > 0)
+    const splitF = Number(e.split_factor_since_alert || 1);
+    const baseAlertDisp = (Number.isFinite(Number(e.alert_price_eur)) && Number(e.alert_price_eur) > 0)
       ? `${Number(e.alert_price_eur).toFixed(2)} €`
       : fmtEur(e.alert_price, e.currency);
+    const adjAlertDisp = (splitF !== 1 && Number.isFinite(Number(e.adjusted_alert_price_eur)) && Number(e.adjusted_alert_price_eur) > 0)
+      ? ` (ajust. ${Number(e.adjusted_alert_price_eur).toFixed(2)} €)`
+      : '';
+    const alertPriceDisp = baseAlertDisp + adjAlertDisp;
     const retNote = `${e._baseCur} · ${e._divBonus > 0 ? '+div efec.' : (e._isLive ? 'vivo' : 'precio')}`;
     return `<div class="hist-card">
       <div class="hist-top">
