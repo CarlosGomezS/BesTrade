@@ -1239,7 +1239,7 @@ def fmt_eur(amount: Any, currency: Optional[str]) -> str:
 
 
 def compute_adaptive_stop_profile(r: Dict[str, Any], ref_entry_eur: float) -> Tuple[float, Optional[float], str]:
-    """Calcula Stop Loss adaptativo según sector, volatilidad 52s y soporte técnico."""
+    """Calcula Stop Loss adaptativo según sector, volatilidad 52s y soporte técnico (seguro con datos incompletos)."""
     sec = str(r.get("sector") or "").lower()
     prof = str(r.get("sector_profile") or "").lower()
     if prof == "retail" or any(k in sec for k in ("health", "defensive", "utilities", "staple")):
@@ -1252,7 +1252,8 @@ def compute_adaptive_stop_profile(r: Dict[str, Any], ref_entry_eur: float) -> Tu
     vol_adj = 0.0
     h52 = safe_float(r.get("high_52w"))
     l52 = safe_float(r.get("low_52w"))
-    if h52 and l52 and h52 > l52 > 0:
+    has_range52 = bool(h52 is not None and l52 is not None and h52 > l52 > 0)
+    if has_range52:
         range52 = (h52 - l52) / h52
         if range52 >= 0.45:
             vol_adj = 3.0
@@ -1263,7 +1264,7 @@ def compute_adaptive_stop_profile(r: Dict[str, Any], ref_entry_eur: float) -> Tu
     pct = max(11.0, min(25.0, round(base_pct + vol_adj)))
 
     cur = (r.get("currency") or "USD").upper()
-    low52_eur = to_eur(l52, cur) if (l52 and l52 > 0) else None
+    low52_eur = to_eur(l52, cur) if has_range52 else None
     if low52_eur and ref_entry_eur > 0 and (ref_entry_eur * 0.76 <= low52_eur < ref_entry_eur * 0.94):
         support_stop = low52_eur * 0.97
         sup_pct = abs(((support_stop / ref_entry_eur) - 1.0) * 100.0)
@@ -1271,15 +1272,17 @@ def compute_adaptive_stop_profile(r: Dict[str, Any], ref_entry_eur: float) -> Tu
             return round(sup_pct, 1), support_stop, f"Auto · {tag} + Soporte 52s"
 
     stop_eur = (ref_entry_eur * (1.0 - pct / 100.0)) if ref_entry_eur > 0 else None
-    return pct, stop_eur, f"Auto · {tag}"
+    suffix = "" if has_range52 else " (sin rango 52s)"
+    return pct, stop_eur, f"Auto · {tag}{suffix}"
 
 
 def compute_trade_plan_eur(
     r: Dict[str, Any],
     budget_eur: float = DEFAULT_TRADE_BUDGET_EUR,
     stop_loss_pct: Optional[float] = None,
+    stop_loss_mode: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
-    """Calcula plan operativo en EUR (3 tramos de entrada, Salida 50%/100% y Stop Loss adaptativo)."""
+    """Calcula plan operativo en EUR (3 tramos de entrada, Salida 50%/100% y Stop Loss adaptativo o Solo Tesis)."""
     cur = (r.get("currency") or "USD").upper()
     p_now = to_eur(r.get("price"), cur)
     if p_now is None or p_now <= 0:
@@ -1305,12 +1308,20 @@ def compute_trade_plan_eur(
     exit1_pct = ((exit1 / avg_entry) - 1.0) * 100.0
     exit2_pct = ((exit2 / avg_entry) - 1.0) * 100.0
 
+    mode = (stop_loss_mode or DEFAULT_STOP_LOSS_MODE or "AUTO").strip().upper()
+    is_thesis_only = (mode == "THESIS") and (stop_loss_pct is None)
+
     if stop_loss_pct is not None:
         sl_mult = 1.0 - (max(5.0, min(45.0, float(stop_loss_pct))) / 100.0)
         stop_loss = min(avg_entry * sl_mult, p3 * 0.94)
         sl_reason = f"Manual -{float(stop_loss_pct):.0f}%"
-    elif DEFAULT_STOP_LOSS_MODE != "AUTO" and DEFAULT_STOP_LOSS_MODE.replace(".", "", 1).isdigit():
-        sl_val = float(DEFAULT_STOP_LOSS_MODE)
+    elif is_thesis_only:
+        _, adap_stop, _ = compute_adaptive_stop_profile(r, avg_entry)
+        base_sl = adap_stop if adap_stop is not None else (avg_entry * 0.83)
+        stop_loss = min(base_sl, p3 * 0.94)
+        sl_reason = "Solo Tesis (Ref. técnica)"
+    elif mode != "AUTO" and mode.replace(".", "", 1).isdigit():
+        sl_val = float(mode)
         sl_mult = 1.0 - (max(5.0, min(45.0, sl_val)) / 100.0)
         stop_loss = min(avg_entry * sl_mult, p3 * 0.94)
         sl_reason = f"Manual -{sl_val:.0f}%"
@@ -1338,6 +1349,7 @@ def compute_trade_plan_eur(
         "stop_loss": round(stop_loss, 2),
         "stop_loss_pct": round(stop_loss_pct_calc, 1),
         "sl_reason": sl_reason,
+        "stop_loss_mode": "THESIS" if is_thesis_only else "TACTICAL",
         "in_buy_zone": 1.0 if in_buy_zone else 0.0,
     }
 
@@ -1879,6 +1891,30 @@ def _max_drawdown_after_alert_pct(ticker: str, init_price: float, alert_date_str
     return None
 
 
+def _max_gain_after_alert_pct(ticker: str, init_price: float, alert_date_str: str) -> Optional[float]:
+    """Calcula la máxima subida porcentual (MFE) alcanzada desde la fecha de alerta respecto al precio de entrada."""
+    if init_price <= 0:
+        return None
+    try:
+        d0 = datetime.strptime(alert_date_str[:10], "%Y-%m-%d")
+        h = yf.Ticker(ticker).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=False)
+        if h is None or h.empty:
+            return None
+        col = "High" if "High" in h else ("Close" if "Close" in h else None)
+        if not col:
+            return None
+        vals = h[col].dropna()
+        if vals.empty:
+            return None
+        max_p = safe_float(vals.max())
+        if max_p is not None and max_p > 0:
+            gain = ((max_p / init_price) - 1.0) * 100.0
+            return round(max(0.0, gain), 1)
+    except Exception:
+        return None
+    return None
+
+
 def _total_return_with_dividends_pct(ticker: str, init_price: float, cur_price: float, alert_date_str: str) -> float:
     """Calcula rentabilidad total % incluyendo dividendos pagados desde alert_date_str."""
     base_ret = ((cur_price / init_price) - 1.0) * 100.0
@@ -1942,6 +1978,10 @@ def update_alert_history(results: List[Dict[str, Any]]) -> None:
             if mdd_pct is not None:
                 prev_mdd = safe_float(entry.get("max_drawdown_after_alert_pct"))
                 entry["max_drawdown_after_alert_pct"] = min(mdd_pct, prev_mdd) if prev_mdd is not None else mdd_pct
+            mfe_pct = _max_gain_after_alert_pct(tkr, init_p, alert_d)
+            if mfe_pct is not None:
+                prev_mfe = safe_float(entry.get("max_gain_after_alert_pct"))
+                entry["max_gain_after_alert_pct"] = max(mfe_pct, prev_mfe) if prev_mfe is not None else mfe_pct
             entry["last_checked"] = today
             entry["last_checked_at"] = now_iso
             if rec:
@@ -2008,7 +2048,10 @@ def update_alert_history(results: List[Dict[str, Any]]) -> None:
                 "benchmarks": {"msci_world_pct": None, "sp500_pct": None},
                 "status": "ACTIVA",
                 "last_price": r["price"],
+                "price_return_pct": 0.0,
                 "return_pct": 0.0,
+                "max_drawdown_after_alert_pct": 0.0,
+                "max_gain_after_alert_pct": 0.0,
                 "last_checked": today,
                 "current_status": tier,
             })
