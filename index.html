@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<title>Cocodrilo Pro v10.11 — EUR + Plan Operativo</title>
+<title>Cocodrilo Pro v11.0 — Gestor Patrimonial EUR</title>
 <style>
 :root{
   --bg:#000000;
@@ -998,6 +998,73 @@ input.finput:focus,select.finput:focus{border-color:var(--accent);box-shadow:0 0
   .pcell small{font-size:8.5px}
 }
 
+/* V11.0 GESTOR PATRIMONIAL (RIESGO · ASIGNADOR · AGENDA · AUDITOR · SIMULADOR) */
+.risk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0}
+@media(max-width:440px){.risk-grid{grid-template-columns:1fr 1fr}}
+.rcell{background:var(--surface-solid);border:1px solid var(--line);border-radius:12px;padding:9px 10px}
+.rcell span{display:block;font-size:9.2px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.rcell b{display:block;font-size:15px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums;color:#ffffff}
+.rcell small{display:block;font-size:9.5px;color:var(--muted);margin-top:2px}
+.rcell.warn{border-color:rgba(234,179,8,.35);background:rgba(234,179,8,.06)}
+.rcell.warn b{color:#fde047}
+.rcell.bad{border-color:rgba(244,63,94,.38);background:rgba(244,63,94,.07)}
+.rcell.bad b{color:#fda4af}
+.rcell.good{border-color:rgba(34,197,94,.32);background:rgba(34,197,94,.06)}
+.rcell.good b{color:#4ade80}
+.bar-row{margin-bottom:8px}
+.bar-row:last-child{margin-bottom:0}
+.bar-head{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;margin-bottom:4px;gap:8px}
+.bar-head b{font-variant-numeric:tabular-nums}
+.bar-track{height:6px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#2563eb,#60a5fa)}
+.bar-fill.warn{background:linear-gradient(90deg,#ca8a04,#facc15)}
+.bar-fill.bad{background:linear-gradient(90deg,#e11d48,#fb7185)}
+.stress-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.scell{background:#070a10;border:1px solid var(--line);border-radius:10px;padding:8px 7px;text-align:center}
+.scell span{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.scell b{display:block;font-size:13px;font-weight:800;margin-top:2px;color:#fda4af;font-variant-numeric:tabular-nums}
+.scell small{display:block;font-size:9px;color:var(--muted);margin-top:1px}
+.alloc-card{
+  background:radial-gradient(280px 150px at 95% -10%,rgba(59,130,246,.20),transparent 70%),#090d16;
+  border:1px solid rgba(59,130,246,.32);border-radius:16px;padding:13px;margin-top:8px;
+}
+.alloc-verdict{font-size:15px;font-weight:800;color:#ffffff;margin:5px 0 4px;letter-spacing:-.015em}
+.alloc-alts{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.alloc-alt{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;
+  padding:7px 9px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid var(--line);cursor:pointer;
+}
+.alloc-alt:active{background:rgba(59,130,246,.12)}
+.ev-item{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer;
+}
+.ev-item:last-child{border-bottom:0;padding-bottom:0}
+.aud-tbl{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
+.aud-tbl th,.aud-tbl td{padding:7px 5px;border-bottom:1px solid var(--line);text-align:center;font-variant-numeric:tabular-nums}
+.aud-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:750}
+.aud-tbl th:first-child,.aud-tbl td:first-child{text-align:left}
+.aud-tbl tr:last-child td{border-bottom:0}
+details.collap-panel{
+  background:var(--surface);border:1px solid var(--line);border-radius:20px;
+  padding:14px 17px;margin-bottom:13px;box-shadow:var(--shadow-card);
+}
+details.collap-panel summary{
+  list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;
+  font-weight:800;font-size:15px;color:#ffffff;
+}
+details.collap-panel summary::-webkit-details-marker{display:none}
+.collap-chev{color:var(--accent-soft);font-size:12px;font-weight:800;transition:transform .18s}
+details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
+.wealth-svg{width:100%;height:190px;display:block;border-radius:13px;background:#05070b;border:1px solid var(--line);margin-top:10px}
+.sim-pills{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
+@media(max-width:540px){
+  details.collap-panel{padding:12px 13px;border-radius:17px;margin-bottom:10px}
+  .rcell b{font-size:13.5px}
+  .stress-row{gap:5px}
+  .scell b{font-size:12px}
+}
+
 /* FIREBASE PUSH TOKEN BOX */
 .fcm-token-box{
   display:none;margin-top:8px;padding:9px 11px;border-radius:11px;
@@ -1015,7 +1082,7 @@ input.finput:focus,select.finput:focus{border-color:var(--accent);box-shadow:0 0
       <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v10.11</span></small>
+        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v11.0</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -1195,10 +1262,32 @@ input.finput:focus,select.finput:focus{border-color:var(--accent);box-shadow:0 0
       </div>
     </div>
 
+    <div class="panel" id="smartAllocatorPanel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div>
+          <div class="eyebrow">Gestor inteligente · Rebalanceo sin vender</div>
+          <h3 style="margin:3px 0 0">Dónde meter tu próxima aportación</h3>
+        </div>
+        <span class="pill blue" id="allocBudgetPill">80 €</span>
+      </div>
+      <div id="smartAllocatorHost" style="margin-top:8px"></div>
+    </div>
+
+    <div class="panel" id="riskControlPanel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div>
+          <div class="eyebrow">Centro de control de riesgo</div>
+          <h3 style="margin:3px 0 0">Exposición, Concentración y Estrés</h3>
+        </div>
+        <span class="pill blue" id="riskStatusPill">Sano</span>
+      </div>
+      <div id="riskControlHost" style="margin-top:8px"></div>
+    </div>
+
     <div class="panel">
       <div class="eyebrow">Control de compras con conversión FX real</div>
       <h3 style="margin:4px 0 6px">Mi Cartera</h3>
-      <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">Escribe 2 letras del ticker o empresa: la app carga su <b>precio realista actual</b> convertido a tu divisa automáticamente y recalcula tu rentabilidad en tiempo real.</p>
+      <p style="margin:0 0 10px;font-size:12px;color:var(--muted)">Todo convertido a <b>euros (€)</b> como en Trade Republic: busca cualquier acción (2+ letras), registra tus compras y controla tu precio de salida (50% y 100%) y tu Stop Loss en vivo.</p>
       <div class="port-form">
         <div class="ac-wrap"><input class="finput" id="portTickerIn" autocomplete="off" placeholder="Buscar (2+ letras)"></div>
         <input class="finput" id="portPriceIn" type="number" step="0.01" placeholder="Precio medio">
@@ -1209,6 +1298,37 @@ input.finput:focus,select.finput:focus{border-color:var(--accent);box-shadow:0 0
       <div id="portfolioSummary"></div>
       <div id="portfolioHost" style="margin-top:10px"></div>
     </div>
+
+    <div class="panel" id="calendarEventsPanel">
+      <div class="eyebrow">Agenda de Cartera y Favoritas</div>
+      <h3 style="margin:4px 0 6px">Resultados próximos, Insiders y Dividendos</h3>
+      <div id="calendarEventsHost"></div>
+    </div>
+
+    <details class="collap-panel" id="wealthSimPanel">
+      <summary>
+        <span><small class="eyebrow" style="display:block;margin-bottom:2px">Interés compuesto · 5 a 20 años</small>Simulador de Patrimonio en EUR</span>
+        <span class="collap-chev">▼</span>
+      </summary>
+      <div style="margin-top:11px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label class="flabel" style="margin-top:0">Aportación mensual (€)</label>
+            <input class="finput" id="wsMonthlyIn" type="number" min="10" step="10" value="80" style="height:36px">
+          </div>
+          <div>
+            <label class="flabel" style="margin-top:0">Horizonte (años)</label>
+            <select class="finput" id="wsYearsSel" style="height:36px">
+              <option value="5">5 años</option>
+              <option value="10" selected>10 años</option>
+              <option value="15">15 años</option>
+              <option value="20">20 años</option>
+            </select>
+          </div>
+        </div>
+        <div id="wealthSimHost"></div>
+      </div>
+    </details>
 
     <div class="panel">
       <div class="eyebrow">Sincronizado con la nube privada</div>
@@ -1279,6 +1399,11 @@ input.finput:focus,select.finput:focus{border-color:var(--accent);box-shadow:0 0
         <div class="kpi y"><span><i class="kdot y"></i>Media</span><strong id="hAvgRet">—</strong></div>
       </div>
       <div id="histAlphaBox" style="margin-top:10px"></div>
+    </div>
+    <div class="panel" id="signalAuditorPanel">
+      <div class="eyebrow">Rendimiento real por tipo de señal y Score</div>
+      <h3 style="margin:4px 0 4px">Auditor de Estrategia</h3>
+      <div id="signalAuditorHost"></div>
     </div>
     <div class="panel" id="histListHost"></div>
   </section>
@@ -1450,12 +1575,13 @@ const STORE = {
   AGENT_CHAT: 'cocodriloApp.agentChat.v10',
   AGENT_MEMORY: 'cocodriloApp.agentMemory.v10',
   FCM_TOKEN: 'cocodriloApp.fcmToken.v10',
-  FCM_APK_TAG: 'cocodriloApp.fcmApkTag.v10'
+  FCM_APK_TAG: 'cocodriloApp.fcmApkTag.v10',
+  STOP_LOSS_PCT: 'cocodriloApp.stopLossPct.v10'
 };
 const DB_FILE = 'user-db.json';
 const WORKFLOWS = { daily: 'cocodrilo-diario.yml', weekly: 'cocodrilo-semanal-1000.yml', intraday: 'cocodrilo-intradia.yml' };
 const PAGE_SIZE = 40;
-const FALLBACK_FX_EUR = { EUR: 1.0, USD: 0.94, GBP: 1.19, CHF: 1.07, CAD: 0.67, JPY: 0.0061 };
+const FALLBACK_FX_EUR = { EUR: 1.0, USD: 0.94, GBP: 1.19, CHF: 1.07, CAD: 0.67, JPY: 0.0061, SEK: 0.087, NOK: 0.085, DKK: 0.134, HKD: 0.121, AUD: 0.61 };
 
 const DEMO_PAYLOAD = {
   is_demo: true,
@@ -1539,6 +1665,7 @@ let favs = readJSON(STORE.FAVS, []);
 let notes = readJSON(STORE.NOTES, {});
 let portfolio = readJSON(STORE.PORTFOLIO, []);
 let cashPot = Number(localStorage.getItem(STORE.CASH_POT) || '0');
+let stopLossMode = (localStorage.getItem(STORE.STOP_LOSS_PCT) || 'AUTO').trim().toUpperCase();
 let checks = readJSON(STORE.CHECKS, {});
 let localUpdatedAt = Number(localStorage.getItem(STORE.UPDATED_AT) || '0');
 let remoteUrl = localStorage.getItem(STORE.REMOTE_URL) || '';
@@ -2127,10 +2254,11 @@ async function openLiveQuickModal(item){
 
   const eurConv = convertAmount(q.price, q.currency, 'EUR');
   const priceEur = (eurConv.ok && eurConv.value) ? eurConv.value : q.price;
-  const origNote = (q.currency && q.currency.toUpperCase() !== 'EUR') ? `Divisa origen: ${fmtMoney(q.price, q.currency)} (FX en vivo)` : 'Cotiza directamente en EUR';
+  const origNote = (q.currency && q.currency.toUpperCase() !== 'EUR') ? 'Convertido a EUR (FX en vivo)' : 'Cotiza directamente en EUR';
   const dd52 = (q.high52w && q.high52w > 0) ? (((q.price / q.high52w) - 1) * 100).toFixed(1) : null;
   const quickTp = priceEur * 1.25;
-  const quickSl = priceEur * 0.82;
+  const quickSlPct = stopLossMode === 'AUTO' ? 18 : (Number(stopLossMode) || 18);
+  const quickSl = priceEur * (1 - quickSlPct / 100);
 
   $('mSub').textContent = `${sym} · ${q.exchange || item.exchange || 'Mercado Global'}${item.sector ? ' · ' + item.sector : ''}`;
   $('mTitle').textContent = q.name || item.name || sym;
@@ -2151,7 +2279,7 @@ async function openLiveQuickModal(item){
       <div class="plan-strip">
         <div class="pcell in"><span>Entrada ref.</span><b>${priceEur.toFixed(2)} €</b><small>Tramo 1 (35%)</small></div>
         <div class="pcell out"><span>Salida (+25%)</span><b>${quickTp.toFixed(2)} €</b><small>Referencia rápida</small></div>
-        <div class="pcell sl"><span>Stop Loss (-18%)</span><b>${quickSl.toFixed(2)} €</b><small>Protección</small></div>
+        <div class="pcell sl"><span>Stop Loss (-${quickSlPct}%)</span><b>${quickSl.toFixed(2)} €</b><small>Protección</small></div>
       </div>
     </div>
 
@@ -2212,16 +2340,53 @@ function toEur(v, cur){
   const src = (cur || 'EUR').toUpperCase();
   if(src === 'EUR') return num;
   const conv = convertAmount(num, src, 'EUR');
-  return (conv.ok && Number.isFinite(conv.value)) ? conv.value : num;
+  return (conv.ok && Number.isFinite(conv.value)) ? conv.value : null;
 }
 
 function fmtEur(v, cur){
+  if(v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
   const eur = toEur(v, cur);
-  if(eur === null || !Number.isFinite(eur)) return '—';
-  return `${eur.toFixed(2)} €`;
+  if(eur !== null && Number.isFinite(eur)) return `${eur.toFixed(2)} €`;
+  const src = (cur || '').toUpperCase();
+  return `${Number(v).toFixed(2)} ${src} (sin FX)`.trim();
 }
 
-function computeTradePlanEur(c, budgetInput = null, customEntryEur = null){
+function computeAdaptiveStopProfile(c, refEntryEur){
+  const sec = String(c?.sector || '').toLowerCase();
+  const prof = String(c?.sector_profile || '').toLowerCase();
+  let basePct = 17;
+  let tag = 'Estándar';
+  if(prof === 'retail' || sec.includes('health') || sec.includes('defensive') || sec.includes('utilities') || sec.includes('staple')){
+    basePct = 14; tag = 'Defensivo';
+  } else if(prof === 'tech' || sec.includes('tech') || sec.includes('communication') || sec.includes('semiconductor')){
+    basePct = 20; tag = 'Tech/Volátil';
+  }
+
+  let volAdj = 0;
+  const h52 = Number(c?.high_52w), l52 = Number(c?.low_52w);
+  if(Number.isFinite(h52) && Number.isFinite(l52) && h52 > 0 && l52 > 0 && h52 > l52){
+    const range52 = (h52 - l52) / h52;
+    if(range52 >= 0.45) volAdj = 3;
+    else if(range52 >= 0.35) volAdj = 1.5;
+    else if(range52 <= 0.22) volAdj = -2;
+  }
+  const pct = Math.max(11, Math.min(25, Math.round(basePct + volAdj)));
+
+  // Anclaje a soporte de mínimo 52 semanas (-3% debajo del mínimo si está en rango razonable)
+  const cur = (c?.currency || 'USD').toUpperCase();
+  const low52Eur = (Number.isFinite(l52) && l52 > 0) ? toEur(l52, cur) : null;
+  let supportStopEur = null;
+  if(low52Eur && refEntryEur > 0 && low52Eur < refEntryEur * 0.94 && low52Eur >= refEntryEur * 0.76){
+    supportStopEur = low52Eur * 0.97;
+    const supPct = Math.abs(((supportStopEur / refEntryEur) - 1) * 100);
+    if(supPct >= 10 && supPct <= 26){
+      return { pct: Math.round(supPct), stopEur: supportStopEur, reason: `Auto · ${tag} + Soporte 52s` };
+    }
+  }
+  return { pct, stopEur: refEntryEur > 0 ? refEntryEur * (1 - pct / 100) : null, reason: `Auto · ${tag}` };
+}
+
+function computeTradePlanEur(c, budgetInput = null, customEntryEur = null, slModeInput = null){
   if(!c) return null;
   const cur = (c.currency || 'USD').toUpperCase();
   const pNowEur = toEur(c.price, cur);
@@ -2232,13 +2397,25 @@ function computeTradePlanEur(c, budgetInput = null, customEntryEur = null){
   const bearEur = dcf && dcf.intrinsic_bear ? toEur(dcf.intrinsic_bear, cur) : null;
   const buyObjEur = dcf && dcf.target_price ? toEur(dcf.target_price, cur) : null;
 
-  const defaultBudget = cashPot >= 80 ? Math.round(cashPot) : 240;
-  const budget = (budgetInput !== null && Number.isFinite(Number(budgetInput)) && Number(budgetInput) >= 20)
-    ? Number(budgetInput)
-    : defaultBudget;
-
   const isPosition = customEntryEur !== null && Number.isFinite(Number(customEntryEur)) && Number(customEntryEur) > 0;
-  const p1 = isPosition ? Number(customEntryEur) : pNowEur;
+  let budget = 80;
+  let isSimulatedBudget = false;
+  let exceedsCashPot = false;
+  if(budgetInput !== null && Number.isFinite(Number(budgetInput)) && Number(budgetInput) >= 10){
+    budget = Number(budgetInput);
+    exceedsCashPot = !isPosition && budget > Math.max(0, cashPot) + 0.01;
+  } else if(!isPosition && cashPot >= 10){
+    budget = Math.round(cashPot);
+  } else {
+    budget = 80;
+    isSimulatedBudget = !isPosition;
+    exceedsCashPot = !isPosition && cashPot < 80;
+  }
+
+  const inBuyZone = c.status === 'OPORTUNIDAD' || (buyObjEur !== null && pNowEur <= buyObjEur);
+  const p1 = isPosition
+    ? Number(customEntryEur)
+    : (inBuyZone ? pNowEur : ((buyObjEur && buyObjEur < pNowEur) ? buyObjEur : pNowEur));
   const p2 = (bearEur && bearEur < p1 * 0.96 && bearEur > p1 * 0.55) ? bearEur : (p1 * 0.88);
   const p3 = p2 * 0.88;
 
@@ -2246,7 +2423,7 @@ function computeTradePlanEur(c, budgetInput = null, customEntryEur = null){
   const s1 = p1 > 0 ? m1 / p1 : 0;
   const s2 = p2 > 0 ? m2 / p2 : 0;
   const s3 = p3 > 0 ? m3 / p3 : 0;
-  const totalShares = s1 + s2 + s3;
+  const totalShares = isPosition ? (budget / p1) : (s1 + s2 + s3);
   const avgEntryEur = isPosition ? Number(customEntryEur) : (totalShares > 0 ? budget / totalShares : p1);
 
   const exit1Eur = (baseEur && baseEur > avgEntryEur * 1.15) ? baseEur : (avgEntryEur * 1.25);
@@ -2254,24 +2431,38 @@ function computeTradePlanEur(c, budgetInput = null, customEntryEur = null){
   const exit1Pct = ((exit1Eur / avgEntryEur) - 1) * 100;
   const exit2Pct = ((exit2Eur / avgEntryEur) - 1) * 100;
 
-  const stopLossEur = isPosition
-    ? (avgEntryEur * 0.82)
-    : Math.min(avgEntryEur * 0.82, p3 * 0.92);
-  const stopLossPct = ((stopLossEur / avgEntryEur) - 1) * 100;
+  const mode = String(slModeInput ?? stopLossMode ?? 'AUTO').trim().toUpperCase();
+  let stopLossEur;
+  let slReason;
+  let slPctTarget;
+  if(mode === 'AUTO' || !Number.isFinite(Number(mode))){
+    const adap = computeAdaptiveStopProfile(c, avgEntryEur);
+    slPctTarget = adap.pct;
+    slReason = adap.reason;
+    const baseSlEur = adap.stopEur || (avgEntryEur * (1 - adap.pct / 100));
+    stopLossEur = isPosition ? baseSlEur : Math.min(baseSlEur, p3 * 0.94);
+  } else {
+    slPctTarget = Math.max(5, Math.min(45, Number(mode)));
+    slReason = `Manual -${slPctTarget}%`;
+    const baseSlEur = avgEntryEur * (1 - slPctTarget / 100);
+    stopLossEur = isPosition ? baseSlEur : Math.min(baseSlEur, p3 * 0.94);
+  }
+  const stopLossPctCalc = ((stopLossEur / avgEntryEur) - 1) * 100;
   const stopLossFromNowPct = ((stopLossEur / pNowEur) - 1) * 100;
 
   const blendedExitEur = (exit1Eur * 0.5) + (exit2Eur * 0.5);
   const estProfitEur = (blendedExitEur - avgEntryEur) * totalShares;
-  const maxRiskEur = Math.max(0, (avgEntryEur - stopLossEur) * totalShares);
-
-  const inBuyZone = c.status === 'OPORTUNIDAD' || (buyObjEur !== null && pNowEur <= buyObjEur);
+  const maxRiskEur = Math.max(0.01, (avgEntryEur - stopLossEur) * totalShares);
+  const riskReward = estProfitEur > 0 ? (estProfitEur / maxRiskEur) : 0;
 
   return {
     pNowEur, baseEur, bearEur, buyObjEur,
-    budget, m1, m2, m3, p1, p2, p3, s1, s2, s3, totalShares,
+    budget, isSimulatedBudget, exceedsCashPot,
+    slPct: slPctTarget, slReason,
+    m1, m2, m3, p1, p2, p3, s1, s2, s3, totalShares,
     avgEntryEur, exit1Eur, exit2Eur, exit1Pct, exit2Pct,
-    stopLossEur, stopLossPct, stopLossFromNowPct,
-    estProfitEur, maxRiskEur, inBuyZone, isPosition
+    stopLossEur, stopLossPct: stopLossPctCalc, stopLossFromNowPct,
+    estProfitEur, maxRiskEur, riskReward, inBuyZone, isPosition
   };
 }
 
@@ -2792,13 +2983,13 @@ function cardHTML(rawC, includeNote = false){
       ${(() => {
         const pl = computeTradePlanEur(c);
         if(!pl) return '';
-        const inLbl = pl.inBuyZone ? `Entrar (${pl.m1.toFixed(0)}€)` : 'Esperar ≤';
+        const inLbl = pl.inBuyZone ? (pl.isSimulatedBudget ? 'Simul. T1 (Bote 0€)' : `Entrar (${pl.m1.toFixed(0)}€)`) : 'Esperar ≤';
         const inVal = pl.inBuyZone ? `${pl.p1.toFixed(2)} €` : (pl.buyObjEur ? `${pl.buyObjEur.toFixed(2)} €` : `${pl.p1.toFixed(2)} €`);
-        const inSub = pl.inBuyZone ? `35% de ${pl.budget.toFixed(0)}€` : `Hoy ${pl.pNowEur.toFixed(2)}€`;
+        const inSub = pl.inBuyZone ? (pl.isSimulatedBudget ? `Ej. ${pl.m1.toFixed(0)}€ de 80€` : `35% de tu bote`) : `Hoy ${pl.pNowEur.toFixed(2)}€`;
         return `<div class="plan-strip">
           <div class="pcell in"><span>${inLbl}</span><b>${inVal}</b><small>${inSub}</small></div>
           <div class="pcell out"><span>Salida (TP)</span><b>${pl.exit1Eur.toFixed(2)} €</b><small>+${pl.exit1Pct.toFixed(0)}% · Total ${pl.exit2Eur.toFixed(0)}€</small></div>
-          <div class="pcell sl"><span>Stop Loss</span><b>${pl.stopLossEur.toFixed(2)} €</b><small>${pl.stopLossPct.toFixed(0)}% vs medio</small></div>
+          <div class="pcell sl"><span>Stop Loss</span><b>${pl.stopLossEur.toFixed(2)} €</b><small>${pl.stopLossPct.toFixed(0)}% · ${pl.slReason.split('·')[0].trim()}</small></div>
         </div>`;
       })()}
     </div>
@@ -2944,26 +3135,33 @@ function computePositionView(pos){
   const isLive = !!(lq && Number.isFinite(Number(lq.price)) && lq.price > 0);
   const changePct = isLive && Number.isFinite(Number(lq.changePct)) ? Number(lq.changePct) : null;
 
-  const avgPriceEur = toEur(pos.avgPrice, posCur) ?? pos.avgPrice;
-  const curPriceEur = rawNativePrice !== null ? (toEur(rawNativePrice, stockCur) ?? avgPriceEur) : avgPriceEur;
+  const avgConv = toEur(pos.avgPrice, posCur);
+  const curConv = rawNativePrice !== null ? toEur(rawNativePrice, stockCur) : avgConv;
+  const fxMissing = (avgConv === null) || (rawNativePrice !== null && curConv === null);
 
-  const costEur = avgPriceEur * pos.shares;
-  const valEur = curPriceEur * pos.shares;
-  const pnlEur = valEur - costEur;
-  const pnlPct = avgPriceEur > 0 ? ((curPriceEur / avgPriceEur) - 1) * 100 : 0;
+  const avgPriceEur = avgConv !== null ? avgConv : null;
+  const curPriceEur = curConv !== null ? curConv : avgPriceEur;
+
+  const costEur = avgPriceEur !== null ? (avgPriceEur * pos.shares) : null;
+  const valEur = curPriceEur !== null ? (curPriceEur * pos.shares) : null;
+  const pnlEur = (valEur !== null && costEur !== null) ? (valEur - costEur) : null;
+  const pnlPct = (avgPriceEur && curPriceEur && avgPriceEur > 0) ? ((curPriceEur / avgPriceEur) - 1) * 100 : 0;
 
   const liveComp = c ? { ...c, price: rawNativePrice ?? c.price } : null;
-  const plan = liveComp ? computeTradePlanEur(liveComp, costEur, avgPriceEur) : null;
-  const exit1Eur = plan ? plan.exit1Eur : (avgPriceEur * 1.25);
-  const exit2Eur = plan ? plan.exit2Eur : (avgPriceEur * 1.45);
-  const stopLossEur = plan ? plan.stopLossEur : (avgPriceEur * 0.82);
+  const plan = (liveComp && avgPriceEur && costEur) ? computeTradePlanEur(liveComp, costEur, avgPriceEur) : null;
+  const fallbackSlPct = stopLossMode === 'AUTO' ? 17 : (Number(stopLossMode) || 18);
+  const exit1Eur = plan ? plan.exit1Eur : (avgPriceEur ? avgPriceEur * 1.25 : null);
+  const exit2Eur = plan ? plan.exit2Eur : (avgPriceEur ? avgPriceEur * 1.45 : null);
+  const stopLossEur = plan ? plan.stopLossEur : (avgPriceEur ? avgPriceEur * (1 - fallbackSlPct / 100) : null);
+  const stopLossPctVal = plan ? Math.abs(Math.round(plan.stopLossPct)) : fallbackSlPct;
+  const slReason = plan ? plan.slReason : `Auto -${fallbackSlPct}%`;
 
   const sig = evaluatePortfolioSignal(pos, liveComp, pnlPct, { curPriceEur, exit1Eur, exit2Eur, stopLossEur });
 
   return {
-    c, lq, isLive, changePct, rawNativePrice, posCur: 'EUR', origPosCur: posCur, stockCur,
+    c, lq, isLive, changePct, rawNativePrice, posCur: 'EUR', origPosCur: posCur, stockCur, fxMissing,
     avgPriceEur, curPriceEur, costEur, valEur, pnlEur, pnlPct,
-    exit1Eur, exit2Eur, stopLossEur, sig
+    exit1Eur, exit2Eur, stopLossEur, stopLossPctVal, slReason, sig
   };
 }
 
@@ -3144,9 +3342,380 @@ function renderMapView(){
 }
 
 /* ===========================
+   V11.0 MÓDULOS DE GESTIÓN PATRIMONIAL (RIESGO · ASIGNADOR · AGENDA · SIMULADOR)
+   =========================== */
+function analyzePortfolioRisk(){
+  const items = portfolio.map(pos => {
+    const pv = computePositionView(pos);
+    const sec = pv.c?.sector || 'Sin clasificar';
+    const isTechAi = /tech|semiconductor|communication|software/i.test(sec + ' ' + (pv.c?.industry || ''));
+    return { pos, pv, sector: sec, isTechAi };
+  });
+  const valid = items.filter(x => x.pv.valEur !== null && x.pv.valEur > 0);
+  const totalValEur = valid.reduce((a, x) => a + x.pv.valEur, 0);
+  const totalCostEur = valid.reduce((a, x) => a + (x.pv.costEur || 0), 0);
+  const totalPatrimonyEur = totalValEur + Math.max(0, cashPot);
+  const investedPct = totalPatrimonyEur > 0 ? (totalValEur / totalPatrimonyEur) * 100 : 0;
+
+  const byPos = valid.map(x => ({
+    ticker: x.pos.ticker,
+    name: x.pv.c?.name || x.pv.lq?.name || x.pos.ticker,
+    valEur: x.pv.valEur,
+    weightPct: totalValEur > 0 ? (x.pv.valEur / totalValEur) * 100 : 0,
+    sector: x.sector,
+    stockCur: x.pv.stockCur,
+    stopRiskEur: (x.pv.stopLossEur && x.pv.curPriceEur > x.pv.stopLossEur)
+      ? (x.pv.curPriceEur - x.pv.stopLossEur) * x.pos.shares : 0
+  })).sort((a, b) => b.weightPct - a.weightPct);
+
+  const secMap = {};
+  const curMap = {};
+  let techAiEur = 0;
+  let totalStopRiskEur = 0;
+  byPos.forEach(p => {
+    secMap[p.sector] = (secMap[p.sector] || 0) + p.valEur;
+    curMap[p.stockCur] = (curMap[p.stockCur] || 0) + p.valEur;
+    totalStopRiskEur += p.stopRiskEur;
+  });
+  valid.forEach(x => { if(x.isTechAi) techAiEur += x.pv.valEur; });
+
+  const bySector = Object.entries(secMap)
+    .map(([name, valEur]) => ({ name, valEur, pct: totalValEur > 0 ? (valEur / totalValEur) * 100 : 0 }))
+    .sort((a, b) => b.pct - a.pct);
+  const techAiPct = totalValEur > 0 ? (techAiEur / totalValEur) * 100 : 0;
+  const usdExposurePct = totalValEur > 0 ? ((curMap['USD'] || 0) / totalValEur) * 100 : 0;
+  const maxPos = byPos[0] || null;
+  const maxSec = bySector[0] || null;
+
+  const warnings = [];
+  if(maxPos && maxPos.weightPct > 25) warnings.push(`Concentración alta en ${maxPos.ticker} (${maxPos.weightPct.toFixed(0)}% > 25%).`);
+  if(maxSec && maxSec.pct > 40) warnings.push(`Sobreexposición al sector ${maxSec.name} (${maxSec.pct.toFixed(0)}% > 40%).`);
+  if(techAiPct > 45) warnings.push(`Exposición Tech/IA elevada (${techAiPct.toFixed(0)}%): riesgo de correlación en caídas de tipos/IA.`);
+  if(usdExposurePct > 75 && valid.length >= 2) warnings.push(`Alta exposición a divisa USD (${usdExposurePct.toFixed(0)}%): sensible al cambio EUR/USD.`);
+  if(valid.length > 0 && valid.length < 4) warnings.push(`Cartera con solo ${valid.length} posición(es): diversificar progresivamente hasta 5–10 negocios.`);
+
+  let level = 'good';
+  if(warnings.some(w => w.includes('> 25%') || w.includes('> 40%') || w.includes('Tech/IA'))) level = 'bad';
+  else if(warnings.length > 0) level = 'warn';
+
+  return {
+    items, valid, totalValEur, totalCostEur, totalPatrimonyEur, investedPct,
+    byPos, bySector, techAiPct, usdExposurePct, maxPos, maxSec,
+    stress15Eur: totalValEur * 0.15,
+    stress25Eur: totalValEur * 0.25,
+    totalStopRiskEur,
+    warnings, level
+  };
+}
+
+function computeSmartAllocation(risk){
+  const realCash = Math.max(0, Number(cashPot) || 0);
+  const isSim = realCash < 10;
+  const amount = isSim ? 80 : Math.round(realCash);
+  const newTotalVal = risk.totalValEur + amount;
+  const posMap = new Map(risk.byPos.map(p => [p.ticker.toUpperCase(), p]));
+  const secPctMap = new Map(risk.bySector.map(s => [s.name, s.pct]));
+
+  const candidates = [];
+  const allLive = (payload.companies || []).map(getLiveCompanyView);
+
+  // 1) Evaluar ampliación de posiciones existentes en cartera (si siguen atractivas y no concentran)
+  risk.items.forEach(item => {
+    const c = item.pv.c ? getLiveCompanyView(item.pv.c) : null;
+    if(!c || !c.passes_quality || c.status !== 'OPORTUNIDAD') return;
+    if(c.earnings_days !== null && c.earnings_days !== undefined && c.earnings_days <= 10) return;
+    if(c.ai_verdict === 'PERMANENTE' || c.sec_verified === false) return;
+    const curW = posMap.get(c.ticker.toUpperCase())?.weightPct || 0;
+    const newW = newTotalVal > 0 ? (((item.pv.valEur || 0) + amount) / newTotalVal) * 100 : 100;
+    if(risk.valid.length >= 2 && curW >= 25) return;
+    const secW = secPctMap.get(c.sector) || 0;
+    let score = (c.conviction_score || c.quality_score || 70) + (c.oro_puro ? 25 : 0) + (c.opportunity_tier === 'ENTRADA_YA' ? 18 : 0);
+    if(curW < 15) score += 8;
+    if(secW >= 38) score -= 22;
+    const pl = computeTradePlanEur(c, amount);
+    if(!pl) return;
+    candidates.push({
+      action: 'AMPLIAR',
+      ticker: c.ticker,
+      name: c.name,
+      sector: c.sector,
+      tier: c.oro_puro ? 'ORO PURO' : (c.opportunity_tier || c.status),
+      score,
+      curW,
+      newW,
+      reason: `Ya en cartera (${curW.toFixed(0)}%) y sigue en zona de compra con Score ${c.quality_score}/100.`,
+      plan: pl
+    });
+  });
+
+  // 2) Evaluar nuevas oportunidades top del Radar que mejoren diversificación
+  allLive
+    .filter(c => c.status === 'OPORTUNIDAD' && c.passes_quality && !posMap.has(c.ticker.toUpperCase()))
+    .filter(c => c.ai_verdict !== 'PERMANENTE' && c.sec_verified !== false)
+    .filter(c => !(c.earnings_days !== null && c.earnings_days !== undefined && c.earnings_days <= 10))
+    .sort((a, b) => (b.oro_puro ? 1 : 0) - (a.oro_puro ? 1 : 0) || (b.conviction_score || 0) - (a.conviction_score || 0))
+    .slice(0, 12)
+    .forEach(c => {
+      const secW = secPctMap.get(c.sector) || 0;
+      const newW = newTotalVal > 0 ? (amount / newTotalVal) * 100 : 100;
+      let score = (c.conviction_score || c.quality_score || 70) + (c.oro_puro ? 30 : 0) + (c.opportunity_tier === 'ENTRADA_YA' ? 22 : c.opportunity_tier === 'GANGA' ? 12 : 0);
+      if(secW === 0 && risk.valid.length > 0) score += 12; // Premio por diversificar sector
+      if(secW >= 38) score -= 25;
+      const pl = computeTradePlanEur(c, amount);
+      if(!pl) return;
+      const divTxt = (secW === 0 && risk.valid.length > 0)
+        ? `Diversifica en sector nuevo (${c.sector})`
+        : `Sector ${c.sector} (${secW.toFixed(0)}% actual)`;
+      candidates.push({
+        action: 'ABRIR NUEVA',
+        ticker: c.ticker,
+        name: c.name,
+        sector: c.sector,
+        tier: c.oro_puro ? 'ORO PURO' : (c.opportunity_tier || c.status),
+        score,
+        curW: 0,
+        newW,
+        reason: `${divTxt} · Score ${c.quality_score}/100 · Desc. DCF ${c.discount_vs_base_pct ?? '—'}%.`,
+        plan: pl
+      });
+    });
+
+  candidates.sort((a, b) => b.score - a.score);
+  return { amount, isSim, top: candidates[0] || null, alts: candidates.slice(1, 3) };
+}
+
+function renderRiskAndAllocator(risk){
+  // A) Smart Allocator
+  const alloc = computeSmartAllocation(risk);
+  const pillA = $('allocBudgetPill');
+  if(pillA){
+    pillA.className = alloc.isSim ? 'pill gold' : 'pill blue';
+    pillA.textContent = alloc.isSim ? 'Simul. 80 € (Bote 0 €)' : `Bote real: ${alloc.amount} €`;
+  }
+  const aHost = $('smartAllocatorHost');
+  if(aHost){
+    if(!alloc.top){
+      aHost.innerHTML = `<div class="notice info" style="margin:0">
+        <b>GUARDAR EN BOTE (${alloc.amount} €):</b> hoy no hay ninguna oportunidad limpia en el Radar sin riesgo de resultados próximos o sobreconcentración. Acumula pólvora seca sin forzar compras.
+      </div>`;
+    } else {
+      const t = alloc.top;
+      const pl = t.plan;
+      const t1Amt = Math.max(10, Math.round(pl.m1));
+      const simWarn = alloc.isSim
+        ? `<div style="font-size:10.5px;color:#fde047;margin-top:6px">Simulación con 80 €: tu Bote está en 0 €. Añade +80 € cuando tengas liquidez real.</div>`
+        : '';
+      const altsHtml = alloc.alts.length
+        ? `<div class="alloc-alts"><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750">Alternativas válidas (toca para abrir informe)</div>` +
+          alloc.alts.map(a => `<div class="alloc-alt" data-open="${esc(a.ticker)}">
+            <div><span class="tkr">${esc(a.ticker)}</span> <b>${esc(a.name.slice(0,22))}</b> <span style="color:var(--muted)">· ${esc(a.action)}</span></div>
+            <span style="color:#93c5fd;font-weight:750">${a.plan.p1.toFixed(2)} €</span>
+          </div>`).join('') + `</div>`
+        : '';
+
+      aHost.innerHTML = `<div class="alloc-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="pill">${esc(t.action)} · ${esc(t.tier)}</span>
+          <span style="font-size:10.5px;color:var(--muted)">Peso tras compra: <b style="color:#ffffff">${t.curW.toFixed(0)}% → ${t.newW.toFixed(0)}%</b></span>
+        </div>
+        <div class="alloc-verdict">${esc(t.name)} <span class="tkr">${esc(t.ticker)}</span></div>
+        <div style="font-size:11.5px;color:var(--text2)">${esc(t.reason)}</div>
+        <div class="plan-strip">
+          <div class="pcell in"><span>Tramo 1 (35%)</span><b>${t1Amt} €</b><small>a ${pl.p1.toFixed(2)} €</small></div>
+          <div class="pcell out"><span>Salida 50%</span><b>${pl.exit1Eur.toFixed(2)} €</b><small>+${pl.exit1Pct.toFixed(0)}% · Total ${pl.exit2Eur.toFixed(0)}€</small></div>
+          <div class="pcell sl"><span>Stop Loss</span><b>${pl.stopLossEur.toFixed(2)} €</b><small>${pl.stopLossPct.toFixed(0)}% (${esc(pl.slReason.split('·')[0].trim())})</small></div>
+        </div>
+        ${simWarn}
+        <div style="display:flex;gap:7px;margin-top:9px">
+          <button class="btn primary sm" style="flex:1" data-open="${esc(t.ticker)}">Ver Plan Completo</button>
+          <button class="btn sm" data-ask-alloc="${esc(t.ticker)}" data-ask-name="${esc(t.name)}">Consultar IA</button>
+        </div>
+        ${altsHtml}
+      </div>`;
+      aHost.querySelectorAll('[data-open]').forEach(el => el.onclick = () => openModal(el.dataset.open));
+      aHost.querySelectorAll('[data-ask-alloc]').forEach(el => el.onclick = () => askAgentAboutTicker(el.dataset.askAlloc, el.dataset.askName));
+    }
+  }
+
+  // B) Risk Control Center
+  const rPill = $('riskStatusPill');
+  const rHost = $('riskControlHost');
+  if(!rHost) return;
+  if(!risk.valid.length){
+    if(rPill){ rPill.className = 'pill blue'; rPill.textContent = 'Sin posiciones'; }
+    rHost.innerHTML = `<div class="notice" style="margin:0">Añade tus compras en <b>Mi Cartera</b> para activar el control de concentración por empresa, sector, exposición Tech/IA, divisa USD y test de estrés en euros.</div>`;
+    return;
+  }
+  if(rPill){
+    rPill.className = risk.level === 'bad' ? 'pill red' : risk.level === 'warn' ? 'pill gold' : 'pill';
+    rPill.textContent = risk.level === 'bad' ? 'Riesgo concentrado' : risk.level === 'warn' ? 'Revisar peso' : 'Equilibrada';
+  }
+
+  const maxPosCls = risk.maxPos && risk.maxPos.weightPct > 25 ? 'bad' : risk.maxPos && risk.maxPos.weightPct > 20 ? 'warn' : 'good';
+  const techCls = risk.techAiPct > 45 ? 'bad' : risk.techAiPct > 35 ? 'warn' : '';
+  const secBars = risk.bySector.slice(0, 5).map(s => {
+    const cls = s.pct > 40 ? 'bad' : s.pct > 30 ? 'warn' : '';
+    return `<div class="bar-row">
+      <div class="bar-head"><span>${esc(s.name)}</span><b>${s.pct.toFixed(0)}% <span style="color:var(--muted);font-weight:600">(${s.valEur.toFixed(0)} €)</span></b></div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.min(100, s.pct).toFixed(1)}%"></div></div>
+    </div>`;
+  }).join('');
+
+  const posBars = risk.byPos.slice(0, 5).map(p => {
+    const cls = p.weightPct > 25 ? 'bad' : p.weightPct > 20 ? 'warn' : '';
+    return `<div class="bar-row">
+      <div class="bar-head"><span><span class="tkr">${esc(p.ticker)}</span> ${esc(p.name.slice(0,18))}</span><b>${p.weightPct.toFixed(0)}% <span style="color:var(--muted);font-weight:600">(${p.valEur.toFixed(0)} €)</span></b></div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.min(100, p.weightPct).toFixed(1)}%"></div></div>
+    </div>`;
+  }).join('');
+
+  const warnHtml = risk.warnings.length
+    ? `<div class="notice ${risk.level === 'bad' ? 'bad' : 'warn'}" style="margin:9px 0 0">${risk.warnings.map(w => `• ${esc(w)}`).join('<br>')}</div>`
+    : `<div class="notice good" style="margin:9px 0 0">✅ Sin alertas de sobreconcentración (ninguna acción &gt;25% ni sector &gt;40%).</div>`;
+
+  rHost.innerHTML = `
+    <div class="risk-grid">
+      <div class="rcell"><span>Invertido / Total</span><b>${risk.investedPct.toFixed(0)}%</b><small>${risk.totalValEur.toFixed(0)} € + ${cashPot.toFixed(0)} € bote</small></div>
+      <div class="rcell ${maxPosCls}"><span>Mayor peso</span><b>${risk.maxPos ? risk.maxPos.weightPct.toFixed(0) + '%' : '—'}</b><small>${risk.maxPos ? esc(risk.maxPos.ticker) : '—'} (límite 25%)</small></div>
+      <div class="rcell ${techCls}"><span>Tech / IA</span><b>${risk.techAiPct.toFixed(0)}%</b><small>USD: ${risk.usdExposurePct.toFixed(0)}%</small></div>
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;margin:8px 0 6px">Peso por acción</div>
+    ${posBars}
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;margin:10px 0 6px">Concentración por sector</div>
+    ${secBars}
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;margin:10px 0 4px">Escenarios de estrés (pérdida potencial en EUR)</div>
+    <div class="stress-row">
+      <div class="scell"><span>Corrección -15%</span><b>-${risk.stress15Eur.toFixed(0)} €</b><small>Caída normal</small></div>
+      <div class="scell"><span>Pánico -25%</span><b>-${risk.stress25Eur.toFixed(0)} €</b><small>Mercado bajista</small></div>
+      <div class="scell"><span>Riesgo Stops</span><b>-${risk.totalStopRiskEur.toFixed(0)} €</b><small>Si saltan todos</small></div>
+    </div>
+    ${warnHtml}`;
+}
+
+function renderCalendarEvents(risk){
+  const host = $('calendarEventsHost');
+  if(!host) return;
+  const watchedSet = new Set([
+    ...portfolio.map(p => (p.ticker || '').toUpperCase()),
+    ...favs.map(t => String(t).toUpperCase())
+  ]);
+  const allWatched = Array.from(watchedSet).map(t => findCompany(t)).filter(Boolean);
+  const inPortSet = new Set(portfolio.map(p => (p.ticker || '').toUpperCase()));
+
+  // Próximos resultados ordenados
+  const earningsList = allWatched
+    .filter(c => c.earnings_days !== null && c.earnings_days !== undefined && c.earnings_days >= 0 && c.earnings_days <= 90)
+    .sort((a, b) => a.earnings_days - b.earnings_days);
+
+  // Compras recientes de directivos
+  const insidersList = allWatched.filter(c => (c.insider_buys_90d || 0) > 0);
+
+  // Dividendos anuales estimados de Mi Cartera
+  let estDivAnnualEur = 0;
+  risk.items.forEach(x => {
+    const dy = Number(x.pv.c?.dividend_yield_pct || 0);
+    if(dy > 0 && x.pv.valEur) estDivAnnualEur += x.pv.valEur * (dy / 100);
+  });
+
+  const earnHtml = earningsList.length
+    ? earningsList.map(c => {
+        const urgent = c.earnings_days <= 10;
+        const srcLbl = inPortSet.has(c.ticker.toUpperCase()) ? 'Cartera' : 'Favorita';
+        return `<div class="ev-item" data-open="${esc(c.ticker)}">
+          <div>
+            <b>${esc(c.name)}</b> <span class="tkr">${esc(c.ticker)}</span>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${srcLbl} · Presenta el <b>${esc(c.earnings_date || '—')}</b></div>
+          </div>
+          <span class="pill ${urgent ? 'red' : 'blue'}">${urgent ? 'En ' + c.earnings_days + 'd · Cautela' : 'En ' + c.earnings_days + 'd'}</span>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:12px;color:var(--muted);padding:4px 0">Sin resultados programados en los próximos 90 días en tu Cartera/Favoritas.</div>';
+
+  const insHtml = insidersList.length
+    ? `<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;margin-bottom:4px">Compras de directivos (90 días)</div>
+        ${insidersList.map(c => `<div class="ev-item" data-open="${esc(c.ticker)}">
+          <span><b>${esc(c.name)}</b> <span class="tkr">${esc(c.ticker)}</span></span>
+          <span class="pill">${c.insider_buys_90d} compra(s)</span>
+        </div>`).join('')}
+      </div>`
+    : '';
+
+  const divHtml = risk.totalValEur > 0
+    ? `<div class="notice info" style="margin:9px 0 0">Dividendos estimados de tu Cartera: <b>${estDivAnnualEur.toFixed(2)} €/año</b> (${(estDivAnnualEur / 12).toFixed(2)} €/mes · yield medio ${(estDivAnnualEur / risk.totalValEur * 100).toFixed(2)}%).</div>`
+    : '';
+
+  host.innerHTML = earnHtml + insHtml + divHtml;
+  host.querySelectorAll('[data-open]').forEach(el => el.onclick = () => openModal(el.dataset.open));
+}
+
+function renderWealthSimulator(risk){
+  const host = $('wealthSimHost');
+  if(!host) return;
+  const startCap = Math.max(0, (risk?.totalValEur || 0) + Math.max(0, cashPot));
+  const monthly = Math.max(10, parseFloat($('wsMonthlyIn')?.value || '80') || 80);
+  const years = Math.max(5, Math.min(30, parseInt($('wsYearsSel')?.value || '10', 10) || 10));
+
+  const project = (annualPct) => {
+    const r = (annualPct / 100) / 12;
+    const pts = [startCap];
+    let val = startCap;
+    for(let y = 1; y <= years; y++){
+      for(let m = 0; m < 12; m++) val = val * (1 + r) + monthly;
+      pts.push(val);
+    }
+    return pts;
+  };
+
+  const pPes = project(6.0);
+  const pBase = project(8.5);
+  const pOpt = project(11.0);
+  const contributed = startCap + monthly * 12 * years;
+  const maxVal = Math.max(pOpt[years], contributed, 100);
+
+  const W = 420, H = 185, pL = 44, pR = 14, pT = 16, pB = 24;
+  const xMap = i => pL + (i / years) * (W - pL - pR);
+  const yMap = v => pT + (1 - (v / maxVal)) * (H - pT - pB);
+  const toPath = arr => arr.map((v, i) => `${i === 0 ? 'M' : 'L'}${xMap(i).toFixed(1)},${yMap(v).toFixed(1)}`).join(' ');
+  const contribPts = Array.from({ length: years + 1 }, (_, i) => startCap + monthly * 12 * i);
+
+  const gridVals = [0, 0.5, 1.0].map(f => maxVal * f);
+  const gridSvg = gridVals.map(v => {
+    const py = yMap(v).toFixed(1);
+    const lbl = v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k€` : `${v.toFixed(0)}€`;
+    return `<line x1="${pL}" y1="${py}" x2="${W - pR}" y2="${py}" stroke="rgba(255,255,255,.07)"/><text x="${pL - 6}" y="${Number(py) + 3}" text-anchor="end" fill="#64748b" font-size="9">${lbl}</text>`;
+  }).join('');
+
+  host.innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">Capital inicial (Cartera + Bote): <b style="color:#ffffff">${startCap.toFixed(0)} €</b> · Total aportado en ${years} años: <b style="color:#ffffff">${contributed.toFixed(0)} €</b></div>
+    <svg class="wealth-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      ${gridSvg}
+      <path d="${toPath(contribPts)}" fill="none" stroke="#475569" stroke-width="1.6" stroke-dasharray="4 3"/>
+      <path d="${toPath(pPes)}" fill="none" stroke="#94a3b8" stroke-width="1.8"/>
+      <path d="${toPath(pBase)}" fill="none" stroke="#3b82f6" stroke-width="2.4"/>
+      <path d="${toPath(pOpt)}" fill="none" stroke="#22c55e" stroke-width="2.4"/>
+      <text x="${xMap(0)}" y="${H - 6}" fill="#64748b" font-size="9">Hoy</text>
+      <text x="${xMap(years)}" y="${H - 6}" text-anchor="end" fill="#64748b" font-size="9">Año ${years}</text>
+    </svg>
+    <div class="sim-pills">
+      <div class="rcell"><span>Conserv. (6%)</span><b>${Math.round(pPes[years]).toLocaleString('es-ES')} €</b><small>+${Math.round(pPes[years] - contributed).toLocaleString('es-ES')} € int.</small></div>
+      <div class="rcell" style="border-color:rgba(59,130,246,.36)"><span>MSCI (8.5%)</span><b style="color:#60a5fa">${Math.round(pBase[years]).toLocaleString('es-ES')} €</b><small>+${Math.round(pBase[years] - contributed).toLocaleString('es-ES')} € int.</small></div>
+      <div class="rcell good"><span>Objetivo (11%)</span><b>${Math.round(pOpt[years]).toLocaleString('es-ES')} €</b><small>+${Math.round(pOpt[years] - contributed).toLocaleString('es-ES')} € int.</small></div>
+    </div>`;
+}
+
+/* ===========================
    VIEW 3: MI CARTERA + FAVORITAS (FX FIXED)
    =========================== */
 function renderFavsView(){
+  const risk = analyzePortfolioRisk();
+  renderRiskAndAllocator(risk);
+  renderCalendarEvents(risk);
+  renderWealthSimulator(risk);
+
   const potEl = $('cashPotVal'), potMsg = $('cashPotMsg'), potBar = $('cashPotBar');
   if(potEl){
     potEl.textContent = `${cashPot.toFixed(0)} €`;
@@ -3183,24 +3752,24 @@ function renderFavsView(){
               <span class="tkr">${esc(pos.ticker)}</span>
               ${pv.isLive ? (pv.lq?.session==='PRE'?'<span class="live-tag pre"><i></i> PRE</span>':pv.lq?.session==='POST'?'<span class="live-tag post"><i></i> POST</span>':pv.lq?.session==='CLOSED'?'<span class="live-tag closed"><i></i> CIERRE</span>':'<span class="live-tag"><i></i> VIVO</span>') : ''}
             </div>
-            <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${pos.shares} acc. · Compra: <b>${pv.avgPriceEur.toFixed(2)} €</b>${liveChangePill(pv.changePct)}</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${pos.shares} acc. · Compra: <b>${pv.avgPriceEur !== null ? pv.avgPriceEur.toFixed(2) + ' €' : fmtMoney(pos.avgPrice, pv.origPosCur) + ' (sin FX)'}</b>${liveChangePill(pv.changePct)}</div>
           </div>
           <div style="text-align:right;flex-shrink:0">
-            <b style="color:${pnlCol};font-size:16px;font-variant-numeric:tabular-nums">${pv.pnlPct>=0?'+':''}${pv.pnlPct.toFixed(2)}%</b>
-            <div style="font-size:11px;color:${pnlCol};font-variant-numeric:tabular-nums">${pv.pnlEur>=0?'+':''}${pv.pnlEur.toFixed(2)} €</div>
+            <b style="color:${pnlCol};font-size:16px;font-variant-numeric:tabular-nums">${pv.fxMissing ? 'Sin FX' : (pv.pnlPct>=0?'+':'') + pv.pnlPct.toFixed(2) + '%'}</b>
+            <div style="font-size:11px;color:${pnlCol};font-variant-numeric:tabular-nums">${pv.pnlEur !== null ? (pv.pnlEur>=0?'+':'') + pv.pnlEur.toFixed(2) + ' €' : '—'}</div>
           </div>
         </div>
 
         <div class="port-metrics">
-          <div><span>Precio hoy</span><b>${pv.curPriceEur.toFixed(2)} €</b></div>
-          <div><span>Valor actual</span><b>${pv.valEur.toFixed(2)} €</b></div>
-          <div><span>Invertido</span><b>${pv.costEur.toFixed(2)} €</b></div>
+          <div><span>Precio hoy</span><b>${pv.curPriceEur !== null ? pv.curPriceEur.toFixed(2) + ' €' : 'Sin FX'}</b></div>
+          <div><span>Valor actual</span><b>${pv.valEur !== null ? pv.valEur.toFixed(2) + ' €' : 'Sin FX'}</b></div>
+          <div><span>Invertido</span><b>${pv.costEur !== null ? pv.costEur.toFixed(2) + ' €' : 'Sin FX'}</b></div>
         </div>
 
         <div class="port-levels">
-          <div><span>Salida 50%</span><b style="color:#93c5fd">${pv.exit1Eur.toFixed(2)} €</b></div>
-          <div><span>Salida Total</span><b style="color:#4ade80">${pv.exit2Eur.toFixed(2)} €</b></div>
-          <div><span>Stop Loss (-18%)</span><b style="color:#fda4af">${pv.stopLossEur.toFixed(2)} €</b></div>
+          <div><span>Salida 50%</span><b style="color:#93c5fd">${pv.exit1Eur !== null ? pv.exit1Eur.toFixed(2) + ' €' : '—'}</b></div>
+          <div><span>Salida Total</span><b style="color:#4ade80">${pv.exit2Eur !== null ? pv.exit2Eur.toFixed(2) + ' €' : '—'}</b></div>
+          <div><span>Stop (-${pv.stopLossPctVal}% · ${esc(pv.slReason.split('·')[0].trim())})</span><b style="color:#fda4af">${pv.stopLossEur !== null ? pv.stopLossEur.toFixed(2) + ' €' : '—'}</b></div>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px">
@@ -3261,41 +3830,94 @@ function renderHistoryView(){
   const entries = (historyData && Array.isArray(historyData.entries)) ? historyData.entries : [];
   const host = $('histListHost');
   const alphaBox = $('histAlphaBox');
+  const audHost = $('signalAuditorHost');
   $('hCount').textContent = entries.length;
   if(!entries.length){
     $('hWinRate').textContent = '—'; $('hAvgRet').textContent = '—';
     alphaBox.innerHTML = '';
+    if(audHost) audHost.innerHTML = '<div class="empty" style="padding:14px">Sin historial suficiente para auditar todavía.</div>';
     host.innerHTML = `<div class="empty">El diario se empezará a rellenar automáticamente cuando salte una <b>👑 ORO PURO</b>, <b>🚨 ENTRAR YA</b> o <b>🏆 GANGA</b>.</div>`;
     return;
   }
+
+  // Preserva el diferencial de dividendos guardado por el backend incluso con precio en vivo
   const enriched = entries.map(e => {
     const lqH = liveQuotes[(e.ticker || '').toUpperCase()];
-    const liveLastP = (lqH && Number.isFinite(Number(lqH.price)) && lqH.price > 0) ? Number(lqH.price) : e.last_price;
-    const liveRet = (lqH && e.alert_price > 0) ? Number((((liveLastP / e.alert_price) - 1) * 100).toFixed(1)) : Number(e.return_pct);
-    return { ...e, _liveLastP: liveLastP, _liveRet: liveRet, _isLive: !!lqH };
+    const liveLastP = (lqH && Number.isFinite(Number(lqH.price)) && lqH.price > 0) ? Number(lqH.price) : Number(e.last_price);
+    const hasDivSplit = Number.isFinite(Number(e.return_pct)) && Number.isFinite(Number(e.price_return_pct));
+    const divBonusPct = hasDivSplit ? Math.max(0, Number(e.return_pct) - Number(e.price_return_pct)) : 0;
+    const liveRet = (lqH && e.alert_price > 0)
+      ? Number(((((liveLastP / e.alert_price) - 1) * 100) + divBonusPct).toFixed(1))
+      : Number(e.return_pct || 0);
+    const msci = Number(e.benchmarks?.msci_world_pct);
+    const alpha = (Number.isFinite(liveRet) && Number.isFinite(msci)) ? (liveRet - msci) : null;
+    const maxDd = (e.max_drawdown_after_alert_pct !== null && e.max_drawdown_after_alert_pct !== undefined)
+      ? Number(e.max_drawdown_after_alert_pct)
+      : (liveRet < 0 ? liveRet : 0);
+    return { ...e, _liveLastP: liveLastP, _liveRet: liveRet, _divBonus: divBonusPct, _alpha: alpha, _maxDd: maxDd, _isLive: !!lqH };
   });
-  const rets = enriched.map(e => Number(e._liveRet)).filter(Number.isFinite);
+
+  const rets = enriched.map(e => e._liveRet).filter(Number.isFinite);
   const wins = rets.filter(r => r > 0).length;
   const avg = rets.length ? (rets.reduce((a,b) => a+b, 0) / rets.length) : 0;
   $('hWinRate').textContent = rets.length ? `${Math.round((wins / rets.length) * 100)}%` : '—';
   $('hAvgRet').textContent = `${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%`;
 
-  const alphas = enriched.map(e => {
-    const r = Number(e._liveRet), m = Number(e.benchmarks?.msci_world_pct);
-    return (Number.isFinite(r) && Number.isFinite(m)) ? (r - m) : null;
-  }).filter(x => x !== null);
+  const alphas = enriched.map(e => e._alpha).filter(x => x !== null);
   if(alphas.length){
     const avgAlpha = alphas.reduce((a,b) => a+b, 0) / alphas.length;
     alphaBox.innerHTML = `<div class="notice ${avgAlpha>=0?'good':'warn'}" style="margin:0">⚖️ <b>Alpha medio frente a MSCI World (${alphas.length} señales):</b> <b>${avgAlpha>=0?'+':''}${avgAlpha.toFixed(1)} pp</b></div>`;
   } else {
-    alphaBox.innerHTML = `<div class="notice info" style="margin:0">ℹ️ Los benchmarks (MSCI World y S&amp;P 500) se rellenarán automáticamente en el próximo escaneo v10.5.</div>`;
+    alphaBox.innerHTML = `<div class="notice info" style="margin:0">ℹ️ Los benchmarks (MSCI World y S&amp;P 500) se rellenan automáticamente en el escaneo diario/semanal.</div>`;
   }
 
-  host.innerHTML = entries.map(e => {
-    const lqH = liveQuotes[(e.ticker || '').toUpperCase()];
-    const liveLastP = (lqH && Number.isFinite(Number(lqH.price)) && lqH.price > 0) ? Number(lqH.price) : e.last_price;
-    const r = (lqH && e.alert_price > 0) ? Number((((liveLastP / e.alert_price) - 1) * 100).toFixed(1)) : Number(e.return_pct || 0);
-    const col = r > 0 ? '#4ade80' : r < 0 ? '#fb7185' : '#859f8f';
+  // Auditor de Señales por Tier y Score Buffett
+  if(audHost){
+    const groupStats = (arr) => {
+      if(!arr.length) return null;
+      const w = arr.filter(x => x._liveRet > 0).length;
+      const meanR = arr.reduce((s, x) => s + x._liveRet, 0) / arr.length;
+      const al = arr.map(x => x._alpha).filter(x => x !== null);
+      const meanA = al.length ? (al.reduce((s, x) => s + x, 0) / al.length) : null;
+      const worstDd = Math.min(...arr.map(x => x._maxDd));
+      return { n: arr.length, winPct: Math.round((w / arr.length) * 100), meanR, meanA, worstDd };
+    };
+    const tiers = [
+      ['ORO PURO', enriched.filter(e => e.tier === 'ORO_PURO')],
+      ['ENTRAR YA', enriched.filter(e => e.tier === 'ENTRADA_YA')],
+      ['GANGA', enriched.filter(e => e.tier === 'GANGA')]
+    ];
+    const rowsTier = tiers.map(([lbl, arr]) => {
+      const st = groupStats(arr);
+      if(!st) return `<tr><td><b>${lbl}</b></td><td>0</td><td>—</td><td>—</td><td>—</td></tr>`;
+      const rCol = st.meanR >= 0 ? '#4ade80' : '#fda4af';
+      const aTxt = st.meanA !== null ? `${st.meanA>=0?'+':''}${st.meanA.toFixed(1)}pp` : '—';
+      return `<tr><td><b>${lbl}</b></td><td>${st.n}</td><td>${st.winPct}%</td><td style="color:${rCol};font-weight:750">${st.meanR>=0?'+':''}${st.meanR.toFixed(1)}%</td><td>${aTxt}</td></tr>`;
+    }).join('');
+
+    const hiScore = groupStats(enriched.filter(e => (e.quality_score || 0) >= 95));
+    const midScore = groupStats(enriched.filter(e => (e.quality_score || 0) < 95));
+    const worstGlobalDd = Math.min(...enriched.map(e => e._maxDd));
+    const sampleNote = enriched.length < 20
+      ? `<div class="notice warn" style="margin:9px 0 0;font-size:11.5px">Muestra inicial (${enriched.length} señales): se necesitan al menos <b>20+ señales cerradas</b> para sacar conclusiones estadísticas sólidas.</div>`
+      : `<div class="notice good" style="margin:9px 0 0;font-size:11.5px">Muestra sólida (${enriched.length} señales auditadas) · Peor caída post-entrada observada: <b>${worstGlobalDd.toFixed(1)}%</b>.</div>`;
+
+    audHost.innerHTML = `
+      <table class="aud-tbl">
+        <thead><tr><th>Señal</th><th>N</th><th>Acierto</th><th>Media</th><th>Alpha</th></tr></thead>
+        <tbody>${rowsTier}</tbody>
+      </table>
+      <div class="risk-grid" style="margin-top:9px;margin-bottom:0">
+        <div class="rcell"><span>Score 95–100</span><b>${hiScore ? (hiScore.meanR>=0?'+':'')+hiScore.meanR.toFixed(1)+'%' : '—'}</b><small>${hiScore ? hiScore.n+' señales · '+hiScore.winPct+'% ok' : 'Sin datos'}</small></div>
+        <div class="rcell"><span>Score &lt;95</span><b>${midScore ? (midScore.meanR>=0?'+':'')+midScore.meanR.toFixed(1)+'%' : '—'}</b><small>${midScore ? midScore.n+' señales · '+midScore.winPct+'% ok' : 'Sin datos'}</small></div>
+        <div class="rcell ${worstGlobalDd <= -15 ? 'bad' : ''}"><span>Peor caída</span><b>${worstGlobalDd.toFixed(1)}%</b><small>Post-entrada</small></div>
+      </div>
+      ${sampleNote}`;
+  }
+
+  host.innerHTML = enriched.map(e => {
+    const r = e._liveRet;
+    const col = r > 0 ? '#4ade80' : r < 0 ? '#f43f5e' : '#7b869a';
     const badge = e.tier === 'ORO_PURO' ? '<span class="pill ganga">👑 ORO PURO</span>'
       : e.tier === 'ENTRADA_YA' ? '<span class="pill entrar-ya">🚨 ENTRAR YA</span>'
       : '<span class="pill ganga">🏆 GANGA</span>';
@@ -3309,11 +3931,18 @@ function renderHistoryView(){
     if(bm.sp500_pct !== null && bm.sp500_pct !== undefined){
       chips.push(`<span class="bench-chip">S&amp;P 500: ${bm.sp500_pct>=0?'+':''}${bm.sp500_pct}%</span>`);
     }
+    if(e.max_drawdown_after_alert_pct !== null && e.max_drawdown_after_alert_pct !== undefined){
+      chips.push(`<span class="bench-chip lag">Máx caída: ${Number(e.max_drawdown_after_alert_pct).toFixed(1)}%</span>`);
+    }
+    if(e._divBonus > 0){
+      chips.push(`<span class="bench-chip beat">+${e._divBonus.toFixed(1)}% div.</span>`);
+    }
     [['d30','30d'],['d90','90d'],['d180','180d'],['d365','365d']].forEach(([k,lbl]) => {
       if(ms[k] !== null && ms[k] !== undefined){
         chips.push(`<span class="bench-chip">${lbl}: ${ms[k]>=0?'+':''}${ms[k]}%</span>`);
       }
     });
+    const retNote = e._divBonus > 0 ? 'Total +div' : (e._isLive ? 'Precio vivo' : 'Total');
     return `<div class="hist-card">
       <div class="hist-top">
         <div style="min-width:0">
@@ -3321,12 +3950,12 @@ function renderHistoryView(){
             <b>${esc(e.name || e.ticker)}</b> <span class="tkr">${esc(e.ticker)}</span> ${badge}
           </div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:4px">
-            Alerta <b>${esc(e.alert_date)}</b> a <b>${fmtEur(e.alert_price, e.currency)}</b> → Hoy: <b>${fmtEur(liveLastP, e.currency)}</b>${lqH ? ' <span class="live-tag"><i></i></span>' : ''}
+            Alerta <b>${esc(e.alert_date)}</b> a <b>${fmtEur(e.alert_price, e.currency)}</b> → Hoy: <b>${fmtEur(e._liveLastP, e.currency)}</b>${e._isLive ? ' <span class="live-tag"><i></i></span>' : ''}
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           <b style="color:${col};font-size:17px;font-variant-numeric:tabular-nums">${r>=0?'+':''}${r.toFixed(1)}%</b>
-          <div style="font-size:10px;color:var(--muted)">Score ${e.quality_score ?? '—'}</div>
+          <div style="font-size:9.5px;color:var(--muted)">Score ${e.quality_score ?? '—'} · ${retNote}</div>
         </div>
       </div>
       ${chips.length ? `<div class="hist-bench">${chips.join('')}</div>` : ''}
@@ -3451,9 +4080,10 @@ function openModal(ticker, skipLiveRefresh = false){
     ['ROIC / Capital', bd.roic], ['Margen Operativo', bd.margin], ['Caja Real (FCF)', bd.fcf],
     ['Balance / Deuda', bd.debt], ['Crecimiento', bd.growth], ['Recompras / Div.', bd.shareholder]
   ];
-  const priceEurHint = (c.currency && c.currency.toUpperCase() !== 'EUR') ? ` (${fmtMoney(c.price, c.currency)})` : '';
+  const priceEurHint = '';
 
-  $('mSub').textContent = `${c.ticker} · ${c.region} · ${c.sector}${c.market_cap_b ? ' · ' + c.market_cap_b + 'B USD' : ''}`;
+  const capEurB = c.market_cap_b ? toEur(c.market_cap_b, 'USD') : null;
+  $('mSub').textContent = `${c.ticker} · ${c.region} · ${c.sector}${capEurB ? ' · ' + capEurB.toFixed(1) + 'B €' : ''}`;
   $('mTitle').textContent = c.name;
 
   const hasPioClassic = c.piotroski_classic_score !== null && c.piotroski_classic_score !== undefined;
@@ -3544,10 +4174,26 @@ function openModal(ticker, skipLiveRefresh = false){
     ` : `<div class="notice warn">DCF estándar por FCF no aplicable a este negocio.</div>`}
 
     <div class="tool-box">
-      <div class="eyebrow">Plan Operativo en EUR (Entrada · Salida · Stop Loss)</div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <span style="font-size:12px;color:var(--muted);white-space:nowrap">Capital a invertir (€):</span>
-        <input class="finput" id="planBudget" type="number" min="20" step="20" value="${cashPot >= 80 ? Math.round(cashPot) : 240}" style="height:36px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="eyebrow">Plan Operativo Trade Republic (100% EUR)</div>
+        <span id="planActionPill" class="pill blue" style="font-size:9.5px">Plan en €</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:8px;margin-top:9px">
+        <div>
+          <span style="display:block;font-size:10.5px;color:var(--muted);margin-bottom:4px">Capital (€ · Bote: ${cashPot.toFixed(0)} €)</span>
+          <input class="finput" id="planBudget" type="number" min="10" step="10" value="${cashPot >= 10 ? Math.round(cashPot) : 80}" style="height:36px">
+        </div>
+        <div>
+          <span style="display:block;font-size:10.5px;color:var(--muted);margin-bottom:4px">Stop Loss</span>
+          <select class="finput" id="planSlSel" style="height:36px;padding:0 8px">
+            <option value="AUTO" ${stopLossMode==='AUTO'?'selected':''}>Auto (Volatilidad / 52s)</option>
+            <option value="12" ${stopLossMode==='12'?'selected':''}>-12% (Ajustado)</option>
+            <option value="15" ${stopLossMode==='15'?'selected':''}>-15% (Moderado)</option>
+            <option value="18" ${stopLossMode==='18'?'selected':''}>-18% (Fijo)</option>
+            <option value="20" ${stopLossMode==='20'?'selected':''}>-20% (Amplio)</option>
+            <option value="25" ${stopLossMode==='25'?'selected':''}>-25% (Value largo)</option>
+          </select>
+        </div>
       </div>
       <div id="planOut"></div>
     </div>
@@ -3586,29 +4232,57 @@ function openModal(ticker, skipLiveRefresh = false){
   }
 
   const updatePlan = () => {
-    const budgetEur = Math.max(20, parseFloat($('planBudget').value) || (cashPot >= 80 ? Math.round(cashPot) : 240));
-    const pl = computeTradePlanEur(c, budgetEur);
-    if(!pl) return;
+    const budgetEur = Math.max(10, parseFloat($('planBudget').value) || (cashPot >= 10 ? Math.round(cashPot) : 80));
+    const selMode = String($('planSlSel')?.value || stopLossMode || 'AUTO').trim().toUpperCase();
+    if(selMode !== stopLossMode){
+      stopLossMode = selMode;
+      localStorage.setItem(STORE.STOP_LOSS_PCT, stopLossMode);
+    }
+    const pl = computeTradePlanEur(c, budgetEur, null, selMode);
+    if(!pl){
+      $('planOut').innerHTML = `<div class="notice warn" style="margin-top:8px">Sin tipo de cambio EUR válido para ${esc(c.currency)}: plan en EUR desactivado hasta disponer de FX.</div>`;
+      return;
+    }
+    const pill = $('planActionPill');
+    if(pill){
+      if(pl.exceedsCashPot){
+        pill.className = 'pill gold';
+        pill.textContent = `SIMULACIÓN (Bote: ${cashPot.toFixed(0)} €)`;
+      } else if(pl.inBuyZone){
+        pill.className = 'pill';
+        pill.textContent = `ENTRAR T1 HOY (${pl.m1.toFixed(0)} €)`;
+      } else {
+        pill.className = 'pill gold';
+        pill.textContent = `ESPERAR A ≤ ${pl.p1.toFixed(2)} €`;
+      }
+    }
+    const t1Tag = pl.inBuyZone ? 'Hoy' : 'Al tocar obj.';
+    const potWarn = pl.exceedsCashPot
+      ? `<div class="notice warn" style="margin:8px 0 0;font-size:11px">⚠️ Estás simulando <b>${pl.budget.toFixed(0)} €</b>, pero tu Bote real tiene <b>${cashPot.toFixed(0)} €</b>. No comprometas más liquidez de la disponible.</div>`
+      : '';
     $('planOut').innerHTML = `
-      <div style="font-size:10.5px;color:var(--muted);margin-top:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">1 · Con cuánto entrar y a qué precio (3 tramos)</div>
+      ${potWarn}
+      <div style="font-size:10.5px;color:var(--muted);margin-top:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">1 · Con cuánto entrar y a qué precio (3 tramos)</div>
       <div class="tranche-grid" style="margin-top:6px">
-        <div class="tcard"><span>Tramo 1 (35%) · Hoy</span><b>${pl.m1.toFixed(0)} €</b><small style="color:var(--muted)">a ${pl.p1.toFixed(2)} € (${pl.s1.toFixed(3)} acc.)</small></div>
+        <div class="tcard"><span>Tramo 1 (35%) · ${t1Tag}</span><b>${pl.m1.toFixed(0)} €</b><small style="color:var(--muted)">a ${pl.p1.toFixed(2)} € (${pl.s1.toFixed(3)} acc.)</small></div>
         <div class="tcard"><span>Tramo 2 (35%) · -12%</span><b>${pl.m2.toFixed(0)} €</b><small style="color:var(--muted)">a ${pl.p2.toFixed(2)} € (${pl.s2.toFixed(3)} acc.)</small></div>
         <div class="tcard"><span>Tramo 3 (30%) · Pánico</span><b>${pl.m3.toFixed(0)} €</b><small style="color:var(--muted)">a ${pl.p3.toFixed(2)} € (${pl.s3.toFixed(3)} acc.)</small></div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">Precio medio si entran los 3 tramos: <b style="color:#93c5fd">${pl.avgEntryEur.toFixed(2)} €</b> (${pl.totalShares.toFixed(3)} acc.)</div>
 
-      <div style="font-size:10.5px;color:var(--muted);margin-top:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">2 · Cuándo salir (Take Profit) y Stop Loss</div>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">2 · En qué precio salir (Take Profit) y Stop Loss</div>
       <div class="exit-grid" style="margin-top:6px">
         <div class="ecard tp1"><span>Salida 1 · Vender 50%</span><b>${pl.exit1Eur.toFixed(2)} €</b><small style="color:#bfdbfe">+${pl.exit1Pct.toFixed(1)}% (Valor justo)</small></div>
         <div class="ecard tp2"><span>Salida Total · 100%</span><b>${pl.exit2Eur.toFixed(2)} €</b><small style="color:#bbf7d0">+${pl.exit2Pct.toFixed(1)}% (Est. +${pl.estProfitEur.toFixed(0)} €)</small></div>
-        <div class="ecard sl"><span>Stop Loss · Salida</span><b>${pl.stopLossEur.toFixed(2)} €</b><small style="color:#fecdd3">${pl.stopLossPct.toFixed(1)}% (Riesgo -${pl.maxRiskEur.toFixed(0)} €)</small></div>
+        <div class="ecard sl"><span>Stop Loss · Salida</span><b>${pl.stopLossEur.toFixed(2)} €</b><small style="color:#fecdd3">${pl.stopLossPct.toFixed(1)}% (${esc(pl.slReason)})</small></div>
       </div>
-      <div style="font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.4;text-align:center">
-        El Stop Loss queda por debajo del Tramo 3 para evitar barridos por ruido. Sal también antes si se rompe la tesis (Score &lt; 65 o SEC MISMATCH).
+      <div style="font-size:10.5px;color:var(--muted);margin-top:8px;line-height:1.45;text-align:center">
+        Ratio Riesgo / Beneficio: <b style="color:#ffffff">1 : ${pl.riskReward.toFixed(1)}</b> · Riesgo máx.: <b style="color:#fda4af">-${pl.maxRiskEur.toFixed(0)} €</b> · Sal también si se rompe la tesis (Score &lt; 65 o SEC MISMATCH).
       </div>`;
   };
-  $('planBudget').oninput = updatePlan; updatePlan();
+  $('planBudget').oninput = updatePlan;
+  if($('planSlSel')) $('planSlSel').onchange = () => { updatePlan(); renderRadarView(); };
+  updatePlan();
 
   $('mAskAgentBtn').onclick = () => {
     $('detailModal').classList.remove('show');
@@ -3693,18 +4367,28 @@ function buildAgentSystemContext(userText = ''){
   const all = payload.companies || [];
   const nowStr = new Date().toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
 
-  // 1. Portfolio summary
+  // 1. Portfolio summary + Risk Control + Smart Allocator
+  const riskSnap = analyzePortfolioRisk();
+  const allocSnap = computeSmartAllocation(riskSnap);
   let portLines = ['(Cartera vacía por ahora)'];
   if(portfolio.length){
-    let totVal = 0, totCost = 0;
-    portLines = portfolio.map(pos => {
-      const pv = computePositionView(pos);
-      if(pv.valEur !== null && pv.costEur !== null){ totVal += pv.valEur; totCost += pv.costEur; }
-      const cLine = pv.c ? ` | Score ${pv.c.quality_score} | DCF Base ${fmtEur(pv.c.dcf?.intrinsic_base, pv.c.currency)} | Salida 50%: ${pv.exit1Eur.toFixed(2)}€ | Salida Total: ${pv.exit2Eur.toFixed(2)}€ | Stop Loss: ${pv.stopLossEur.toFixed(2)}€` : ` | Salida 50%: ${pv.exit1Eur.toFixed(2)}€ | Stop Loss: ${pv.stopLossEur.toFixed(2)}€`;
-      return `- ${pos.ticker} (${pv.c?.name || pv.lq?.name || pos.ticker}): ${pos.shares} acc. · Compra ${pv.avgPriceEur.toFixed(2)} € · Hoy ${pv.curPriceEur.toFixed(2)} € (${pv.isLive ? 'VIVO' : 'ESTÁTICO'}) · PnL ${pv.pnlPct >= 0 ? '+' : ''}${pv.pnlPct.toFixed(2)}% (${pv.pnlEur >= 0 ? '+' : ''}${pv.pnlEur.toFixed(2)} €) · Señal: ${pv.sig.label}${cLine}`;
+    portLines = riskSnap.items.map(({ pos, pv }) => {
+      const avgTxt = pv.avgPriceEur !== null ? `${pv.avgPriceEur.toFixed(2)} €` : 'sin FX';
+      const curTxt = pv.curPriceEur !== null ? `${pv.curPriceEur.toFixed(2)} €` : 'sin FX';
+      const pnlTxt = pv.pnlEur !== null ? `${pv.pnlEur >= 0 ? '+' : ''}${pv.pnlEur.toFixed(2)} €` : 'sin FX';
+      const ex1Txt = pv.exit1Eur !== null ? `${pv.exit1Eur.toFixed(2)}€` : '—';
+      const ex2Txt = pv.exit2Eur !== null ? `${pv.exit2Eur.toFixed(2)}€` : '—';
+      const slTxt = pv.stopLossEur !== null ? `${pv.stopLossEur.toFixed(2)}€ (${pv.slReason})` : '—';
+      const wPct = riskSnap.totalValEur > 0 && pv.valEur ? ((pv.valEur / riskSnap.totalValEur) * 100).toFixed(0) + '%' : '—';
+      const cLine = pv.c ? ` | Peso ${wPct} | Score ${pv.c.quality_score} | DCF Base ${fmtEur(pv.c.dcf?.intrinsic_base, pv.c.currency)} | Salida 50%: ${ex1Txt} | Salida Total: ${ex2Txt} | Stop Loss: ${slTxt}` : ` | Peso ${wPct} | Salida 50%: ${ex1Txt} | Stop Loss: ${slTxt}`;
+      return `- ${pos.ticker} (${pv.c?.name || pv.lq?.name || pos.ticker}): ${pos.shares} acc. · Compra ${avgTxt} · Hoy ${curTxt} (${pv.isLive ? 'VIVO' : 'ESTÁTICO'}) · PnL ${pv.pnlPct >= 0 ? '+' : ''}${pv.pnlPct.toFixed(2)}% (${pnlTxt}) · Señal: ${pv.sig.label}${cLine}`;
     });
-    const totPnl = totCost > 0 ? (((totVal / totCost) - 1) * 100).toFixed(2) : '0.00';
-    portLines.unshift(`TOTAL CARTERA: Valor ${totVal.toFixed(2)} € | Invertido ${totCost.toFixed(2)} € | Resultado ${Number(totPnl) >= 0 ? '+' : ''}${totPnl}%`);
+    const totPnl = riskSnap.totalCostEur > 0 ? (((riskSnap.totalValEur / riskSnap.totalCostEur) - 1) * 100).toFixed(2) : '0.00';
+    portLines.unshift(`TOTAL CARTERA: Valor ${riskSnap.totalValEur.toFixed(2)} € | Invertido ${riskSnap.totalCostEur.toFixed(2)} € | Resultado ${Number(totPnl) >= 0 ? '+' : ''}${totPnl}% | Tech/IA: ${riskSnap.techAiPct.toFixed(0)}% | USD: ${riskSnap.usdExposurePct.toFixed(0)}% | Riesgo Stops: -${riskSnap.totalStopRiskEur.toFixed(0)} €`);
+    if(riskSnap.warnings.length) portLines.push(`ALERTAS DE RIESGO CARTERA: ${riskSnap.warnings.join(' | ')}`);
+  }
+  if(allocSnap.top){
+    portLines.push(`ASIGNADOR AUTOMÁTICO (${allocSnap.isSim ? 'Simulación 80€, bote 0€' : 'Bote real ' + allocSnap.amount + '€'}): ${allocSnap.top.action} ${allocSnap.top.ticker} (${allocSnap.top.name}) · Tramo 1: ${allocSnap.top.plan.m1.toFixed(0)}€ a ${allocSnap.top.plan.p1.toFixed(2)}€ · Peso ${allocSnap.top.curW.toFixed(0)}%->${allocSnap.top.newW.toFixed(0)}%`);
   }
 
   // 2. Top Radar candidates (Oro Puro, Entrar Ya, Gangas, Muy Buenas + Quality+Price)
@@ -4360,6 +5044,8 @@ $('spendPotBtn').onclick = () => {
   if(!confirm('¿Poner el bote a 0 € porque ya has ejecutado la compra?')) return;
   cashPot = 0; saveLocalUserState(true); renderAll(); toast('🎯 Bote reiniciado a 0 €');
 };
+if($('wsMonthlyIn')) $('wsMonthlyIn').oninput = () => renderWealthSimulator(analyzePortfolioRisk());
+if($('wsYearsSel')) $('wsYearsSel').onchange = () => renderWealthSimulator(analyzePortfolioRisk());
 
 $('addPortBtn').onclick = () => {
   const tkr = $('portTickerIn').value.trim().toUpperCase();
