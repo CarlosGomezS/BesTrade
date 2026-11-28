@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<title>Cocodrilo Pro v11.3 — Gestor Patrimonial EUR</title>
+<title>Cocodrilo Pro v11.4 — Gestor Patrimonial EUR</title>
 <style>
 :root{
   --bg:#000000;
@@ -1118,7 +1118,7 @@ details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
       <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v11.3</span></small>
+        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v11.4</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -1436,7 +1436,7 @@ details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
     <div class="panel">
       <div class="eyebrow">Seguimiento prospectivo en EUR · Splits + Hitos exactos</div>
       <h3 style="margin:4px 0 6px">Diario de Aciertos</h3>
-      <p style="margin:0 0 11px;font-size:12.5px;color:var(--muted)">Conserva la fecha y el precio exactos de cada alerta, ajusta <b>splits</b> y homogeneiza tanto tus alertas (<b>precio + dividendos en efectivo, sin reinversión</b>) como <b>MSCI World (URTH)</b> y <b>S&amp;P 500 (SPY)</b> en <b>EUR</b> con tipo de cambio histórico.</p>
+      <p style="margin:0 0 11px;font-size:12.5px;color:var(--muted)">Conserva la fecha y el precio exactos de cada alerta, verifica <b>splits</b> y aplica la <b>misma metodología</b> (precio + dividendos en efectivo al cambio de su fecha de pago, sin reinversión) tanto a tus alertas como a <b>MSCI World (URTH)</b> y <b>S&amp;P 500 (SPY)</b> en <b>EUR</b>.</p>
       <div class="kpi-row" id="histKpis">
         <div class="kpi"><span><i class="kdot b"></i>Alertas</span><strong id="hCount">0</strong></div>
         <div class="kpi g"><span><i class="kdot g"></i>Positivo</span><strong id="hWinRate">—</strong></div>
@@ -1629,7 +1629,7 @@ const FALLBACK_FX_EUR = { EUR: 1.0, USD: 0.94, GBP: 1.19, CHF: 1.07, CAD: 0.67, 
 
 const DEMO_PAYLOAD = {
   is_demo: true,
-  scanner_version: "v11.3-oraculo",
+  scanner_version: "v11.4-oraculo",
   generated_at: new Date().toISOString(),
   universe_mode: "demo (ejemplo)",
   total_scanned: 2150,
@@ -2708,7 +2708,7 @@ async function cloudPush(showMsg = false, retryCount = 0){
       checks
     };
     const body = {
-      message: 'Sync Cocodrilo user-db v11.3',
+      message: 'Sync Cocodrilo user-db v11.4',
       content: toBase64Utf8(JSON.stringify(dbObj, null, 2))
     };
     if(cloudSha) body.sha = cloudSha;
@@ -2882,7 +2882,7 @@ function buildBuffettPrompt(c){
     : '';
   return `Actúa como analista siguiendo estrictamente el método de Warren Buffett y Charlie Munger. Invierto en EUR en Trade Republic.
 Analiza ${liveC.name} (${liveC.ticker}), sector ${liveC.sector} (${liveC.region}).
-Datos del Radar Cocodrilo v11.3 (convertidos a EUR):
+Datos del Radar Cocodrilo v11.4 (convertidos a EUR):
 - Precio actual: ${fmtEur(liveC.price, liveC.currency)} (caída 52s: ${liveC.drawdown_52w_pct ?? 'N/D'}%)
 - Calidad: ${liveC.quality_score}/100 | Cuadrante: ${quad}
 - Piotroski Clásico: ${pioCls} | Adaptado: ${liveC.piotroski_score ?? 'N/D'}/${liveC.piotroski_max ?? 9}
@@ -2901,7 +2901,7 @@ function copyPrompt(ticker){
   if(!c) return;
   const txt = buildBuffettPrompt(c);
   if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(() => toast('Prompt Buffett v11.3 copiado.')).catch(() => prompt('Copia:', txt));
+    navigator.clipboard.writeText(txt).then(() => toast('Prompt Buffett v11.4 copiado.')).catch(() => prompt('Copia:', txt));
   } else prompt('Copia:', txt);
 }
 
@@ -4194,7 +4194,7 @@ function renderHistoryView(){
     const curTag = eurHomogCount === alphas.length ? 'homogeneizado en EUR' : (eurHomogCount > 0 ? `${eurHomogCount}/${alphas.length} en EUR` : 'misma divisa');
     alphaBox.innerHTML = `<div class="notice ${avgAlpha>=0?'good':'warn'}" style="margin:0">⚖️ <b>Alpha medio frente a MSCI World (${alphas.length} señales · ${curTag}):</b> <b>${avgAlpha>=0?'+':''}${avgAlpha.toFixed(1)} pp</b>${med !== null ? ` · Mediana: <b>${med>=0?'+':''}${med.toFixed(1)}%</b>` : ''}</div>`;
   } else {
-    alphaBox.innerHTML = `<div class="notice info" style="margin:0">ℹ️ Los benchmarks homogeneizados en EUR (URTH y SPY) se rellenan automáticamente en el próximo escaneo v11.3.</div>`;
+    alphaBox.innerHTML = `<div class="notice info" style="margin:0">ℹ️ Los benchmarks homogeneizados en EUR (URTH y SPY) se rellenan automáticamente en el próximo escaneo v11.4.</div>`;
   }
 
   // Auditor de Señales v11.3 (Media · Mediana · MAE · MFE · Horizontes EUR/Local · Señales abiertas)
@@ -4286,8 +4286,13 @@ function renderHistoryView(){
     if(e.currency && e.currency.toUpperCase() !== 'EUR' && e._liveRetEur !== null){
       chips.push(`<span class="bench-chip">Local (${esc(e.currency)}): ${e._liveRetLocal>=0?'+':''}${e._liveRetLocal.toFixed(1)}%</span>`);
     }
-    if(Number(e.split_factor_since_alert || 1) !== 1){
+    if(e.splits_status === 'ERROR' || e.splits_status === 'UNAVAILABLE'){
+      chips.push(`<span class="bench-chip lag">⚠️ Splits sin verificar</span>`);
+    } else if(Number(e.split_factor_since_alert || 1) !== 1){
       chips.push(`<span class="bench-chip">Split ${Number(e.split_factor_since_alert)}x</span>`);
+    }
+    if(e.fx_status === 'DIVIDEND_FX_UNAVAILABLE'){
+      chips.push(`<span class="bench-chip lag">⚠️ FX div. N/D</span>`);
     }
     if(e.max_drawdown_after_alert_pct !== null && e.max_drawdown_after_alert_pct !== undefined){
       chips.push(`<span class="bench-chip lag">MAE: ${Number(e.max_drawdown_after_alert_pct).toFixed(1)}%</span>`);
@@ -4496,7 +4501,7 @@ function openModal(ticker, skipLiveRefresh = false){
     ${c.oro_puro ? `<div class="notice good"><b>👑 SEÑAL ORO PURO (1-2/AÑO):</b> doble verificación superada (calidad élite + SEC MATCH ≤15% + Piotroski + Forward Check + Tribunal IA favorable).</div>` : ''}
 
     <div class="notice info">
-      <b>🛡️ Auditoría Oráculo v11.3</b>
+      <b>🛡️ Auditoría Oráculo v11.4</b>
       <div class="oracle-grid">
         <div class="oracle-cell">
           <span>Piotroski Clásico (activos medios)</span>
@@ -4817,7 +4822,7 @@ function buildAgentSystemContext(userText = ''){
   return `Eres el AGENTE ORÁCULO DE BESTRADE: un gestor profesional de renta variable, analista fundamental de élite y especialista táctico en entradas escalonadas, entrenado bajo la filosofía estricta de Warren Buffett y Charlie Munger.
 
 TU MISIÓN Y REGLAS DE HIERRO (OBLIGATORIAS):
-1. Conoces de arriba a abajo TODO el sistema BesTrade v11.3: Score Buffett (0-100), Piotroski Clásico (9 señales originales con activos medios y su cobertura k/9), Piotroski Adaptado, auditoría oficial SEC EDGAR (MATCH <=15%, ACCEPTABLE 15-30%, MISMATCH >30%), Owner Earnings (FCF descontando SBC), DCF Conservador/Base/Optimista, Forward Check (previsiones de BPA e ingresos), Cuadrante Calidad vs. Valoración, Tribunal IA, Diario de Aciertos y Precios/FX en vivo.
+1. Conoces de arriba a abajo TODO el sistema BesTrade v11.4: Score Buffett (0-100), Piotroski Clásico (9 señales originales con activos medios y su cobertura k/9), Piotroski Adaptado, auditoría oficial SEC EDGAR (MATCH <=15%, ACCEPTABLE 15-30%, MISMATCH >30%), Owner Earnings (FCF descontando SBC), DCF Conservador/Base/Optimista, Forward Check (previsiones de BPA e ingresos), Cuadrante Calidad vs. Valoración, Tribunal IA, Diario de Aciertos y Precios/FX en vivo.
 2. NUNCA INVENTES DATOS NI GARANTICES RENTABILIDADES: usa EXCLUSIVAMENTE las cifras exactas que aparecen en el contexto en vivo de abajo. Si falta un dato (ej. Piotroski parcial 5/9 o SEC no verificado), señálalo abiertamente como limitación.
 3. SEPARA SIEMPRE CALIDAD DE PRECIO: distingue con claridad entre (a) Excelente a precio razonable/con margen, (b) Excelente pero cara, (c) Mediocre aparentemente barata (posible trampa de valor) y (d) Problemas fundamentales.
 4. INVERSIÓN INVERSA (CHARLIE MUNGER): antes de recomendar entrar en cualquier empresa, expón SIEMPRE el argumento bajista ("cómo podríamos perder dinero aquí") y los avisos reales (ej. FCF capado, resultados en <=10 días, Piotroski clásico bajo).
@@ -4955,7 +4960,7 @@ function renderAgentView(){
           <p style="margin:4px 0;color:var(--text2)">Toca cualquier botón rápido de arriba o pregúntame directamente por cualquier ticker (ej. <code>DECK</code>, <code>NVDA</code>, <code>ADBE</code>, <code>ITX.MC</code>) para analizar calidad, valoración, trampas y plan en 3 tramos.</p>
           ${setupWarn}
         </div>
-        <div class="msg-meta">Buffett &amp; Munger Engine · v11.3</div>
+        <div class="msg-meta">Buffett &amp; Munger Engine · v11.4</div>
       </div>`;
     return;
   }
