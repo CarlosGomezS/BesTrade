@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<title>Cocodrilo Pro v11.0 — Gestor Patrimonial EUR</title>
+<title>Cocodrilo Pro v11.1 — Gestor Patrimonial EUR</title>
 <style>
 :root{
   --bg:#000000;
@@ -1065,6 +1065,42 @@ details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
   .scell b{font-size:12px}
 }
 
+/* V11.1 REPARTO EXACTO · MODO TESIS/TÁCTICO · TEMAS */
+.mode-toggle-row{
+  display:grid;grid-template-columns:1fr 1fr;gap:5px;background:#04060a;
+  border:1px solid var(--line);border-radius:11px;padding:3px;margin:8px 0 4px;
+}
+.mtog{
+  border:0;background:transparent;color:var(--muted);border-radius:8px;padding:6px 8px;
+  font-size:11px;font-weight:750;cursor:pointer;transition:all .15s;
+}
+.mtog.active{background:#151d2e;color:#ffffff;box-shadow:inset 0 0 0 1px rgba(59,130,246,.42)}
+.alloc-split-list{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.alloc-line{
+  background:#070b14;border:1px solid rgba(59,130,246,.28);border-radius:13px;padding:10px 11px;
+  cursor:pointer;transition:border-color .15s;
+}
+.alloc-line:active{border-color:rgba(96,165,250,.6)}
+.alloc-line.cash{border-color:var(--line);background:#07090e;cursor:default}
+.alloc-line-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.alloc-amt{font-size:17px;font-weight:800;color:#60a5fa;font-variant-numeric:tabular-nums;flex-shrink:0}
+.alloc-line.cash .alloc-amt{color:#e2e8f0}
+.alloc-meta{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
+.disc-box{
+  margin-top:9px;padding:8px 10px;border-radius:10px;background:#06080d;
+  border:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.45;
+}
+.theme-alert{
+  margin-top:9px;padding:9px 11px;border-radius:12px;background:rgba(244,63,94,.08);
+  border:1px solid rgba(244,63,94,.32);color:#fecdd3;font-size:11.5px;line-height:1.45;
+}
+.hor-strip{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:9px;
+}
+.hcell{background:#070a10;border:1px solid var(--line);border-radius:9px;padding:6px 5px;text-align:center}
+.hcell span{display:block;font-size:9px;color:var(--muted);text-transform:uppercase}
+.hcell b{display:block;font-size:12px;margin-top:2px;font-variant-numeric:tabular-nums}
+
 /* FIREBASE PUSH TOKEN BOX */
 .fcm-token-box{
   display:none;margin-top:8px;padding:9px 11px;border-radius:11px;
@@ -1082,7 +1118,7 @@ details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
       <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v11.0</span></small>
+        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v11.1</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -1277,9 +1313,13 @@ details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <div>
           <div class="eyebrow">Centro de control de riesgo</div>
-          <h3 style="margin:3px 0 0">Exposición, Concentración y Estrés</h3>
+          <h3 style="margin:3px 0 0">Exposición, Temas y Estrés</h3>
         </div>
         <span class="pill blue" id="riskStatusPill">Sano</span>
+      </div>
+      <div class="mode-toggle-row" id="stopModeToggle">
+        <button class="mtog" data-slmode="THESIS" id="mtogThesis">Solo Tesis (Buffett)</button>
+        <button class="mtog" data-slmode="AUTO" id="mtogAuto">Táctico (Stop Auto)</button>
       </div>
       <div id="riskControlHost" style="margin-top:8px"></div>
     </div>
@@ -1311,19 +1351,23 @@ details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
         <span class="collap-chev">▼</span>
       </summary>
       <div style="margin-top:11px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
           <div>
-            <label class="flabel" style="margin-top:0">Aportación mensual (€)</label>
+            <label class="flabel" style="margin-top:0">Aporte/mes (€)</label>
             <input class="finput" id="wsMonthlyIn" type="number" min="10" step="10" value="80" style="height:36px">
           </div>
           <div>
-            <label class="flabel" style="margin-top:0">Horizonte (años)</label>
+            <label class="flabel" style="margin-top:0">Horizonte</label>
             <select class="finput" id="wsYearsSel" style="height:36px">
               <option value="5">5 años</option>
               <option value="10" selected>10 años</option>
               <option value="15">15 años</option>
               <option value="20">20 años</option>
             </select>
+          </div>
+          <div>
+            <label class="flabel" style="margin-top:0">Inflación/año</label>
+            <input class="finput" id="wsInflIn" type="number" min="0" max="10" step="0.5" value="2.5" style="height:36px">
           </div>
         </div>
         <div id="wealthSimHost"></div>
@@ -2351,6 +2395,13 @@ function fmtEur(v, cur){
   return `${Number(v).toFixed(2)} ${src} (sin FX)`.trim();
 }
 
+function getScanAgeHours(){
+  if(!payload || payload.is_demo || !payload.generated_at) return 0;
+  const ts = Date.parse(payload.generated_at);
+  if(!Number.isFinite(ts)) return 0;
+  return Math.max(0, (Date.now() - ts) / 3600000);
+}
+
 function computeAdaptiveStopProfile(c, refEntryEur){
   const sec = String(c?.sector || '').toLowerCase();
   const prof = String(c?.sector_profile || '').toLowerCase();
@@ -2364,7 +2415,8 @@ function computeAdaptiveStopProfile(c, refEntryEur){
 
   let volAdj = 0;
   const h52 = Number(c?.high_52w), l52 = Number(c?.low_52w);
-  if(Number.isFinite(h52) && Number.isFinite(l52) && h52 > 0 && l52 > 0 && h52 > l52){
+  const hasRange52 = Number.isFinite(h52) && Number.isFinite(l52) && h52 > 0 && l52 > 0 && h52 > l52;
+  if(hasRange52){
     const range52 = (h52 - l52) / h52;
     if(range52 >= 0.45) volAdj = 3;
     else if(range52 >= 0.35) volAdj = 1.5;
@@ -2372,18 +2424,17 @@ function computeAdaptiveStopProfile(c, refEntryEur){
   }
   const pct = Math.max(11, Math.min(25, Math.round(basePct + volAdj)));
 
-  // Anclaje a soporte de mínimo 52 semanas (-3% debajo del mínimo si está en rango razonable)
   const cur = (c?.currency || 'USD').toUpperCase();
-  const low52Eur = (Number.isFinite(l52) && l52 > 0) ? toEur(l52, cur) : null;
-  let supportStopEur = null;
+  const low52Eur = hasRange52 ? toEur(l52, cur) : null;
   if(low52Eur && refEntryEur > 0 && low52Eur < refEntryEur * 0.94 && low52Eur >= refEntryEur * 0.76){
-    supportStopEur = low52Eur * 0.97;
+    const supportStopEur = low52Eur * 0.97;
     const supPct = Math.abs(((supportStopEur / refEntryEur) - 1) * 100);
     if(supPct >= 10 && supPct <= 26){
       return { pct: Math.round(supPct), stopEur: supportStopEur, reason: `Auto · ${tag} + Soporte 52s` };
     }
   }
-  return { pct, stopEur: refEntryEur > 0 ? refEntryEur * (1 - pct / 100) : null, reason: `Auto · ${tag}` };
+  const suffix = hasRange52 ? '' : ' (sin rango 52s)';
+  return { pct, stopEur: refEntryEur > 0 ? refEntryEur * (1 - pct / 100) : null, reason: `Auto · ${tag}${suffix}` };
 }
 
 function computeTradePlanEur(c, budgetInput = null, customEntryEur = null, slModeInput = null){
@@ -2432,10 +2483,17 @@ function computeTradePlanEur(c, budgetInput = null, customEntryEur = null, slMod
   const exit2Pct = ((exit2Eur / avgEntryEur) - 1) * 100;
 
   const mode = String(slModeInput ?? stopLossMode ?? 'AUTO').trim().toUpperCase();
+  const isThesisOnly = mode === 'THESIS';
   let stopLossEur;
   let slReason;
   let slPctTarget;
-  if(mode === 'AUTO' || !Number.isFinite(Number(mode))){
+  if(isThesisOnly){
+    const adap = computeAdaptiveStopProfile(c, avgEntryEur);
+    slPctTarget = adap.pct;
+    slReason = 'Solo Tesis (Buffett)';
+    const baseSlEur = adap.stopEur || (avgEntryEur * (1 - adap.pct / 100));
+    stopLossEur = isPosition ? baseSlEur : Math.min(baseSlEur, p3 * 0.94);
+  } else if(mode === 'AUTO' || !Number.isFinite(Number(mode))){
     const adap = computeAdaptiveStopProfile(c, avgEntryEur);
     slPctTarget = adap.pct;
     slReason = adap.reason;
@@ -2458,7 +2516,7 @@ function computeTradePlanEur(c, budgetInput = null, customEntryEur = null, slMod
   return {
     pNowEur, baseEur, bearEur, buyObjEur,
     budget, isSimulatedBudget, exceedsCashPot,
-    slPct: slPctTarget, slReason,
+    isThesisOnly, slPct: slPctTarget, slReason,
     m1, m2, m3, p1, p2, p3, s1, s2, s3, totalShares,
     avgEntryEur, exit1Eur, exit2Eur, exit1Pct, exit2Pct,
     stopLossEur, stopLossPct: stopLossPctCalc, stopLossFromNowPct,
@@ -2989,7 +3047,7 @@ function cardHTML(rawC, includeNote = false){
         return `<div class="plan-strip">
           <div class="pcell in"><span>${inLbl}</span><b>${inVal}</b><small>${inSub}</small></div>
           <div class="pcell out"><span>Salida (TP)</span><b>${pl.exit1Eur.toFixed(2)} €</b><small>+${pl.exit1Pct.toFixed(0)}% · Total ${pl.exit2Eur.toFixed(0)}€</small></div>
-          <div class="pcell sl"><span>Stop Loss</span><b>${pl.stopLossEur.toFixed(2)} €</b><small>${pl.stopLossPct.toFixed(0)}% · ${pl.slReason.split('·')[0].trim()}</small></div>
+          <div class="pcell sl"><span>${pl.isThesisOnly ? 'Salida Tesis' : 'Stop Loss'}</span><b>${pl.isThesisOnly ? 'Solo Tesis' : pl.stopLossEur.toFixed(2) + ' €'}</b><small>${pl.isThesisOnly ? 'Ref. ' + pl.stopLossEur.toFixed(0) + ' €' : pl.stopLossPct.toFixed(0) + '% · ' + pl.slReason.split('·')[0].trim()}</small></div>
         </div>`;
       })()}
     </div>
@@ -3101,26 +3159,33 @@ function evaluatePortfolioSignal(pos, c, pnlPct, levels){
   const slEur = levels?.stopLossEur;
   const ex1Eur = levels?.exit1Eur;
   const ex2Eur = levels?.exit2Eur;
+  const isThesis = !!levels?.isThesisOnly;
 
-  if(c && !c.passes_quality && (c.quality_score < 65 || (c.hard_fails||[]).length > 0)){
-    return { kind:'sell', label:'🚨 SALIR / TESIS ROTA: cayó la calidad o saltó alerta crítica — revisar fundamentales', badge:'<span class="pill red">SALIR · TESIS ROTA</span>' };
+  const brokenThesis = c && (
+    c.sec_verified === false ||
+    c.ai_verdict === 'PERMANENTE' ||
+    (!c.passes_quality && (c.quality_score < 65 || (c.hard_fails||[]).length > 0))
+  );
+  if(brokenThesis){
+    return { kind:'sell', label:'🚨 SALIR / TESIS ROTA: cayó la calidad, falló SEC o IA detectó deterioro estructural', badge:'<span class="pill red">SALIR · TESIS ROTA</span>' };
   }
-  if(curEur && slEur && curEur <= slEur){
+  if(!isThesis && curEur && slEur && curEur <= slEur){
     return { kind:'sell', label:`🛑 STOP LOSS (${slEur.toFixed(2)} €) ALCANZADO: llevas ${pnlPct.toFixed(1)}% — cortar pérdidas o revalidar tesis hoy`, badge:'<span class="pill red">STOP LOSS</span>' };
   }
   if(curEur && ex2Eur && curEur >= ex2Eur && Number.isFinite(pnlPct) && pnlPct >= 12){
-    return { kind:'profit', label:`💰 SALIDA TOTAL (${ex2Eur.toFixed(2)} €): llevas +${pnlPct.toFixed(1)}% — recoger beneficios`, badge:'<span class="pill gold">SALIDA TOTAL</span>' };
+    return { kind:'profit', label:`💰 SALIDA TOTAL (${ex2Eur.toFixed(2)} €): llevas +${pnlPct.toFixed(1)}% — valorar recoger beneficios`, badge:'<span class="pill gold">SALIDA TOTAL</span>' };
   }
   if(curEur && ex1Eur && curEur >= ex1Eur && Number.isFinite(pnlPct) && pnlPct >= 15){
     return { kind:'profit', label:`🎯 SALIDA PARCIAL 50% (${ex1Eur.toFixed(2)} €): alcanzó valor justo (+${pnlPct.toFixed(1)}%) — valorar vender la mitad`, badge:'<span class="pill gold">VENDER 50%</span>' };
   }
+  const slTxt = isThesis ? 'Modo Solo Tesis (sin stop mecánico)' : `Stop ${slEur ? slEur.toFixed(2) + ' €' : '—'}`;
   if(!c){
-    return { kind:'ok', label:`Mantener · Salida ref. ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} · Stop Loss ${slEur ? slEur.toFixed(2) + ' €' : '—'}`, badge:'<span class="pill blue">MANTENER</span>' };
+    return { kind:'ok', label:`Mantener · Salida ref. ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} · ${slTxt}`, badge:'<span class="pill blue">MANTENER</span>' };
   }
   if(c.status === 'OPORTUNIDAD'){
-    return { kind:'add', label:`🟢 Zona atractiva (puedes ampliar) · Salida 1 en ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} · Stop Loss ${slEur ? slEur.toFixed(2) + ' €' : '—'}`, badge:'<span class="pill">ZONA COMPRA</span>' };
+    return { kind:'add', label:`🟢 Zona atractiva (puedes ampliar) · Salida 1 en ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} · ${slTxt}`, badge:'<span class="pill">ZONA COMPRA</span>' };
   }
-  return { kind:'ok', label:`✅ Negocio sano — mantener hasta ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} (Stop Loss ${slEur ? slEur.toFixed(2) + ' €' : '—'})`, badge:'<span class="pill blue">MANTENER</span>' };
+  return { kind:'ok', label:`✅ Negocio sano — mantener hasta ${ex1Eur ? ex1Eur.toFixed(2) + ' €' : '—'} (${slTxt})`, badge:'<span class="pill blue">MANTENER</span>' };
 }
 
 function computePositionView(pos){
@@ -3149,19 +3214,20 @@ function computePositionView(pos){
 
   const liveComp = c ? { ...c, price: rawNativePrice ?? c.price } : null;
   const plan = (liveComp && avgPriceEur && costEur) ? computeTradePlanEur(liveComp, costEur, avgPriceEur) : null;
-  const fallbackSlPct = stopLossMode === 'AUTO' ? 17 : (Number(stopLossMode) || 18);
+  const isThesisOnly = stopLossMode === 'THESIS';
+  const fallbackSlPct = (stopLossMode === 'AUTO' || isThesisOnly) ? 17 : (Number(stopLossMode) || 18);
   const exit1Eur = plan ? plan.exit1Eur : (avgPriceEur ? avgPriceEur * 1.25 : null);
   const exit2Eur = plan ? plan.exit2Eur : (avgPriceEur ? avgPriceEur * 1.45 : null);
   const stopLossEur = plan ? plan.stopLossEur : (avgPriceEur ? avgPriceEur * (1 - fallbackSlPct / 100) : null);
   const stopLossPctVal = plan ? Math.abs(Math.round(plan.stopLossPct)) : fallbackSlPct;
-  const slReason = plan ? plan.slReason : `Auto -${fallbackSlPct}%`;
+  const slReason = isThesisOnly ? 'Solo Tesis' : (plan ? plan.slReason : `Auto -${fallbackSlPct}%`);
 
-  const sig = evaluatePortfolioSignal(pos, liveComp, pnlPct, { curPriceEur, exit1Eur, exit2Eur, stopLossEur });
+  const sig = evaluatePortfolioSignal(pos, liveComp, pnlPct, { curPriceEur, exit1Eur, exit2Eur, stopLossEur, isThesisOnly });
 
   return {
     c, lq, isLive, changePct, rawNativePrice, posCur: 'EUR', origPosCur: posCur, stockCur, fxMissing,
     avgPriceEur, curPriceEur, costEur, valEur, pnlEur, pnlPct,
-    exit1Eur, exit2Eur, stopLossEur, stopLossPctVal, slReason, sig
+    exit1Eur, exit2Eur, stopLossEur, stopLossPctVal, slReason, isThesisOnly, sig
   };
 }
 
@@ -3342,14 +3408,48 @@ function renderMapView(){
 }
 
 /* ===========================
-   V11.0 MÓDULOS DE GESTIÓN PATRIMONIAL (RIESGO · ASIGNADOR · AGENDA · SIMULADOR)
+   V11.1 MÓDULOS DE GESTIÓN PATRIMONIAL (RIESGO TEMÁTICO · REPARTO EXACTO · AGENDA · SIMULADOR REAL)
    =========================== */
+const AI_CLOUD_TICKERS = new Set([
+  'NVDA','MSFT','AMZN','GOOGL','GOOG','META','AVGO','AMD','ASML','ASML.AS','TSM',
+  'ANET','PLTR','ORCL','MU','INTC','QCOM','ARM','SNPS','CDNS','SMCI','DELL',
+  'CRM','NOW','ADBE','INTU','APP','SNOW','DDOG','NET','SAP','SAP.DE','AAPL'
+]);
+const CONSUMO_TICKERS = new Set([
+  'AMZN','DECK','EXPE','BKNG','ITX.MC','MC.PA','NKE','COST','WMT','HD','LOW','LULU','MCD','SBUX','ABNB','MELI'
+]);
+
+function detectThemesForCompany(ticker, c){
+  const tkr = String(ticker || '').toUpperCase();
+  const baseTkr = tkr.split('.')[0];
+  const txt = `${c?.sector || ''} ${c?.industry || ''}`.toLowerCase();
+  const themes = [];
+  if(AI_CLOUD_TICKERS.has(tkr) || AI_CLOUD_TICKERS.has(baseTkr) || /tech|semiconductor|software|cloud|internet|communication|electronic/i.test(txt)){
+    themes.push('IA / Cloud / Semis');
+  }
+  if(CONSUMO_TICKERS.has(tkr) || CONSUMO_TICKERS.has(baseTkr) || /consumer|retail|apparel|footwear|travel|restaurant|auto|luxury|leisure/i.test(txt)){
+    themes.push('Consumo y Retail');
+  }
+  if(/health|pharma|biotech|medical|utilities|staple|defensive|food|beverage/i.test(txt)){
+    themes.push('Salud y Defensivo');
+  }
+  if(/financial|bank|insurance|real estate|reit|payment|credit/i.test(txt)){
+    themes.push('Finanzas y Tipos');
+  }
+  if(/industrial|energy|oil|gas|defense|aerospace|material|chemical|mining/i.test(txt)){
+    themes.push('Industria y Energía');
+  }
+  if(!themes.length) themes.push('Otros / Mixto');
+  return themes;
+}
+
 function analyzePortfolioRisk(){
   const items = portfolio.map(pos => {
     const pv = computePositionView(pos);
     const sec = pv.c?.sector || 'Sin clasificar';
-    const isTechAi = /tech|semiconductor|communication|software/i.test(sec + ' ' + (pv.c?.industry || ''));
-    return { pos, pv, sector: sec, isTechAi };
+    const themes = detectThemesForCompany(pos.ticker, pv.c);
+    const isTechAi = themes.includes('IA / Cloud / Semis');
+    return { pos, pv, sector: sec, themes, isTechAi };
   });
   const valid = items.filter(x => x.pv.valEur !== null && x.pv.valEur > 0);
   const totalValEur = valid.reduce((a, x) => a + x.pv.valEur, 0);
@@ -3363,47 +3463,69 @@ function analyzePortfolioRisk(){
     valEur: x.pv.valEur,
     weightPct: totalValEur > 0 ? (x.pv.valEur / totalValEur) * 100 : 0,
     sector: x.sector,
+    themes: x.themes,
     stockCur: x.pv.stockCur,
-    stopRiskEur: (x.pv.stopLossEur && x.pv.curPriceEur > x.pv.stopLossEur)
+    stopRiskEur: (!x.pv.isThesisOnly && x.pv.stopLossEur && x.pv.curPriceEur > x.pv.stopLossEur)
       ? (x.pv.curPriceEur - x.pv.stopLossEur) * x.pos.shares : 0
   })).sort((a, b) => b.weightPct - a.weightPct);
 
   const secMap = {};
   const curMap = {};
+  const themeMap = {};
   let techAiEur = 0;
   let totalStopRiskEur = 0;
   byPos.forEach(p => {
     secMap[p.sector] = (secMap[p.sector] || 0) + p.valEur;
     curMap[p.stockCur] = (curMap[p.stockCur] || 0) + p.valEur;
     totalStopRiskEur += p.stopRiskEur;
+    p.themes.forEach(th => {
+      if(!themeMap[th]) themeMap[th] = { valEur: 0, tickers: [] };
+      themeMap[th].valEur += p.valEur;
+      themeMap[th].tickers.push(p.ticker);
+    });
   });
   valid.forEach(x => { if(x.isTechAi) techAiEur += x.pv.valEur; });
 
   const bySector = Object.entries(secMap)
     .map(([name, valEur]) => ({ name, valEur, pct: totalValEur > 0 ? (valEur / totalValEur) * 100 : 0 }))
     .sort((a, b) => b.pct - a.pct);
+  const byTheme = Object.entries(themeMap)
+    .map(([name, obj]) => ({
+      name,
+      valEur: obj.valEur,
+      tickers: obj.tickers,
+      count: obj.tickers.length,
+      pct: totalValEur > 0 ? (obj.valEur / totalValEur) * 100 : 0,
+      shock25Eur: obj.valEur * 0.25
+    }))
+    .sort((a, b) => b.pct - a.pct);
+
   const techAiPct = totalValEur > 0 ? (techAiEur / totalValEur) * 100 : 0;
   const usdExposurePct = totalValEur > 0 ? ((curMap['USD'] || 0) / totalValEur) * 100 : 0;
   const maxPos = byPos[0] || null;
   const maxSec = bySector[0] || null;
+  const topTheme = byTheme[0] || null;
+  const themeOverlapAlert = (topTheme && topTheme.pct > 45 && topTheme.count >= 2) ? topTheme : null;
 
   const warnings = [];
-  if(maxPos && maxPos.weightPct > 25) warnings.push(`Concentración alta en ${maxPos.ticker} (${maxPos.weightPct.toFixed(0)}% > 25%).`);
-  if(maxSec && maxSec.pct > 40) warnings.push(`Sobreexposición al sector ${maxSec.name} (${maxSec.pct.toFixed(0)}% > 40%).`);
-  if(techAiPct > 45) warnings.push(`Exposición Tech/IA elevada (${techAiPct.toFixed(0)}%): riesgo de correlación en caídas de tipos/IA.`);
+  if(maxPos && maxPos.weightPct > 25) warnings.push(`Concentración en ${maxPos.ticker} (${maxPos.weightPct.toFixed(0)}% > ref. 25%).`);
+  if(maxSec && maxSec.pct > 40) warnings.push(`Peso elevado en sector ${maxSec.name} (${maxSec.pct.toFixed(0)}% > ref. 40%).`);
   if(usdExposurePct > 75 && valid.length >= 2) warnings.push(`Alta exposición a divisa USD (${usdExposurePct.toFixed(0)}%): sensible al cambio EUR/USD.`);
-  if(valid.length > 0 && valid.length < 4) warnings.push(`Cartera con solo ${valid.length} posición(es): diversificar progresivamente hasta 5–10 negocios.`);
+  if(valid.length > 0 && valid.length < 4) warnings.push(`Cartera con ${valid.length} posición(es): diversificar progresivamente hasta 5–10 negocios.`);
 
   let level = 'good';
-  if(warnings.some(w => w.includes('> 25%') || w.includes('> 40%') || w.includes('Tech/IA'))) level = 'bad';
+  if(themeOverlapAlert || (maxPos && maxPos.weightPct > 25) || (maxSec && maxSec.pct > 40)) level = 'bad';
   else if(warnings.length > 0) level = 'warn';
 
   return {
     items, valid, totalValEur, totalCostEur, totalPatrimonyEur, investedPct,
-    byPos, bySector, techAiPct, usdExposurePct, maxPos, maxSec,
+    byPos, bySector, byTheme, topTheme, themeOverlapAlert,
+    techAiPct, usdExposurePct, maxPos, maxSec,
     stress15Eur: totalValEur * 0.15,
     stress25Eur: totalValEur * 0.25,
+    stress35Eur: totalValEur * 0.35,
     totalStopRiskEur,
+    isThesisMode: stopLossMode === 'THESIS',
     warnings, level
   };
 }
@@ -3415,77 +3537,161 @@ function computeSmartAllocation(risk){
   const newTotalVal = risk.totalValEur + amount;
   const posMap = new Map(risk.byPos.map(p => [p.ticker.toUpperCase(), p]));
   const secPctMap = new Map(risk.bySector.map(s => [s.name, s.pct]));
+  const themePctMap = new Map(risk.byTheme.map(t => [t.name, t.pct]));
+  const scanAgeHours = getScanAgeHours();
+  const staleData = scanAgeHours > 72;
 
   const candidates = [];
+  const discarded = [];
   const allLive = (payload.companies || []).map(getLiveCompanyView);
 
-  // 1) Evaluar ampliación de posiciones existentes en cartera (si siguen atractivas y no concentran)
+  const evalCandidate = (c, action, curValEur, curW) => {
+    const tkr = c.ticker.toUpperCase();
+    if(c.sec_verified === false){
+      discarded.push({ ticker: tkr, reason: 'SEC MISMATCH' }); return;
+    }
+    if(c.ai_verdict === 'PERMANENTE'){
+      discarded.push({ ticker: tkr, reason: 'IA: riesgo trampa' }); return;
+    }
+    if(action === 'AMPLIAR' && risk.valid.length >= 2 && curW >= 25){
+      discarded.push({ ticker: tkr, reason: `Ya pesa ${curW.toFixed(0)}% (>25%)` }); return;
+    }
+    const themes = detectThemesForCompany(tkr, c);
+    const primaryTheme = themes[0];
+    const themeW = themePctMap.get(primaryTheme) || 0;
+    const secW = secPctMap.get(c.sector) || 0;
+    const earningsRisk = c.earnings_days !== null && c.earnings_days !== undefined && c.earnings_days >= 0 && c.earnings_days <= 10;
+
+    let score = (c.conviction_score || c.quality_score || 70)
+      + (c.oro_puro ? 28 : 0)
+      + (c.opportunity_tier === 'ENTRADA_YA' ? 20 : c.opportunity_tier === 'GANGA' ? 10 : 0);
+
+    if(action === 'AMPLIAR' && curW < 15) score += 7;
+    if(action === 'ABRIR NUEVA' && themeW === 0 && risk.valid.length > 0) score += 14;
+    if(themeW >= 42) score -= 22;
+    else if(secW >= 38) score -= 16;
+    if(earningsRisk) score -= 6; // Avisa y reduce tamaño, NO excluye automáticamente
+
+    const pl = computeTradePlanEur(c, amount);
+    if(!pl){
+      discarded.push({ ticker: tkr, reason: `Sin cambio FX (${c.currency})` }); return;
+    }
+    candidates.push({
+      action,
+      ticker: tkr,
+      name: c.name,
+      sector: c.sector,
+      primaryTheme,
+      themeW,
+      tier: c.oro_puro ? 'ORO PURO' : (c.opportunity_tier || c.status),
+      score,
+      curValEur,
+      curW,
+      earningsRisk,
+      earningsDays: c.earnings_days,
+      earningsDate: c.earnings_date,
+      discPct: c.discount_vs_base_pct,
+      qScore: c.quality_score,
+      plan: pl
+    });
+  };
+
+  // 1) Posiciones existentes en zona de compra
   risk.items.forEach(item => {
     const c = item.pv.c ? getLiveCompanyView(item.pv.c) : null;
     if(!c || !c.passes_quality || c.status !== 'OPORTUNIDAD') return;
-    if(c.earnings_days !== null && c.earnings_days !== undefined && c.earnings_days <= 10) return;
-    if(c.ai_verdict === 'PERMANENTE' || c.sec_verified === false) return;
     const curW = posMap.get(c.ticker.toUpperCase())?.weightPct || 0;
-    const newW = newTotalVal > 0 ? (((item.pv.valEur || 0) + amount) / newTotalVal) * 100 : 100;
-    if(risk.valid.length >= 2 && curW >= 25) return;
-    const secW = secPctMap.get(c.sector) || 0;
-    let score = (c.conviction_score || c.quality_score || 70) + (c.oro_puro ? 25 : 0) + (c.opportunity_tier === 'ENTRADA_YA' ? 18 : 0);
-    if(curW < 15) score += 8;
-    if(secW >= 38) score -= 22;
-    const pl = computeTradePlanEur(c, amount);
-    if(!pl) return;
-    candidates.push({
-      action: 'AMPLIAR',
-      ticker: c.ticker,
-      name: c.name,
-      sector: c.sector,
-      tier: c.oro_puro ? 'ORO PURO' : (c.opportunity_tier || c.status),
-      score,
-      curW,
-      newW,
-      reason: `Ya en cartera (${curW.toFixed(0)}%) y sigue en zona de compra con Score ${c.quality_score}/100.`,
-      plan: pl
-    });
+    evalCandidate(c, 'AMPLIAR', item.pv.valEur || 0, curW);
   });
 
-  // 2) Evaluar nuevas oportunidades top del Radar que mejoren diversificación
+  // 2) Nuevas oportunidades del Radar
   allLive
     .filter(c => c.status === 'OPORTUNIDAD' && c.passes_quality && !posMap.has(c.ticker.toUpperCase()))
-    .filter(c => c.ai_verdict !== 'PERMANENTE' && c.sec_verified !== false)
-    .filter(c => !(c.earnings_days !== null && c.earnings_days !== undefined && c.earnings_days <= 10))
     .sort((a, b) => (b.oro_puro ? 1 : 0) - (a.oro_puro ? 1 : 0) || (b.conviction_score || 0) - (a.conviction_score || 0))
-    .slice(0, 12)
-    .forEach(c => {
-      const secW = secPctMap.get(c.sector) || 0;
-      const newW = newTotalVal > 0 ? (amount / newTotalVal) * 100 : 100;
-      let score = (c.conviction_score || c.quality_score || 70) + (c.oro_puro ? 30 : 0) + (c.opportunity_tier === 'ENTRADA_YA' ? 22 : c.opportunity_tier === 'GANGA' ? 12 : 0);
-      if(secW === 0 && risk.valid.length > 0) score += 12; // Premio por diversificar sector
-      if(secW >= 38) score -= 25;
-      const pl = computeTradePlanEur(c, amount);
-      if(!pl) return;
-      const divTxt = (secW === 0 && risk.valid.length > 0)
-        ? `Diversifica en sector nuevo (${c.sector})`
-        : `Sector ${c.sector} (${secW.toFixed(0)}% actual)`;
-      candidates.push({
-        action: 'ABRIR NUEVA',
-        ticker: c.ticker,
-        name: c.name,
-        sector: c.sector,
-        tier: c.oro_puro ? 'ORO PURO' : (c.opportunity_tier || c.status),
-        score,
-        curW: 0,
-        newW,
-        reason: `${divTxt} · Score ${c.quality_score}/100 · Desc. DCF ${c.discount_vs_base_pct ?? '—'}%.`,
-        plan: pl
-      });
-    });
+    .slice(0, 14)
+    .forEach(c => evalCandidate(c, 'ABRIR NUEVA', 0, 0));
 
   candidates.sort((a, b) => b.score - a.score);
-  return { amount, isSim, top: candidates[0] || null, alts: candidates.slice(1, 3) };
+
+  // Construir reparto exacto en EUR que sume exactamente `amount`
+  const allocations = [];
+  if(!candidates.length){
+    return {
+      amount, isSim, staleData, scanAgeHours,
+      allocations: [],
+      reserveEur: amount,
+      top: null,
+      discarded: discarded.slice(0, 4)
+    };
+  }
+
+  const pick1 = candidates[0];
+  // Buscar segunda candidata que diversifique tema/sector si existe y hay capital >= 50 €
+  const pick2 = amount >= 50
+    ? (candidates.slice(1).find(x => x.primaryTheme !== pick1.primaryTheme) || candidates[1] || null)
+    : null;
+
+  let eur1 = 0, eur2 = 0;
+  if(pick2){
+    const pct1 = pick1.earningsRisk ? 0.35 : 0.50;
+    const pct2 = pick2.earningsRisk ? 0.20 : 0.30;
+    eur1 = Math.max(10, Math.round((amount * pct1) / 5) * 5);
+    eur2 = Math.max(10, Math.round((amount * pct2) / 5) * 5);
+    if(eur1 + eur2 > amount - 5){
+      eur2 = Math.max(0, amount - eur1);
+    }
+  } else {
+    const pct1 = pick1.earningsRisk ? 0.35 : 0.60;
+    eur1 = Math.max(10, Math.min(amount, Math.round((amount * pct1) / 5) * 5));
+  }
+  const reserveEur = Math.max(0, amount - eur1 - eur2);
+
+  const finalizePick = (cand, allocEur) => {
+    if(allocEur <= 0) return;
+    const newW = newTotalVal > 0 ? ((cand.curValEur + allocEur) / newTotalVal) * 100 : 100;
+    const riskNote = cand.earningsRisk
+      ? `Resultados en ${cand.earningsDays}d (${cand.earningsDate || 'próximos'}): importe reducido por prudencia ante volatilidad.`
+      : (cand.themeW >= 40
+        ? `Aumenta exposición a ${cand.primaryTheme} (ya en ${cand.themeW.toFixed(0)}%).`
+        : (cand.themeW === 0 && risk.valid.length > 0
+          ? `Diversifica entrando en nuevo bloque temático (${cand.primaryTheme}).`
+          : `Bloque ${cand.primaryTheme} controlado (${cand.themeW.toFixed(0)}% actual).`));
+    allocations.push({
+      ...cand,
+      allocEur,
+      newW,
+      riskNote
+    });
+  };
+
+  finalizePick(pick1, eur1);
+  if(pick2 && eur2 > 0) finalizePick(pick2, eur2);
+
+  // Añadir no elegidas relevantes a descartadas
+  candidates.slice(pick2 ? 2 : 1, 5).forEach(c => {
+    if(discarded.length < 4){
+      discarded.push({ ticker: c.ticker, reason: `Menor convicción (${c.qScore}/100 · ${c.primaryTheme})` });
+    }
+  });
+
+  return {
+    amount, isSim, staleData, scanAgeHours,
+    allocations,
+    reserveEur,
+    top: allocations[0] || null,
+    discarded: discarded.slice(0, 4)
+  };
 }
 
 function renderRiskAndAllocator(risk){
-  // A) Smart Allocator
+  // Sync Stop Loss Mode buttons
+  const mtT = $('mtogThesis'), mtA = $('mtogAuto');
+  if(mtT && mtA){
+    mtT.classList.toggle('active', stopLossMode === 'THESIS');
+    mtA.classList.toggle('active', stopLossMode !== 'THESIS');
+  }
+
+  // A) Smart Allocator (Reparto exacto en EUR)
   const alloc = computeSmartAllocation(risk);
   const pillA = $('allocBudgetPill');
   if(pillA){
@@ -3494,56 +3700,75 @@ function renderRiskAndAllocator(risk){
   }
   const aHost = $('smartAllocatorHost');
   if(aHost){
-    if(!alloc.top){
-      aHost.innerHTML = `<div class="notice info" style="margin:0">
-        <b>GUARDAR EN BOTE (${alloc.amount} €):</b> hoy no hay ninguna oportunidad limpia en el Radar sin riesgo de resultados próximos o sobreconcentración. Acumula pólvora seca sin forzar compras.
+    const staleBanner = alloc.staleData
+      ? `<div class="notice warn" style="margin:0 0 8px;font-size:11.5px">⚠️ Último escaneo fundamental hace <b>${Math.round(alloc.scanAgeHours / 24)} días</b>: actualiza el escaneo <b>Diario</b> antes de comprometer capital.</div>`
+      : '';
+    if(!alloc.allocations.length){
+      aHost.innerHTML = staleBanner + `<div class="notice info" style="margin:0">
+        <b>100% LIQUIDEZ EN BOTE (${alloc.amount} €):</b> hoy no hay ninguna oportunidad que mejore tu cartera sin asumir riesgos innecesarios. No comprar también es una gran decisión.
       </div>`;
     } else {
-      const t = alloc.top;
-      const pl = t.plan;
-      const t1Amt = Math.max(10, Math.round(pl.m1));
       const simWarn = alloc.isSim
-        ? `<div style="font-size:10.5px;color:#fde047;margin-top:6px">Simulación con 80 €: tu Bote está en 0 €. Añade +80 € cuando tengas liquidez real.</div>`
+        ? `<div style="font-size:10.5px;color:#fde047;margin-top:7px">Simulación con 80 € (tu Bote real tiene ${cashPot.toFixed(0)} €). No comprometas dinero que aún no tienes.</div>`
         : '';
-      const altsHtml = alloc.alts.length
-        ? `<div class="alloc-alts"><div style="font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750">Alternativas válidas (toca para abrir informe)</div>` +
-          alloc.alts.map(a => `<div class="alloc-alt" data-open="${esc(a.ticker)}">
-            <div><span class="tkr">${esc(a.ticker)}</span> <b>${esc(a.name.slice(0,22))}</b> <span style="color:var(--muted)">· ${esc(a.action)}</span></div>
-            <span style="color:#93c5fd;font-weight:750">${a.plan.p1.toFixed(2)} €</span>
-          </div>`).join('') + `</div>`
+      const linesHtml = alloc.allocations.map(a => {
+        const pl = a.plan;
+        const slLabel = pl.isThesisOnly ? 'Solo Tesis' : `SL ${pl.stopLossEur.toFixed(2)} €`;
+        const earnPill = a.earningsRisk ? ` <span class="pill red" style="font-size:9px">Res. ${a.earningsDays}d</span>` : '';
+        return `<div class="alloc-line" data-open="${esc(a.ticker)}">
+          <div class="alloc-line-top">
+            <div style="min-width:0">
+              <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+                <span class="pill" style="font-size:9px">${esc(a.action)}</span>
+                <b>${esc(a.name.slice(0,22))}</b>
+                <span class="tkr">${esc(a.ticker)}</span>${earnPill}
+              </div>
+              <div class="alloc-meta">
+                Hoy <b>${pl.pNowEur.toFixed(2)} €</b>${a.discPct !== null ? ` (Desc. ${a.discPct}%)` : ''} · Peso: <b style="color:#ffffff">${a.curW.toFixed(0)}% → ${a.newW.toFixed(0)}%</b> · Salida 50%: ${pl.exit1Eur.toFixed(2)} € · ${slLabel}
+              </div>
+              <div class="alloc-meta" style="color:#93c5fd">${esc(a.riskNote)}</div>
+            </div>
+            <div class="alloc-amt">${a.allocEur} €</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      const cashLine = alloc.reserveEur > 0
+        ? `<div class="alloc-line cash">
+            <div class="alloc-line-top">
+              <div>
+                <b>Liquidez en Bote (Reserva)</b>
+                <div class="alloc-meta">Pólvora seca reservada para Tramo 2/3 si hay corrección o futuras gangas.</div>
+              </div>
+              <div class="alloc-amt">${alloc.reserveEur} €</div>
+            </div>
+          </div>`
         : '';
 
-      aHost.innerHTML = `<div class="alloc-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-          <span class="pill">${esc(t.action)} · ${esc(t.tier)}</span>
-          <span style="font-size:10.5px;color:var(--muted)">Peso tras compra: <b style="color:#ffffff">${t.curW.toFixed(0)}% → ${t.newW.toFixed(0)}%</b></span>
+      const discHtml = alloc.discarded.length
+        ? `<div class="disc-box"><b style="color:#cbd5e1">Descartadas hoy:</b> ${alloc.discarded.map(d => `<span class="tkr">${esc(d.ticker)}</span> ${esc(d.reason)}`).join(' · ')}<br><span style="opacity:.85">Si prefieres esperar, conservar <b>${alloc.amount} €</b> en liquidez siempre es válido.</span></div>`
+        : `<div class="disc-box">Si prefieres no entrar hoy, conservar <b>${alloc.amount} €</b> en liquidez siempre es válido.</div>`;
+
+      aHost.innerHTML = staleBanner + `<div class="alloc-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:11px;font-weight:800;color:#93c5fd;text-transform:uppercase;letter-spacing:.06em">Plan de aportación (${alloc.amount} €)</span>
+          <span style="font-size:10.5px;color:var(--muted)">Toca una acción para ver informe</span>
         </div>
-        <div class="alloc-verdict">${esc(t.name)} <span class="tkr">${esc(t.ticker)}</span></div>
-        <div style="font-size:11.5px;color:var(--text2)">${esc(t.reason)}</div>
-        <div class="plan-strip">
-          <div class="pcell in"><span>Tramo 1 (35%)</span><b>${t1Amt} €</b><small>a ${pl.p1.toFixed(2)} €</small></div>
-          <div class="pcell out"><span>Salida 50%</span><b>${pl.exit1Eur.toFixed(2)} €</b><small>+${pl.exit1Pct.toFixed(0)}% · Total ${pl.exit2Eur.toFixed(0)}€</small></div>
-          <div class="pcell sl"><span>Stop Loss</span><b>${pl.stopLossEur.toFixed(2)} €</b><small>${pl.stopLossPct.toFixed(0)}% (${esc(pl.slReason.split('·')[0].trim())})</small></div>
-        </div>
+        <div class="alloc-split-list">${linesHtml}${cashLine}</div>
         ${simWarn}
-        <div style="display:flex;gap:7px;margin-top:9px">
-          <button class="btn primary sm" style="flex:1" data-open="${esc(t.ticker)}">Ver Plan Completo</button>
-          <button class="btn sm" data-ask-alloc="${esc(t.ticker)}" data-ask-name="${esc(t.name)}">Consultar IA</button>
-        </div>
-        ${altsHtml}
+        ${discHtml}
       </div>`;
       aHost.querySelectorAll('[data-open]').forEach(el => el.onclick = () => openModal(el.dataset.open));
-      aHost.querySelectorAll('[data-ask-alloc]').forEach(el => el.onclick = () => askAgentAboutTicker(el.dataset.askAlloc, el.dataset.askName));
     }
   }
 
-  // B) Risk Control Center
+  // B) Risk Control Center (Sector + Temas reales + Solapamiento + Estrés)
   const rPill = $('riskStatusPill');
   const rHost = $('riskControlHost');
   if(!rHost) return;
   if(!risk.valid.length){
     if(rPill){ rPill.className = 'pill blue'; rPill.textContent = 'Sin posiciones'; }
-    rHost.innerHTML = `<div class="notice" style="margin:0">Añade tus compras en <b>Mi Cartera</b> para activar el control de concentración por empresa, sector, exposición Tech/IA, divisa USD y test de estrés en euros.</div>`;
+    rHost.innerHTML = `<div class="notice" style="margin:0">Añade tus compras en <b>Mi Cartera</b> para activar el control de concentración por empresa, bloques temáticos (IA/Cloud, Consumo, Salud), divisa USD y test de estrés en euros.</div>`;
     return;
   }
   if(rPill){
@@ -3553,14 +3778,6 @@ function renderRiskAndAllocator(risk){
 
   const maxPosCls = risk.maxPos && risk.maxPos.weightPct > 25 ? 'bad' : risk.maxPos && risk.maxPos.weightPct > 20 ? 'warn' : 'good';
   const techCls = risk.techAiPct > 45 ? 'bad' : risk.techAiPct > 35 ? 'warn' : '';
-  const secBars = risk.bySector.slice(0, 5).map(s => {
-    const cls = s.pct > 40 ? 'bad' : s.pct > 30 ? 'warn' : '';
-    return `<div class="bar-row">
-      <div class="bar-head"><span>${esc(s.name)}</span><b>${s.pct.toFixed(0)}% <span style="color:var(--muted);font-weight:600">(${s.valEur.toFixed(0)} €)</span></b></div>
-      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.min(100, s.pct).toFixed(1)}%"></div></div>
-    </div>`;
-  }).join('');
-
   const posBars = risk.byPos.slice(0, 5).map(p => {
     const cls = p.weightPct > 25 ? 'bad' : p.weightPct > 20 ? 'warn' : '';
     return `<div class="bar-row">
@@ -3569,28 +3786,45 @@ function renderRiskAndAllocator(risk){
     </div>`;
   }).join('');
 
+  const themeBars = risk.byTheme.slice(0, 5).map(t => {
+    const cls = t.pct > 45 ? 'bad' : t.pct > 35 ? 'warn' : '';
+    return `<div class="bar-row">
+      <div class="bar-head"><span>${esc(t.name)} <small style="color:var(--muted)">(${t.count})</small></span><b>${t.pct.toFixed(0)}% <span style="color:var(--muted);font-weight:600">(${t.valEur.toFixed(0)} €)</span></b></div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.min(100, t.pct).toFixed(1)}%"></div></div>
+    </div>`;
+  }).join('');
+
+  const overlapHtml = risk.themeOverlapAlert
+    ? `<div class="theme-alert"><b>CONCENTRACIÓN TEMÁTICA (${esc(risk.themeOverlapAlert.name)}):</b> aunque tienes <b>${risk.themeOverlapAlert.count} empresas distintas</b> (${risk.themeOverlapAlert.tickers.join(', ')}), el <b>${risk.themeOverlapAlert.pct.toFixed(0)}%</b> de tu cartera depende del mismo motor. Si este bloque corrige un -25% a la vez, tu cartera cae <b>-${risk.themeOverlapAlert.shock25Eur.toFixed(0)} €</b>.</div>`
+    : '';
+
   const warnHtml = risk.warnings.length
     ? `<div class="notice ${risk.level === 'bad' ? 'bad' : 'warn'}" style="margin:9px 0 0">${risk.warnings.map(w => `• ${esc(w)}`).join('<br>')}</div>`
-    : `<div class="notice good" style="margin:9px 0 0">✅ Sin alertas de sobreconcentración (ninguna acción &gt;25% ni sector &gt;40%).</div>`;
+    : (!risk.themeOverlapAlert ? `<div class="notice good" style="margin:9px 0 0">✅ Cartera equilibrada por peso, sector y exposición temática.</div>` : '');
+
+  const thirdStress = risk.isThesisMode
+    ? `<div class="scell"><span>Crisis -35%</span><b>-${risk.stress35Eur.toFixed(0)} €</b><small>Modo Solo Tesis</small></div>`
+    : `<div class="scell"><span>Riesgo Stops</span><b>-${risk.totalStopRiskEur.toFixed(0)} €</b><small>Si saltan todos</small></div>`;
 
   rHost.innerHTML = `
     <div class="risk-grid">
       <div class="rcell"><span>Invertido / Total</span><b>${risk.investedPct.toFixed(0)}%</b><small>${risk.totalValEur.toFixed(0)} € + ${cashPot.toFixed(0)} € bote</small></div>
-      <div class="rcell ${maxPosCls}"><span>Mayor peso</span><b>${risk.maxPos ? risk.maxPos.weightPct.toFixed(0) + '%' : '—'}</b><small>${risk.maxPos ? esc(risk.maxPos.ticker) : '—'} (límite 25%)</small></div>
-      <div class="rcell ${techCls}"><span>Tech / IA</span><b>${risk.techAiPct.toFixed(0)}%</b><small>USD: ${risk.usdExposurePct.toFixed(0)}%</small></div>
+      <div class="rcell ${maxPosCls}"><span>Mayor peso</span><b>${risk.maxPos ? risk.maxPos.weightPct.toFixed(0) + '%' : '—'}</b><small>${risk.maxPos ? esc(risk.maxPos.ticker) : '—'} (ref. 25%)</small></div>
+      <div class="rcell ${techCls}"><span>IA / Cloud / Semis</span><b>${risk.techAiPct.toFixed(0)}%</b><small>USD: ${risk.usdExposurePct.toFixed(0)}%</small></div>
     </div>
 
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;margin:8px 0 6px">Peso por acción</div>
     ${posBars}
 
-    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;margin:10px 0 6px">Concentración por sector</div>
-    ${secBars}
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;margin:10px 0 6px">Exposición temática y solapamiento</div>
+    ${themeBars}
+    ${overlapHtml}
 
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:750;margin:10px 0 4px">Escenarios de estrés (pérdida potencial en EUR)</div>
     <div class="stress-row">
       <div class="scell"><span>Corrección -15%</span><b>-${risk.stress15Eur.toFixed(0)} €</b><small>Caída normal</small></div>
       <div class="scell"><span>Pánico -25%</span><b>-${risk.stress25Eur.toFixed(0)} €</b><small>Mercado bajista</small></div>
-      <div class="scell"><span>Riesgo Stops</span><b>-${risk.totalStopRiskEur.toFixed(0)} €</b><small>Si saltan todos</small></div>
+      ${thirdStress}
     </div>
     ${warnHtml}`;
 }
@@ -3604,16 +3838,14 @@ function renderCalendarEvents(risk){
   ]);
   const allWatched = Array.from(watchedSet).map(t => findCompany(t)).filter(Boolean);
   const inPortSet = new Set(portfolio.map(p => (p.ticker || '').toUpperCase()));
+  const posValMap = new Map(risk.byPos.map(p => [p.ticker.toUpperCase(), p.valEur]));
 
-  // Próximos resultados ordenados
   const earningsList = allWatched
     .filter(c => c.earnings_days !== null && c.earnings_days !== undefined && c.earnings_days >= 0 && c.earnings_days <= 90)
     .sort((a, b) => a.earnings_days - b.earnings_days);
 
-  // Compras recientes de directivos
   const insidersList = allWatched.filter(c => (c.insider_buys_90d || 0) > 0);
 
-  // Dividendos anuales estimados de Mi Cartera
   let estDivAnnualEur = 0;
   risk.items.forEach(x => {
     const dy = Number(x.pv.c?.dividend_yield_pct || 0);
@@ -3623,13 +3855,18 @@ function renderCalendarEvents(risk){
   const earnHtml = earningsList.length
     ? earningsList.map(c => {
         const urgent = c.earnings_days <= 10;
-        const srcLbl = inPortSet.has(c.ticker.toUpperCase()) ? 'Cartera' : 'Favorita';
+        const tkr = c.ticker.toUpperCase();
+        const inPort = inPortSet.has(tkr);
+        const posVal = posValMap.get(tkr) || 0;
+        const impactNote = (urgent && inPort && posVal > 0)
+          ? ` · Riesgo evento -10%: -${(posVal * 0.10).toFixed(0)} €`
+          : (urgent ? ' · Si entras, reduce tamaño al 50%' : '');
         return `<div class="ev-item" data-open="${esc(c.ticker)}">
           <div>
             <b>${esc(c.name)}</b> <span class="tkr">${esc(c.ticker)}</span>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px">${srcLbl} · Presenta el <b>${esc(c.earnings_date || '—')}</b></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${inPort ? 'Cartera' : 'Favorita'} · <b>${esc(c.earnings_date || '—')}</b>${impactNote}</div>
           </div>
-          <span class="pill ${urgent ? 'red' : 'blue'}">${urgent ? 'En ' + c.earnings_days + 'd · Cautela' : 'En ' + c.earnings_days + 'd'}</span>
+          <span class="pill ${urgent ? 'red' : 'blue'}">${urgent ? 'En ' + c.earnings_days + 'd · Evento' : 'En ' + c.earnings_days + 'd'}</span>
         </div>`;
       }).join('')
     : '<div style="font-size:12px;color:var(--muted);padding:4px 0">Sin resultados programados en los próximos 90 días en tu Cartera/Favoritas.</div>';
@@ -3658,6 +3895,7 @@ function renderWealthSimulator(risk){
   const startCap = Math.max(0, (risk?.totalValEur || 0) + Math.max(0, cashPot));
   const monthly = Math.max(10, parseFloat($('wsMonthlyIn')?.value || '80') || 80);
   const years = Math.max(5, Math.min(30, parseInt($('wsYearsSel')?.value || '10', 10) || 10));
+  const inflPct = Math.max(0, Math.min(10, parseFloat($('wsInflIn')?.value ?? '2.5') || 0));
 
   const project = (annualPct) => {
     const r = (annualPct / 100) / 12;
@@ -3670,9 +3908,11 @@ function renderWealthSimulator(risk){
     return pts;
   };
 
-  const pPes = project(6.0);
-  const pBase = project(8.5);
-  const pOpt = project(11.0);
+  const deflate = (nominalVal) => nominalVal / Math.pow(1 + inflPct / 100, years);
+
+  const pAdv = project(2.0);
+  const pBase = project(7.0);
+  const pOpt = project(10.0);
   const contributed = startCap + monthly * 12 * years;
   const maxVal = Math.max(pOpt[years], contributed, 100);
 
@@ -3690,20 +3930,23 @@ function renderWealthSimulator(risk){
   }).join('');
 
   host.innerHTML = `
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">Capital inicial (Cartera + Bote): <b style="color:#ffffff">${startCap.toFixed(0)} €</b> · Total aportado en ${years} años: <b style="color:#ffffff">${contributed.toFixed(0)} €</b></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">Inicial (Cartera + Bote): <b style="color:#ffffff">${startCap.toFixed(0)} €</b> · Aportado en ${years}a: <b style="color:#ffffff">${contributed.toFixed(0)} €</b> · Inflación: <b>${inflPct.toFixed(1)}%/año</b></div>
     <svg class="wealth-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
       ${gridSvg}
       <path d="${toPath(contribPts)}" fill="none" stroke="#475569" stroke-width="1.6" stroke-dasharray="4 3"/>
-      <path d="${toPath(pPes)}" fill="none" stroke="#94a3b8" stroke-width="1.8"/>
+      <path d="${toPath(pAdv)}" fill="none" stroke="#f43f5e" stroke-width="1.8"/>
       <path d="${toPath(pBase)}" fill="none" stroke="#3b82f6" stroke-width="2.4"/>
-      <path d="${toPath(pOpt)}" fill="none" stroke="#22c55e" stroke-width="2.4"/>
+      <path d="${toPath(pOpt)}" fill="none" stroke="#22c55e" stroke-width="2.2"/>
       <text x="${xMap(0)}" y="${H - 6}" fill="#64748b" font-size="9">Hoy</text>
       <text x="${xMap(years)}" y="${H - 6}" text-anchor="end" fill="#64748b" font-size="9">Año ${years}</text>
     </svg>
     <div class="sim-pills">
-      <div class="rcell"><span>Conserv. (6%)</span><b>${Math.round(pPes[years]).toLocaleString('es-ES')} €</b><small>+${Math.round(pPes[years] - contributed).toLocaleString('es-ES')} € int.</small></div>
-      <div class="rcell" style="border-color:rgba(59,130,246,.36)"><span>MSCI (8.5%)</span><b style="color:#60a5fa">${Math.round(pBase[years]).toLocaleString('es-ES')} €</b><small>+${Math.round(pBase[years] - contributed).toLocaleString('es-ES')} € int.</small></div>
-      <div class="rcell good"><span>Objetivo (11%)</span><b>${Math.round(pOpt[years]).toLocaleString('es-ES')} €</b><small>+${Math.round(pOpt[years] - contributed).toLocaleString('es-ES')} € int.</small></div>
+      <div class="rcell bad"><span>Adverso (2%)</span><b>${Math.round(pAdv[years]).toLocaleString('es-ES')} €</b><small>Real hoy: ${Math.round(deflate(pAdv[years])).toLocaleString('es-ES')} €</small></div>
+      <div class="rcell" style="border-color:rgba(59,130,246,.36)"><span>Bolsa Base (7%)</span><b style="color:#60a5fa">${Math.round(pBase[years]).toLocaleString('es-ES')} €</b><small>Real hoy: ${Math.round(deflate(pBase[years])).toLocaleString('es-ES')} €</small></div>
+      <div class="rcell good"><span>Hipótesis (10%)</span><b>${Math.round(pOpt[years]).toLocaleString('es-ES')} €</b><small>Real hoy: ${Math.round(deflate(pOpt[years])).toLocaleString('es-ES')} €</small></div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.4">
+      Hipótesis matemáticas ilustrativas con reinversión; no constituyen previsión ni garantía. «Real hoy» descuenta ${inflPct.toFixed(1)}%/año de inflación para mostrar tu poder adquisitivo equivalente.
     </div>`;
 }
 
@@ -3769,7 +4012,7 @@ function renderFavsView(){
         <div class="port-levels">
           <div><span>Salida 50%</span><b style="color:#93c5fd">${pv.exit1Eur !== null ? pv.exit1Eur.toFixed(2) + ' €' : '—'}</b></div>
           <div><span>Salida Total</span><b style="color:#4ade80">${pv.exit2Eur !== null ? pv.exit2Eur.toFixed(2) + ' €' : '—'}</b></div>
-          <div><span>Stop (-${pv.stopLossPctVal}% · ${esc(pv.slReason.split('·')[0].trim())})</span><b style="color:#fda4af">${pv.stopLossEur !== null ? pv.stopLossEur.toFixed(2) + ' €' : '—'}</b></div>
+          <div><span>${pv.isThesisOnly ? 'Salida Tesis (Ref.)' : 'Stop (-' + pv.stopLossPctVal + '% · ' + esc(pv.slReason.split('·')[0].trim()) + ')'}</span><b style="color:${pv.isThesisOnly ? '#cbd5e1' : '#fda4af'}">${pv.isThesisOnly ? 'Solo Tesis' : (pv.stopLossEur !== null ? pv.stopLossEur.toFixed(2) + ' €' : '—')}</b></div>
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px">
@@ -3824,8 +4067,15 @@ function renderFavsView(){
 }
 
 /* ===========================
-   VIEW 4: DIARIO DE ACIERTOS (BENCHMARKS + MILESTONES)
+   VIEW 4: DIARIO DE ACIERTOS + AUDITOR ESTADÍSTICO v11.1
    =========================== */
+function calcMedian(nums){
+  const arr = (nums || []).filter(Number.isFinite).sort((a, b) => a - b);
+  if(!arr.length) return null;
+  const mid = Math.floor(arr.length / 2);
+  return arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+}
+
 function renderHistoryView(){
   const entries = (historyData && Array.isArray(historyData.entries)) ? historyData.entries : [];
   const host = $('histListHost');
@@ -3840,7 +4090,7 @@ function renderHistoryView(){
     return;
   }
 
-  // Preserva el diferencial de dividendos guardado por el backend incluso con precio en vivo
+  // Preserva el diferencial de dividendos guardado por el backend incluso con precio en vivo (sin doble conteo)
   const enriched = entries.map(e => {
     const lqH = liveQuotes[(e.ticker || '').toUpperCase()];
     const liveLastP = (lqH && Number.isFinite(Number(lqH.price)) && lqH.price > 0) ? Number(lqH.price) : Number(e.last_price);
@@ -3851,36 +4101,41 @@ function renderHistoryView(){
       : Number(e.return_pct || 0);
     const msci = Number(e.benchmarks?.msci_world_pct);
     const alpha = (Number.isFinite(liveRet) && Number.isFinite(msci)) ? (liveRet - msci) : null;
-    const maxDd = (e.max_drawdown_after_alert_pct !== null && e.max_drawdown_after_alert_pct !== undefined)
+    const mae = (e.max_drawdown_after_alert_pct !== null && e.max_drawdown_after_alert_pct !== undefined)
       ? Number(e.max_drawdown_after_alert_pct)
       : (liveRet < 0 ? liveRet : 0);
-    return { ...e, _liveLastP: liveLastP, _liveRet: liveRet, _divBonus: divBonusPct, _alpha: alpha, _maxDd: maxDd, _isLive: !!lqH };
+    const mfe = (e.max_gain_after_alert_pct !== null && e.max_gain_after_alert_pct !== undefined)
+      ? Number(e.max_gain_after_alert_pct)
+      : (liveRet > 0 ? liveRet : 0);
+    return { ...e, _liveLastP: liveLastP, _liveRet: liveRet, _divBonus: divBonusPct, _alpha: alpha, _mae: mae, _mfe: mfe, _isLive: !!lqH };
   });
 
   const rets = enriched.map(e => e._liveRet).filter(Number.isFinite);
   const wins = rets.filter(r => r > 0).length;
   const avg = rets.length ? (rets.reduce((a,b) => a+b, 0) / rets.length) : 0;
+  const med = calcMedian(rets);
   $('hWinRate').textContent = rets.length ? `${Math.round((wins / rets.length) * 100)}%` : '—';
   $('hAvgRet').textContent = `${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%`;
 
   const alphas = enriched.map(e => e._alpha).filter(x => x !== null);
   if(alphas.length){
     const avgAlpha = alphas.reduce((a,b) => a+b, 0) / alphas.length;
-    alphaBox.innerHTML = `<div class="notice ${avgAlpha>=0?'good':'warn'}" style="margin:0">⚖️ <b>Alpha medio frente a MSCI World (${alphas.length} señales):</b> <b>${avgAlpha>=0?'+':''}${avgAlpha.toFixed(1)} pp</b></div>`;
+    alphaBox.innerHTML = `<div class="notice ${avgAlpha>=0?'good':'warn'}" style="margin:0">⚖️ <b>Alpha medio frente a MSCI World (${alphas.length} señales):</b> <b>${avgAlpha>=0?'+':''}${avgAlpha.toFixed(1)} pp</b>${med !== null ? ` · Mediana: <b>${med>=0?'+':''}${med.toFixed(1)}%</b>` : ''}</div>`;
   } else {
     alphaBox.innerHTML = `<div class="notice info" style="margin:0">ℹ️ Los benchmarks (MSCI World y S&amp;P 500) se rellenan automáticamente en el escaneo diario/semanal.</div>`;
   }
 
-  // Auditor de Señales por Tier y Score Buffett
+  // Auditor de Señales v11.1 (Media · Mediana · MAE · MFE · Horizontes · Señales abiertas)
   if(audHost){
     const groupStats = (arr) => {
       if(!arr.length) return null;
       const w = arr.filter(x => x._liveRet > 0).length;
-      const meanR = arr.reduce((s, x) => s + x._liveRet, 0) / arr.length;
+      const vals = arr.map(x => x._liveRet);
+      const meanR = vals.reduce((s, v) => s + v, 0) / arr.length;
+      const medR = calcMedian(vals);
       const al = arr.map(x => x._alpha).filter(x => x !== null);
       const meanA = al.length ? (al.reduce((s, x) => s + x, 0) / al.length) : null;
-      const worstDd = Math.min(...arr.map(x => x._maxDd));
-      return { n: arr.length, winPct: Math.round((w / arr.length) * 100), meanR, meanA, worstDd };
+      return { n: arr.length, winPct: Math.round((w / arr.length) * 100), meanR, medR, meanA };
     };
     const tiers = [
       ['ORO PURO', enriched.filter(e => e.tier === 'ORO_PURO')],
@@ -3897,10 +4152,22 @@ function renderHistoryView(){
 
     const hiScore = groupStats(enriched.filter(e => (e.quality_score || 0) >= 95));
     const midScore = groupStats(enriched.filter(e => (e.quality_score || 0) < 95));
-    const worstGlobalDd = Math.min(...enriched.map(e => e._maxDd));
+    const worstMae = Math.min(...enriched.map(e => e._mae));
+    const bestMfe = Math.max(...enriched.map(e => e._mfe));
+    const openCount = enriched.filter(e => (e.status || 'ACTIVA') === 'ACTIVA').length;
+    const openPct = Math.round((openCount / enriched.length) * 100);
+
+    const horCells = [['d30','30d'],['d90','90d'],['d180','180d'],['d365','365d']].map(([k, lbl]) => {
+      const vals = enriched.map(e => e.milestones_pct?.[k]).filter(v => v !== null && v !== undefined && Number.isFinite(Number(v))).map(Number);
+      if(!vals.length) return `<div class="hcell"><span>${lbl}</span><b style="color:var(--muted)">—</b></div>`;
+      const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const col = m >= 0 ? '#4ade80' : '#fda4af';
+      return `<div class="hcell"><span>${lbl} (n=${vals.length})</span><b style="color:${col}">${m>=0?'+':''}${m.toFixed(1)}%</b></div>`;
+    }).join('');
+
     const sampleNote = enriched.length < 20
-      ? `<div class="notice warn" style="margin:9px 0 0;font-size:11.5px">Muestra inicial (${enriched.length} señales): se necesitan al menos <b>20+ señales cerradas</b> para sacar conclusiones estadísticas sólidas.</div>`
-      : `<div class="notice good" style="margin:9px 0 0;font-size:11.5px">Muestra sólida (${enriched.length} señales auditadas) · Peor caída post-entrada observada: <b>${worstGlobalDd.toFixed(1)}%</b>.</div>`;
+      ? `<div class="notice warn" style="margin:9px 0 0;font-size:11.5px">Muestra inicial (${enriched.length} señales · ${openPct}% aún abiertas): registro prospectivo sin sesgo de futuro; se requieren <b>20+ señales</b> para validez estadística.</div>`
+      : `<div class="notice good" style="margin:9px 0 0;font-size:11.5px">Muestra sólida (${enriched.length} señales · ${openPct}% abiertas) · Mediana: <b>${med>=0?'+':''}${med.toFixed(1)}%</b> · Registro prospectivo real.</div>`;
 
     audHost.innerHTML = `
       <table class="aud-tbl">
@@ -3908,10 +4175,15 @@ function renderHistoryView(){
         <tbody>${rowsTier}</tbody>
       </table>
       <div class="risk-grid" style="margin-top:9px;margin-bottom:0">
+        <div class="rcell"><span>Mediana</span><b>${med !== null ? (med>=0?'+':'')+med.toFixed(1)+'%' : '—'}</b><small>Evita sesgo extremos</small></div>
+        <div class="rcell ${worstMae <= -15 ? 'bad' : ''}"><span>Peor caída (MAE)</span><b>${worstMae.toFixed(1)}%</b><small>Sufrimiento máx.</small></div>
+        <div class="rcell good"><span>Mejor subida (MFE)</span><b>+${bestMfe.toFixed(1)}%</b><small>Potencial máx.</small></div>
+      </div>
+      <div class="risk-grid" style="margin-top:7px;margin-bottom:0;grid-template-columns:1fr 1fr">
         <div class="rcell"><span>Score 95–100</span><b>${hiScore ? (hiScore.meanR>=0?'+':'')+hiScore.meanR.toFixed(1)+'%' : '—'}</b><small>${hiScore ? hiScore.n+' señales · '+hiScore.winPct+'% ok' : 'Sin datos'}</small></div>
         <div class="rcell"><span>Score &lt;95</span><b>${midScore ? (midScore.meanR>=0?'+':'')+midScore.meanR.toFixed(1)+'%' : '—'}</b><small>${midScore ? midScore.n+' señales · '+midScore.winPct+'% ok' : 'Sin datos'}</small></div>
-        <div class="rcell ${worstGlobalDd <= -15 ? 'bad' : ''}"><span>Peor caída</span><b>${worstGlobalDd.toFixed(1)}%</b><small>Post-entrada</small></div>
       </div>
+      <div class="hor-strip">${horCells}</div>
       ${sampleNote}`;
   }
 
@@ -3932,7 +4204,10 @@ function renderHistoryView(){
       chips.push(`<span class="bench-chip">S&amp;P 500: ${bm.sp500_pct>=0?'+':''}${bm.sp500_pct}%</span>`);
     }
     if(e.max_drawdown_after_alert_pct !== null && e.max_drawdown_after_alert_pct !== undefined){
-      chips.push(`<span class="bench-chip lag">Máx caída: ${Number(e.max_drawdown_after_alert_pct).toFixed(1)}%</span>`);
+      chips.push(`<span class="bench-chip lag">MAE: ${Number(e.max_drawdown_after_alert_pct).toFixed(1)}%</span>`);
+    }
+    if(e.max_gain_after_alert_pct !== null && e.max_gain_after_alert_pct !== undefined && Number(e.max_gain_after_alert_pct) > 0){
+      chips.push(`<span class="bench-chip beat">MFE: +${Number(e.max_gain_after_alert_pct).toFixed(1)}%</span>`);
     }
     if(e._divBonus > 0){
       chips.push(`<span class="bench-chip beat">+${e._divBonus.toFixed(1)}% div.</span>`);
@@ -4186,7 +4461,8 @@ function openModal(ticker, skipLiveRefresh = false){
         <div>
           <span style="display:block;font-size:10.5px;color:var(--muted);margin-bottom:4px">Stop Loss</span>
           <select class="finput" id="planSlSel" style="height:36px;padding:0 8px">
-            <option value="AUTO" ${stopLossMode==='AUTO'?'selected':''}>Auto (Volatilidad / 52s)</option>
+            <option value="THESIS" ${stopLossMode==='THESIS'?'selected':''}>Solo Tesis (Buffett · Sin stop)</option>
+            <option value="AUTO" ${stopLossMode==='AUTO'?'selected':''}>Táctico Auto (Volatilidad / 52s)</option>
             <option value="12" ${stopLossMode==='12'?'selected':''}>-12% (Ajustado)</option>
             <option value="15" ${stopLossMode==='15'?'selected':''}>-15% (Moderado)</option>
             <option value="18" ${stopLossMode==='18'?'selected':''}>-18% (Fijo)</option>
@@ -4274,7 +4550,7 @@ function openModal(ticker, skipLiveRefresh = false){
       <div class="exit-grid" style="margin-top:6px">
         <div class="ecard tp1"><span>Salida 1 · Vender 50%</span><b>${pl.exit1Eur.toFixed(2)} €</b><small style="color:#bfdbfe">+${pl.exit1Pct.toFixed(1)}% (Valor justo)</small></div>
         <div class="ecard tp2"><span>Salida Total · 100%</span><b>${pl.exit2Eur.toFixed(2)} €</b><small style="color:#bbf7d0">+${pl.exit2Pct.toFixed(1)}% (Est. +${pl.estProfitEur.toFixed(0)} €)</small></div>
-        <div class="ecard sl"><span>Stop Loss · Salida</span><b>${pl.stopLossEur.toFixed(2)} €</b><small style="color:#fecdd3">${pl.stopLossPct.toFixed(1)}% (${esc(pl.slReason)})</small></div>
+        <div class="ecard sl"><span>${pl.isThesisOnly ? 'Salida · Solo Tesis' : 'Stop Loss · Salida'}</span><b>${pl.isThesisOnly ? 'Sin Stop' : pl.stopLossEur.toFixed(2) + ' €'}</b><small style="color:#fecdd3">${pl.isThesisOnly ? 'Ref. técnica: ' + pl.stopLossEur.toFixed(2) + ' €' : pl.stopLossPct.toFixed(1) + '% (' + esc(pl.slReason) + ')'}</small></div>
       </div>
       <div style="font-size:10.5px;color:var(--muted);margin-top:8px;line-height:1.45;text-align:center">
         Ratio Riesgo / Beneficio: <b style="color:#ffffff">1 : ${pl.riskReward.toFixed(1)}</b> · Riesgo máx.: <b style="color:#fda4af">-${pl.maxRiskEur.toFixed(0)} €</b> · Sal también si se rompe la tesis (Score &lt; 65 o SEC MISMATCH).
@@ -4387,8 +4663,16 @@ function buildAgentSystemContext(userText = ''){
     portLines.unshift(`TOTAL CARTERA: Valor ${riskSnap.totalValEur.toFixed(2)} € | Invertido ${riskSnap.totalCostEur.toFixed(2)} € | Resultado ${Number(totPnl) >= 0 ? '+' : ''}${totPnl}% | Tech/IA: ${riskSnap.techAiPct.toFixed(0)}% | USD: ${riskSnap.usdExposurePct.toFixed(0)}% | Riesgo Stops: -${riskSnap.totalStopRiskEur.toFixed(0)} €`);
     if(riskSnap.warnings.length) portLines.push(`ALERTAS DE RIESGO CARTERA: ${riskSnap.warnings.join(' | ')}`);
   }
-  if(allocSnap.top){
-    portLines.push(`ASIGNADOR AUTOMÁTICO (${allocSnap.isSim ? 'Simulación 80€, bote 0€' : 'Bote real ' + allocSnap.amount + '€'}): ${allocSnap.top.action} ${allocSnap.top.ticker} (${allocSnap.top.name}) · Tramo 1: ${allocSnap.top.plan.m1.toFixed(0)}€ a ${allocSnap.top.plan.p1.toFixed(2)}€ · Peso ${allocSnap.top.curW.toFixed(0)}%->${allocSnap.top.newW.toFixed(0)}%`);
+  if(riskSnap.themeOverlapAlert){
+    portLines.push(`SOLAPAMIENTO TEMÁTICO: ${riskSnap.themeOverlapAlert.name} supone ${riskSnap.themeOverlapAlert.pct.toFixed(0)}% (${riskSnap.themeOverlapAlert.tickers.join(', ')}) · Caída -25% conjunta: -${riskSnap.themeOverlapAlert.shock25Eur.toFixed(0)} €`);
+  }
+  portLines.push(`MODO STOP LOSS ACTIVO: ${stopLossMode === 'THESIS' ? 'SOLO TESIS (Buffett largo plazo, sin stop mecánico)' : 'TÁCTICO (' + stopLossMode + ')'}`);
+  if(allocSnap.staleData){
+    portLines.push(`AVISO DATOS DESACTUALIZADOS: último escaneo hace ${Math.round(allocSnap.scanAgeHours / 24)} días.`);
+  }
+  if(allocSnap.allocations.length){
+    const splitStr = allocSnap.allocations.map(a => `${a.action} ${a.ticker}: ${a.allocEur}€ (${a.curW.toFixed(0)}%->${a.newW.toFixed(0)}%${a.earningsRisk ? ', Res.'+a.earningsDays+'d' : ''})`).join(' | ');
+    portLines.push(`PLAN DE APORTACIÓN EXACTO (${allocSnap.isSim ? 'Simul. 80€, bote 0€' : 'Bote real ' + allocSnap.amount + '€'}): ${splitStr}${allocSnap.reserveEur > 0 ? ' | Liquidez en bote: ' + allocSnap.reserveEur + '€' : ''}`);
   }
 
   // 2. Top Radar candidates (Oro Puro, Entrar Ya, Gangas, Muy Buenas + Quality+Price)
@@ -5046,6 +5330,15 @@ $('spendPotBtn').onclick = () => {
 };
 if($('wsMonthlyIn')) $('wsMonthlyIn').oninput = () => renderWealthSimulator(analyzePortfolioRisk());
 if($('wsYearsSel')) $('wsYearsSel').onchange = () => renderWealthSimulator(analyzePortfolioRisk());
+if($('wsInflIn')) $('wsInflIn').oninput = () => renderWealthSimulator(analyzePortfolioRisk());
+document.querySelectorAll('#stopModeToggle .mtog').forEach(btn => {
+  btn.onclick = () => {
+    stopLossMode = btn.dataset.slmode || 'AUTO';
+    localStorage.setItem(STORE.STOP_LOSS_PCT, stopLossMode);
+    renderAll();
+    toast(stopLossMode === 'THESIS' ? '🏛️ Modo Solo Tesis (Buffett) activado: sin stops mecánicos.' : '🛡️ Modo Táctico (Stop Auto adaptativo) activado.');
+  };
+});
 
 $('addPortBtn').onclick = () => {
   const tkr = $('portTickerIn').value.trim().toUpperCase();
