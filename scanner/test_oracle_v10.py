@@ -991,5 +991,95 @@ class TestOracleV103(unittest.TestCase):
             mdd = bs._max_drawdown_after_alert_pct("DECK", 100.0, "2026-10-01")
         self.assertEqual(mdd, -18.0)
 
+    # --- 16) MFE/MAE POST-ALERTA, DATOS INCOMPLETOS EN STOP LOSS Y MODO SOLO TESIS ---
+    def test_mfe_mae_incomplete_stop_data_and_thesis_mode(self):
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+
+        # Datos incompletos o invertidos en 52s -> fallback seguro sin crashear
+        incomplete_cases = [
+            {"ticker": "X1", "currency": "EUR", "price": 50.0, "sector": "Technology", "high_52w": None, "low_52w": None},
+            {"ticker": "X2", "currency": "EUR", "price": 50.0, "sector": "Healthcare", "high_52w": 0.0, "low_52w": -5.0},
+            {"ticker": "X3", "currency": "EUR", "price": 50.0, "sector": "Industrials", "high_52w": 40.0, "low_52w": 60.0},
+        ]
+        for rec in incomplete_cases:
+            pct, stop_eur, reason = bs.compute_adaptive_stop_profile(rec, 50.0)
+            self.assertGreaterEqual(pct, 11.0)
+            self.assertLessEqual(pct, 25.0)
+            self.assertIsNotNone(stop_eur)
+            self.assertIn("sin rango 52s", reason)
+
+        # Modo SOLO TESIS (THESIS) no impone stop mecánico obligatorio
+        plan_thesis = bs.compute_trade_plan_eur(
+            {"ticker": "ASML.AS", "currency": "EUR", "price": 600.0, "status": "OPORTUNIDAD", "sector": "Technology"},
+            budget_eur=240.0,
+            stop_loss_mode="THESIS",
+        )
+        self.assertIsNotNone(plan_thesis)
+        self.assertEqual(plan_thesis["stop_loss_mode"], "THESIS")
+        self.assertIn("Solo Tesis", plan_thesis["sl_reason"])
+
+        # MFE y MAE con datos válidos + fallback None con DataFrame vacío
+        class MockHighLowTicker:
+            def __init__(self, sym):
+                self.sym = sym
+                self.dividends = pd.Series([2.0], index=pd.to_datetime(["2026-10-15"]))
+
+            def history(self, period="5d", start=None, auto_adjust=False):
+                if self.sym == "EMPTY":
+                    return pd.DataFrame()
+                if start is not None and auto_adjust:
+                    return pd.DataFrame({"Close": [100.0, 108.0]})
+                if start is not None:
+                    return pd.DataFrame({"High": [105.0, 124.0, 115.0], "Low": [99.0, 88.0, 102.0], "Close": [101.0, 112.0, 110.0]})
+                return pd.DataFrame({"Close": [110.0]})
+
+        with patch.object(bs.yf, "Ticker", side_effect=MockHighLowTicker):
+            self.assertEqual(bs._max_gain_after_alert_pct("DECK", 100.0, "2026-10-01"), 24.0)
+            self.assertEqual(bs._max_drawdown_after_alert_pct("DECK", 100.0, "2026-10-01"), -12.0)
+            self.assertIsNone(bs._max_gain_after_alert_pct("EMPTY", 100.0, "2026-10-01"))
+            self.assertIsNone(bs._max_drawdown_after_alert_pct("EMPTY", 100.0, "2026-10-01"))
+
+            with tempfile.TemporaryDirectory() as td:
+                hist_file = Path(td) / "history.json"
+                hist_file.write_text(json.dumps({
+                    "updated_at": "2026-10-01T10:00:00+00:00",
+                    "entries": [{
+                        "ticker": "DECK",
+                        "name": "Deckers",
+                        "currency": "USD",
+                        "tier": "ORO_PURO",
+                        "alert_date": "2026-10-01",
+                        "alert_price": 100.0,
+                        "quality_score": 98,
+                        "last_price": 100.0,
+                        "return_pct": 0.0,
+                    }]
+                }), encoding="utf-8")
+                with patch.object(bs, "OUT_HISTORY_JSON", hist_file):
+                    bs.update_alert_history([])
+                saved = json.loads(hist_file.read_text(encoding="utf-8"))
+                e = saved["entries"][0]
+                self.assertEqual(e["alert_date"], "2026-10-01")
+                self.assertEqual(e["alert_price"], 100.0)
+                self.assertEqual(e["price_return_pct"], 10.0)
+                self.assertEqual(e["return_pct"], 12.0)  # +10% precio + 2% dividendo sin doble conteo
+                self.assertEqual(e["max_drawdown_after_alert_pct"], -12.0)
+                self.assertEqual(e["max_gain_after_alert_pct"], 24.0)
+
 if __name__ == "__main__":
     unittest.main()
