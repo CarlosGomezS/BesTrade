@@ -1505,5 +1505,109 @@ class TestOracleV103(unittest.TestCase):
             self.assertEqual(eb["fx_status"], "UNAVAILABLE")
             self.assertIsNone(eb["return_eur_pct"])
 
+    # --- 22) AUDITORÍA PROFUNDA: CERO DOBLE CONTEO DE DIVIDENDOS, FX INVERTIDO, FESTIVOS Y FX OBSOLETO ---
+    def test_no_dividend_double_count_inverted_fx_holiday_and_stale_fx(self):
+        from datetime import datetime, timezone
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "Europa"
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+        bs._fx_hist_cache.clear()
+        bs._fx_cache.clear()
+
+        stock_auto_adjust_calls = []
+
+        class MockEdgeFxTicker:
+            def __init__(self, sym: str):
+                self.sym = sym
+                self.splits = pd.Series(dtype=float)
+                if sym == "AZN.L":
+                    # Dividendo 1 el mismo día de la alerta (2026-10-03, NO debe sumarse)
+                    # Dividendo 2 posterior a la alerta (2026-10-20, +5 GBP, SÍ debe sumarse)
+                    self.dividends = pd.Series(
+                        [4.0, 5.0],
+                        index=pd.to_datetime(["2026-10-03", "2026-10-20"]),
+                    )
+                else:
+                    self.dividends = pd.Series(dtype=float)
+
+            def history(self, period="5d", start=None, auto_adjust=False):
+                if self.sym in ("AZN.L", "STALE.CH"):
+                    stock_auto_adjust_calls.append((self.sym, period, start, auto_adjust))
+                    return pd.DataFrame(
+                        {"High": [112.0, 112.0], "Low": [98.0, 98.0], "Close": [100.0, 110.0]},
+                        index=pd.to_datetime(["2026-10-05", "2026-11-15"]),
+                    )
+                # Par directo GBPEUR=X vacío -> fuerza fallback al par invertido EURGBP=X
+                if self.sym == "GBPEUR=X":
+                    return pd.DataFrame()
+                if self.sym == "EURGBP=X":
+                    # Alerta el sábado 2026-10-03 (festivo): toma última sesión 2026-10-02 (EURGBP=0.80 -> GBPEUR=1.25)
+                    # Hoy 2026-11-15 (domingo): toma viernes 2026-11-13 (EURGBP=0.80 -> GBPEUR=1.25)
+                    return pd.DataFrame(
+                        {"Close": [0.80, 0.80, 0.80]},
+                        index=pd.to_datetime(["2026-10-02", "2026-10-20", "2026-11-13"]),
+                    )
+                # Divisa CHF con cotización obsoleta (>10 días sin actualizar antes del 2026-11-15) -> debe rechazarse
+                if self.sym == "CHFEUR=X":
+                    return pd.DataFrame(
+                        {"Close": [1.05]},
+                        index=pd.to_datetime(["2026-10-02"]),
+                    )
+                if self.sym == "USDEUR=X":
+                    return pd.DataFrame({"Close": [0.90, 0.90]}, index=pd.to_datetime(["2026-10-02", "2026-11-13"]))
+                if self.sym in ("SPY", "URTH"):
+                    return pd.DataFrame({"Close": [100.0, 104.0]}, index=pd.to_datetime(["2026-10-05", "2026-11-13"]))
+                return pd.DataFrame()
+
+        now_sun = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            hist_file = Path(td) / "history.json"
+            hist_file.write_text(json.dumps({
+                "updated_at": "2026-10-03T10:00:00+00:00",
+                "entries": [
+                    {"ticker": "AZN.L", "name": "AstraZeneca", "currency": "GBP", "tier": "GANGA", "alert_date": "2026-10-03", "alert_price": 100.0, "quality_score": 92, "last_price": 100.0, "return_pct": 0.0},
+                    {"ticker": "STALE.CH", "name": "Stale FX Corp", "currency": "CHF", "tier": "GANGA", "alert_date": "2026-10-03", "alert_price": 100.0, "quality_score": 88, "last_price": 100.0, "return_pct": 0.0},
+                ]
+            }), encoding="utf-8")
+
+            with (
+                patch.object(bs, "OUT_HISTORY_JSON", hist_file),
+                patch.object(bs.yf, "Ticker", side_effect=MockEdgeFxTicker),
+            ):
+                bs.update_alert_history([], now_dt=now_sun)
+
+            saved = json.loads(hist_file.read_text(encoding="utf-8"))
+            by_t = {x["ticker"]: x for x in saved["entries"]}
+
+            # 1) TODAS las llamadas de precios de acciones usaron auto_adjust=False (cero doble conteo con dividendos)
+            self.assertTrue(len(stock_auto_adjust_calls) >= 2)
+            self.assertTrue(all(adj is False for _, _, _, adj in stock_auto_adjust_calls))
+
+            # 2) AZN.L: par invertido EURGBP=X (0.80 -> 1.25), festivos cubiertos, y solo suma el div posterior (+5 GBP, NO el de alert_date)
+            azn = by_t["AZN.L"]
+            self.assertEqual(azn["fx_status"], "OK")
+            self.assertAlmostEqual(azn["fx_alert_to_eur"], 1.25, places=4)
+            self.assertEqual(azn["price_return_pct"], 10.0)
+            self.assertEqual(azn["return_pct"], 15.0)
+            self.assertEqual(azn["return_eur_pct"], 15.0)
+
+            # 3) STALE.CH: FX de hace >40 días rechazado -> UNAVAILABLE y return_eur_pct = None (nunca usa FX obsoleto)
+            stale = by_t["STALE.CH"]
+            self.assertEqual(stale["fx_status"], "UNAVAILABLE")
+            self.assertIsNone(stale["return_eur_pct"])
+
 if __name__ == "__main__":
     unittest.main()
