@@ -537,7 +537,7 @@ class TestOracleV103(unittest.TestCase):
             self.assertTrue(hist_path.exists())
 
             published = json.loads(latest_path.read_text(encoding="utf-8"))
-            self.assertEqual(published["scanner_version"], "v11.1-oraculo")
+            self.assertEqual(published["scanner_version"], "v11.2-oraculo")
             self.assertIn("fx_rates_eur", published)
             self.assertEqual(len(published["companies"]), 1)
 
@@ -1137,6 +1137,109 @@ class TestOracleV103(unittest.TestCase):
             msg = bs.format_detailed_opp(sample_rec, "🚨 ENTRAR YA")
             self.assertIn("ajusta a tu bote real", msg)
             self.assertNotIn("240 €", msg)
+
+    # --- 18) HITOS EXACTOS (30/90/180/365D), AUTOCORRECCIÓN DE DRIFT Y BENCHMARKS HOMOGÉNEOS SPY/URTH ---
+    def test_exact_milestone_dates_and_homogeneous_spy_urth_benchmarks(self):
+        from datetime import datetime, timezone
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+
+        bench_calls = []
+
+        class MockExactHistoryTicker:
+            def __init__(self, sym: str):
+                self.sym = sym
+                # Dividendo 1 el día 20 (+1.5 USD, entra en d30), Dividendo 2 el día 40 (+3.0 USD, NO entra en d30 pero sí en return_pct hoy)
+                self.dividends = pd.Series(
+                    [1.5, 3.0],
+                    index=pd.to_datetime(["2026-10-21", "2026-11-10"]),
+                )
+
+            def history(self, period="5d", start=None, auto_adjust=False):
+                if self.sym in ("SPY", "URTH", "^GSPC"):
+                    bench_calls.append((self.sym, auto_adjust))
+                    if self.sym == "SPY":
+                        return pd.DataFrame({"Close": [500.0, 525.0]}, index=pd.to_datetime(["2026-10-01", "2026-11-15"]))
+                    if self.sym == "URTH":
+                        return pd.DataFrame({"Close": [150.0, 156.0]}, index=pd.to_datetime(["2026-10-01", "2026-11-15"]))
+                if start is not None:
+                    # Alerta el 2026-10-01 a 100.0; +30 días = 2026-10-31 (sábado) -> primera sesión hábil = 2026-11-02 (cierre 110.0)
+                    # Hoy (día 45 = 2026-11-15) está a 130.0
+                    dates = pd.to_datetime(["2026-10-01", "2026-10-15", "2026-10-30", "2026-11-02", "2026-11-10", "2026-11-13"])
+                    return pd.DataFrame(
+                        {
+                            "High":  [102.0, 108.0, 109.0, 112.0, 125.0, 132.0],
+                            "Low":   [ 98.0,  92.0, 104.0, 108.0, 118.0, 128.0],
+                            "Close": [100.0,  95.0, 106.0, 110.0, 122.0, 130.0],
+                        },
+                        index=dates,
+                    )
+                return pd.DataFrame({"Close": [130.0]}, index=pd.to_datetime(["2026-11-13"]))
+
+        now_day45 = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            hist_file = Path(td) / "history.json"
+            # Inyectamos adrede un d30 desviado (registrado 12 días tarde) para comprobar también la autocorrección
+            hist_file.write_text(json.dumps({
+                "updated_at": "2026-11-12T10:00:00+00:00",
+                "entries": [{
+                    "ticker": "DECK",
+                    "name": "Deckers",
+                    "currency": "USD",
+                    "tier": "ORO_PURO",
+                    "alert_date": "2026-10-01",
+                    "alert_price": 100.0,
+                    "quality_score": 98,
+                    "last_price": 122.0,
+                    "return_pct": 22.0,
+                    "milestones_pct": {"d30": 26.5, "d90": None, "d180": None, "d365": None},
+                    "milestone_dates": {"d30": "2026-11-12", "d90": None, "d180": None, "d365": None},
+                }]
+            }), encoding="utf-8")
+
+            with (
+                patch.object(bs, "OUT_HISTORY_JSON", hist_file),
+                patch.object(bs.yf, "Ticker", side_effect=MockExactHistoryTicker),
+            ):
+                bs.update_alert_history([], now_dt=now_day45)
+
+            saved = json.loads(hist_file.read_text(encoding="utf-8"))
+            e = saved["entries"][0]
+            # d30 exacto = primera sesión hábil >= 2026-10-31 -> 2026-11-02 (Close 110.0 + div 1.5 = +11.5%, NO +34.5% del día 45)
+            self.assertEqual(e["milestone_dates"]["d30"], "2026-11-02")
+            self.assertEqual(e["milestones_pct"]["d30"], 11.5)
+            # d90 sigue None porque solo pasaron 45 días
+            self.assertIsNone(e["milestones_pct"]["d90"])
+            self.assertIsNone(e["milestone_dates"]["d90"])
+            # Retorno actual incluye ambos dividendos en efectivo: (130 + 1.5 + 3.0) / 100 - 1 = +34.5%
+            self.assertEqual(e["price_return_pct"], 30.0)
+            self.assertEqual(e["return_pct"], 34.5)
+            self.assertEqual(e["return_methodology"], "price_plus_cash_dividends")
+            # Benchmarks homogéneos SPY y URTH (nunca ^GSPC), ambos con auto_adjust=True
+            syms_called = [s for s, _ in bench_calls]
+            self.assertIn("SPY", syms_called)
+            self.assertIn("URTH", syms_called)
+            self.assertNotIn("^GSPC", syms_called)
+            self.assertTrue(all(adj is True for _, adj in bench_calls))
+            self.assertEqual(e["benchmarks"]["sp500_symbol"], "SPY")
+            self.assertEqual(e["benchmarks"]["sp500_pct"], 5.0)
+            self.assertEqual(e["benchmarks"]["msci_world_symbol"], "URTH")
+            self.assertEqual(e["benchmarks"]["msci_world_pct"], 4.0)
+            self.assertEqual(e["benchmarks"]["methodology"], "total_return_etf_adjusted")
 
 if __name__ == "__main__":
     unittest.main()
