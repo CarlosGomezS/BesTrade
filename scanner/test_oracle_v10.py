@@ -537,7 +537,7 @@ class TestOracleV103(unittest.TestCase):
             self.assertTrue(hist_path.exists())
 
             published = json.loads(latest_path.read_text(encoding="utf-8"))
-            self.assertEqual(published["scanner_version"], "v10.5-oraculo")
+            self.assertEqual(published["scanner_version"], "v11.1-oraculo")
             self.assertIn("fx_rates_eur", published)
             self.assertEqual(len(published["companies"]), 1)
 
@@ -931,12 +931,17 @@ class TestOracleV103(unittest.TestCase):
             self.assertGreater(plan["exit2"], plan["exit1"])
             self.assertLess(plan["stop_loss"], plan["p3"])
 
-            msg = bs.format_detailed_opp(sample_rec, "🚨 ENTRAR YA")
-            self.assertIn("90.00 €", msg)
-            self.assertIn("Entrada EUR", msg)
-            self.assertIn("Salida (TP)", msg)
-            self.assertIn("Stop Loss", msg)
-            self.assertNotIn("100.0 USD", msg)
+            msg_no_pot = bs.format_detailed_opp(sample_rec, "🚨 ENTRAR YA")
+            self.assertIn("90.00 €", msg_no_pot)
+            self.assertIn("Plan entrada (35% / 35% / 30%", msg_no_pot)
+            self.assertIn("Salida (TP)", msg_no_pot)
+            self.assertIn("Stop Loss", msg_no_pot)
+            self.assertNotIn("100.0 USD", msg_no_pot)
+            self.assertNotIn("240 €", msg_no_pot)
+
+            with patch.object(bs, "DEFAULT_TRADE_BUDGET_EUR", 240.0):
+                msg_with_pot = bs.format_detailed_opp(sample_rec, "🚨 ENTRAR YA")
+                self.assertIn("Entrada EUR (240 €)", msg_with_pot)
 
     # --- 15) FX ESTRICTO (SIN FALSOS EUROS), STOP LOSS ADAPTATIVO Y MAX DRAWDOWN POST-ALERTA ---
     def test_strict_fx_no_fake_eur_and_adaptive_stop_loss(self):
@@ -1080,6 +1085,58 @@ class TestOracleV103(unittest.TestCase):
                 self.assertEqual(e["return_pct"], 12.0)  # +10% precio + 2% dividendo sin doble conteo
                 self.assertEqual(e["max_drawdown_after_alert_pct"], -12.0)
                 self.assertEqual(e["max_gain_after_alert_pct"], 24.0)
+
+    # --- 17) SIN PRESUPUESTO FANTASMA DE 240 EUR EN ESCÁNER / TELEGRAM / PUSH ---
+    def test_no_phantom_240_eur_budget_when_unset(self):
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+
+        sample_rec = {
+            "ticker": "DECK",
+            "name": "Deckers Outdoor",
+            "region": "EE. UU.",
+            "price": 100.0,
+            "currency": "USD",
+            "status": "OPORTUNIDAD",
+            "drawdown_52w_pct": -30.0,
+            "quality_score": 98,
+            "roic_pct": 28.0,
+            "net_debt_ebitda": -0.5,
+            "p_fcf": 12.0,
+            "forward_pe": 13.5,
+            "discount_vs_base_pct": 45.0,
+            "dcf": {"intrinsic_base": 180.0, "intrinsic_bear": 140.0, "target_price": 135.0},
+            "ai_verdict": "TEMPORAL",
+            "oro_puro": True,
+        }
+
+        with (
+            patch.object(bs, "DEFAULT_TRADE_BUDGET_EUR", None),
+            patch.object(bs, "get_fx_rate", return_value=0.90),
+        ):
+            plan = bs.compute_trade_plan_eur(sample_rec)
+            self.assertIsNotNone(plan)
+            self.assertTrue(plan["is_example_budget"])
+            self.assertEqual(plan["budget"], 80.0)
+            self.assertNotEqual(plan["budget"], 240.0)
+
+            msg = bs.format_detailed_opp(sample_rec, "🚨 ENTRAR YA")
+            self.assertIn("ajusta a tu bote real", msg)
+            self.assertNotIn("240 €", msg)
 
 if __name__ == "__main__":
     unittest.main()
