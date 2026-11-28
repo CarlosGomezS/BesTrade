@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
-<title>Cocodrilo Pro v11.2 — Gestor Patrimonial EUR</title>
+<title>Cocodrilo Pro v11.3 — Gestor Patrimonial EUR</title>
 <style>
 :root{
   --bg:#000000;
@@ -1118,7 +1118,7 @@ details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
       <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
       <div class="brand-txt">
         <h1>COCODRILO PRO</h1>
-        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v11.2</span></small>
+        <small id="appSubtitle">ORÁCULO <span class="ver-tag">v11.3</span></small>
       </div>
     </div>
     <div class="appbar-right">
@@ -1434,9 +1434,9 @@ details.collap-panel[open] .collap-chev{transform:rotate(180deg)}
   <!-- VIEW 4: DIARIO DE ACIERTOS -->
   <section class="view" id="view-hist">
     <div class="panel">
-      <div class="eyebrow">Seguimiento prospectivo · Hitos exactos y ETFs con dividendos</div>
+      <div class="eyebrow">Seguimiento prospectivo en EUR · Splits + Hitos exactos</div>
       <h3 style="margin:4px 0 6px">Diario de Aciertos</h3>
-      <p style="margin:0 0 11px;font-size:12.5px;color:var(--muted)">Conserva la fecha y el precio exactos de cada alerta original y compara su rentabilidad (<b>precio + dividendos en efectivo, sin reinversión</b>) frente a los ETFs <b>MSCI World (URTH)</b> y <b>S&amp;P 500 (SPY)</b> con dividendos.</p>
+      <p style="margin:0 0 11px;font-size:12.5px;color:var(--muted)">Conserva la fecha y el precio exactos de cada alerta, ajusta <b>splits</b> y homogeneiza tanto tus alertas (<b>precio + dividendos en efectivo, sin reinversión</b>) como <b>MSCI World (URTH)</b> y <b>S&amp;P 500 (SPY)</b> en <b>EUR</b> con tipo de cambio histórico.</p>
       <div class="kpi-row" id="histKpis">
         <div class="kpi"><span><i class="kdot b"></i>Alertas</span><strong id="hCount">0</strong></div>
         <div class="kpi g"><span><i class="kdot g"></i>Positivo</span><strong id="hWinRate">—</strong></div>
@@ -1629,7 +1629,7 @@ const FALLBACK_FX_EUR = { EUR: 1.0, USD: 0.94, GBP: 1.19, CHF: 1.07, CAD: 0.67, 
 
 const DEMO_PAYLOAD = {
   is_demo: true,
-  scanner_version: "v11.2-oraculo",
+  scanner_version: "v11.3-oraculo",
   generated_at: new Date().toISOString(),
   universe_mode: "demo (ejemplo)",
   total_scanned: 2150,
@@ -2708,7 +2708,7 @@ async function cloudPush(showMsg = false, retryCount = 0){
       checks
     };
     const body = {
-      message: 'Sync Cocodrilo user-db v11.2',
+      message: 'Sync Cocodrilo user-db v11.3',
       content: toBase64Utf8(JSON.stringify(dbObj, null, 2))
     };
     if(cloudSha) body.sha = cloudSha;
@@ -2882,7 +2882,7 @@ function buildBuffettPrompt(c){
     : '';
   return `Actúa como analista siguiendo estrictamente el método de Warren Buffett y Charlie Munger. Invierto en EUR en Trade Republic.
 Analiza ${liveC.name} (${liveC.ticker}), sector ${liveC.sector} (${liveC.region}).
-Datos del Radar Cocodrilo v11.2 (convertidos a EUR):
+Datos del Radar Cocodrilo v11.3 (convertidos a EUR):
 - Precio actual: ${fmtEur(liveC.price, liveC.currency)} (caída 52s: ${liveC.drawdown_52w_pct ?? 'N/D'}%)
 - Calidad: ${liveC.quality_score}/100 | Cuadrante: ${quad}
 - Piotroski Clásico: ${pioCls} | Adaptado: ${liveC.piotroski_score ?? 'N/D'}/${liveC.piotroski_max ?? 9}
@@ -2901,7 +2901,7 @@ function copyPrompt(ticker){
   if(!c) return;
   const txt = buildBuffettPrompt(c);
   if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(() => toast('Prompt Buffett v11.2 copiado.')).catch(() => prompt('Copia:', txt));
+    navigator.clipboard.writeText(txt).then(() => toast('Prompt Buffett v11.3 copiado.')).catch(() => prompt('Copia:', txt));
   } else prompt('Copia:', txt);
 }
 
@@ -4098,24 +4098,86 @@ function renderHistoryView(){
     return;
   }
 
-  // Preserva el diferencial de dividendos guardado por el backend incluso con precio en vivo (sin doble conteo)
+  // Homogeneiza en EUR cuando hay FX histórico; respeta splits (adjusted_alert_price) y dividendos en efectivo sin doble conteo
   const enriched = entries.map(e => {
-    const lqH = liveQuotes[(e.ticker || '').toUpperCase()];
+    const tkr = (e.ticker || '').toUpperCase();
+    const cur = (e.currency || 'USD').toUpperCase();
+    const lqH = liveQuotes[tkr];
     const liveLastP = (lqH && Number.isFinite(Number(lqH.price)) && lqH.price > 0) ? Number(lqH.price) : Number(e.last_price);
+    const effAlertP = (Number.isFinite(Number(e.adjusted_alert_price)) && Number(e.adjusted_alert_price) > 0)
+      ? Number(e.adjusted_alert_price) : Number(e.alert_price);
     const hasDivSplit = Number.isFinite(Number(e.return_pct)) && Number.isFinite(Number(e.price_return_pct));
-    const divBonusPct = hasDivSplit ? Math.max(0, Number(e.return_pct) - Number(e.price_return_pct)) : 0;
-    const liveRet = (lqH && e.alert_price > 0)
-      ? Number(((((liveLastP / e.alert_price) - 1) * 100) + divBonusPct).toFixed(1))
+    const divBonusLocal = hasDivSplit ? Math.max(0, Number(e.return_pct) - Number(e.price_return_pct)) : 0;
+
+    const liveRetLocal = (lqH && effAlertP > 0)
+      ? Number(((((liveLastP / effAlertP) - 1) * 100) + divBonusLocal).toFixed(1))
       : Number(e.return_pct || 0);
-    const msci = Number(e.benchmarks?.msci_world_pct);
-    const alpha = (Number.isFinite(liveRet) && Number.isFinite(msci)) ? (liveRet - msci) : null;
+
+    // Retorno en EUR (si existe histórico FX o es acción en EUR)
+    let liveRetEur = Number.isFinite(Number(e.return_eur_pct)) ? Number(e.return_eur_pct) : null;
+    if(cur === 'EUR'){
+      liveRetEur = liveRetLocal;
+    } else if(lqH && Number.isFinite(Number(e.adjusted_alert_price_eur)) && Number(e.adjusted_alert_price_eur) > 0){
+      const liveEurP = toEur(liveLastP, cur);
+      if(liveEurP !== null && liveEurP > 0){
+        const hasEurDiv = Number.isFinite(Number(e.return_eur_pct)) && Number.isFinite(Number(e.price_return_eur_pct));
+        const divBonusEur = hasEurDiv ? Math.max(0, Number(e.return_eur_pct) - Number(e.price_return_eur_pct)) : 0;
+        liveRetEur = Number(((((liveEurP / Number(e.adjusted_alert_price_eur)) - 1) * 100) + divBonusEur).toFixed(1));
+      }
+    }
+
+    const msciEur = (e.benchmarks?.msci_world_eur_pct !== null && e.benchmarks?.msci_world_eur_pct !== undefined)
+      ? Number(e.benchmarks.msci_world_eur_pct) : null;
+    const spEur = (e.benchmarks?.sp500_eur_pct !== null && e.benchmarks?.sp500_eur_pct !== undefined)
+      ? Number(e.benchmarks.sp500_eur_pct) : null;
+    const msciUsd = (e.benchmarks?.msci_world_pct !== null && e.benchmarks?.msci_world_pct !== undefined)
+      ? Number(e.benchmarks.msci_world_pct) : null;
+    const spUsd = (e.benchmarks?.sp500_pct !== null && e.benchmarks?.sp500_pct !== undefined)
+      ? Number(e.benchmarks.sp500_pct) : null;
+
+    // Comparación homogénea EUR vs EUR (solo si ambos están en EUR; si es USD y falta FX EUR, USD vs USD; nunca EUR vs USD)
+    let evalRet = liveRetLocal;
+    let msciRef = null;
+    let spRef = null;
+    let baseCur = cur;
+    if(liveRetEur !== null && msciEur !== null){
+      evalRet = liveRetEur;
+      msciRef = msciEur;
+      spRef = spEur;
+      baseCur = 'EUR';
+    } else if(cur === 'USD' && msciUsd !== null){
+      evalRet = liveRetLocal;
+      msciRef = msciUsd;
+      spRef = spUsd;
+      baseCur = 'USD';
+    } else if(liveRetEur !== null){
+      evalRet = liveRetEur;
+      baseCur = 'EUR';
+    }
+
+    const alpha = (Number.isFinite(evalRet) && msciRef !== null && Number.isFinite(msciRef)) ? (evalRet - msciRef) : null;
     const mae = (e.max_drawdown_after_alert_pct !== null && e.max_drawdown_after_alert_pct !== undefined)
       ? Number(e.max_drawdown_after_alert_pct)
-      : (liveRet < 0 ? liveRet : 0);
+      : (liveRetLocal < 0 ? liveRetLocal : 0);
     const mfe = (e.max_gain_after_alert_pct !== null && e.max_gain_after_alert_pct !== undefined)
       ? Number(e.max_gain_after_alert_pct)
-      : (liveRet > 0 ? liveRet : 0);
-    return { ...e, _liveLastP: liveLastP, _liveRet: liveRet, _divBonus: divBonusPct, _alpha: alpha, _mae: mae, _mfe: mfe, _isLive: !!lqH };
+      : (liveRetLocal > 0 ? liveRetLocal : 0);
+
+    return {
+      ...e,
+      _liveLastP: liveLastP,
+      _liveRet: evalRet,
+      _liveRetLocal: liveRetLocal,
+      _liveRetEur: liveRetEur,
+      _baseCur: baseCur,
+      _msciRef: msciRef,
+      _spRef: spRef,
+      _divBonus: divBonusLocal,
+      _alpha: alpha,
+      _mae: mae,
+      _mfe: mfe,
+      _isLive: !!lqH
+    };
   });
 
   const rets = enriched.map(e => e._liveRet).filter(Number.isFinite);
@@ -4125,15 +4187,17 @@ function renderHistoryView(){
   $('hWinRate').textContent = rets.length ? `${Math.round((wins / rets.length) * 100)}%` : '—';
   $('hAvgRet').textContent = `${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%`;
 
+  const eurHomogCount = enriched.filter(e => e._baseCur === 'EUR' && e._msciRef !== null).length;
   const alphas = enriched.map(e => e._alpha).filter(x => x !== null);
   if(alphas.length){
     const avgAlpha = alphas.reduce((a,b) => a+b, 0) / alphas.length;
-    alphaBox.innerHTML = `<div class="notice ${avgAlpha>=0?'good':'warn'}" style="margin:0">⚖️ <b>Alpha medio frente a MSCI World (${alphas.length} señales):</b> <b>${avgAlpha>=0?'+':''}${avgAlpha.toFixed(1)} pp</b>${med !== null ? ` · Mediana: <b>${med>=0?'+':''}${med.toFixed(1)}%</b>` : ''}</div>`;
+    const curTag = eurHomogCount === alphas.length ? 'homogeneizado en EUR' : (eurHomogCount > 0 ? `${eurHomogCount}/${alphas.length} en EUR` : 'misma divisa');
+    alphaBox.innerHTML = `<div class="notice ${avgAlpha>=0?'good':'warn'}" style="margin:0">⚖️ <b>Alpha medio frente a MSCI World (${alphas.length} señales · ${curTag}):</b> <b>${avgAlpha>=0?'+':''}${avgAlpha.toFixed(1)} pp</b>${med !== null ? ` · Mediana: <b>${med>=0?'+':''}${med.toFixed(1)}%</b>` : ''}</div>`;
   } else {
-    alphaBox.innerHTML = `<div class="notice info" style="margin:0">ℹ️ Los benchmarks (MSCI World y S&amp;P 500) se rellenan automáticamente en el escaneo diario/semanal.</div>`;
+    alphaBox.innerHTML = `<div class="notice info" style="margin:0">ℹ️ Los benchmarks homogeneizados en EUR (URTH y SPY) se rellenan automáticamente en el próximo escaneo v11.3.</div>`;
   }
 
-  // Auditor de Señales v11.1 (Media · Mediana · MAE · MFE · Horizontes · Señales abiertas)
+  // Auditor de Señales v11.3 (Media · Mediana · MAE · MFE · Horizontes EUR/Local · Señales abiertas)
   if(audHost){
     const groupStats = (arr) => {
       if(!arr.length) return null;
@@ -4166,7 +4230,12 @@ function renderHistoryView(){
     const openPct = Math.round((openCount / enriched.length) * 100);
 
     const horCells = [['d30','30d'],['d90','90d'],['d180','180d'],['d365','365d']].map(([k, lbl]) => {
-      const vals = enriched.map(e => e.milestones_pct?.[k]).filter(v => v !== null && v !== undefined && Number.isFinite(Number(v))).map(Number);
+      const vals = enriched.map(e => {
+        const eurV = e.milestones_eur_pct?.[k];
+        if(eurV !== null && eurV !== undefined && Number.isFinite(Number(eurV))) return Number(eurV);
+        const locV = e.milestones_pct?.[k];
+        return (locV !== null && locV !== undefined && Number.isFinite(Number(locV))) ? Number(locV) : null;
+      }).filter(v => v !== null);
       if(!vals.length) return `<div class="hcell"><span>${lbl}</span><b style="color:var(--muted)">—</b></div>`;
       const m = vals.reduce((a, b) => a + b, 0) / vals.length;
       const col = m >= 0 ? '#4ade80' : '#fda4af';
@@ -4202,17 +4271,23 @@ function renderHistoryView(){
       : e.tier === 'ENTRADA_YA' ? '<span class="pill entrar-ya">🚨 ENTRAR YA</span>'
       : '<span class="pill ganga">🏆 GANGA</span>';
     const bm = e.benchmarks || {};
-    const ms = e.milestones_pct || {};
+    const ms = (e._baseCur === 'EUR' && e.milestones_eur_pct) ? e.milestones_eur_pct : (e.milestones_pct || {});
     const chips = [];
     const msciSym = bm.msci_world_symbol || 'URTH';
     const spSym = bm.sp500_symbol || 'SPY';
     const msDates = e.milestone_dates || {};
-    if(bm.msci_world_pct !== null && bm.msci_world_pct !== undefined){
-      const diff = r - Number(bm.msci_world_pct);
-      chips.push(`<span class="bench-chip ${diff>=0?'beat':'lag'}">MSCI (${esc(msciSym)}): ${bm.msci_world_pct>=0?'+':''}${bm.msci_world_pct}% (${diff>=0?'+':''}${diff.toFixed(1)}pp)</span>`);
+    if(e._msciRef !== null){
+      const diff = r - e._msciRef;
+      chips.push(`<span class="bench-chip ${diff>=0?'beat':'lag'}">MSCI (${esc(msciSym)} ${e._baseCur}): ${e._msciRef>=0?'+':''}${e._msciRef}% (${diff>=0?'+':''}${diff.toFixed(1)}pp)</span>`);
     }
-    if(bm.sp500_pct !== null && bm.sp500_pct !== undefined){
-      chips.push(`<span class="bench-chip">S&amp;P (${esc(spSym)}): ${bm.sp500_pct>=0?'+':''}${bm.sp500_pct}%</span>`);
+    if(e._spRef !== null){
+      chips.push(`<span class="bench-chip">S&amp;P (${esc(spSym)} ${e._baseCur}): ${e._spRef>=0?'+':''}${e._spRef}%</span>`);
+    }
+    if(e.currency && e.currency.toUpperCase() !== 'EUR' && e._liveRetEur !== null){
+      chips.push(`<span class="bench-chip">Local (${esc(e.currency)}): ${e._liveRetLocal>=0?'+':''}${e._liveRetLocal.toFixed(1)}%</span>`);
+    }
+    if(Number(e.split_factor_since_alert || 1) !== 1){
+      chips.push(`<span class="bench-chip">Split ${Number(e.split_factor_since_alert)}x</span>`);
     }
     if(e.max_drawdown_after_alert_pct !== null && e.max_drawdown_after_alert_pct !== undefined){
       chips.push(`<span class="bench-chip lag">MAE: ${Number(e.max_drawdown_after_alert_pct).toFixed(1)}%</span>`);
@@ -4224,12 +4299,16 @@ function renderHistoryView(){
       chips.push(`<span class="bench-chip beat">+${e._divBonus.toFixed(1)}% div. efec.</span>`);
     }
     [['d30','30d'],['d90','90d'],['d180','180d'],['d365','365d']].forEach(([k,lbl]) => {
-      if(ms[k] !== null && ms[k] !== undefined){
+      const valM = (ms[k] !== null && ms[k] !== undefined) ? ms[k] : e.milestones_pct?.[k];
+      if(valM !== null && valM !== undefined){
         const dtHint = msDates[k] ? ` title="Cierre exacto: ${esc(msDates[k])}"` : '';
-        chips.push(`<span class="bench-chip"${dtHint}>${lbl}: ${ms[k]>=0?'+':''}${ms[k]}%</span>`);
+        chips.push(`<span class="bench-chip"${dtHint}>${lbl}: ${valM>=0?'+':''}${valM}%</span>`);
       }
     });
-    const retNote = e._divBonus > 0 ? 'Precio+div efec.' : (e._isLive ? 'Precio vivo' : 'Precio+div');
+    const alertPriceDisp = (Number.isFinite(Number(e.alert_price_eur)) && Number(e.alert_price_eur) > 0)
+      ? `${Number(e.alert_price_eur).toFixed(2)} €`
+      : fmtEur(e.alert_price, e.currency);
+    const retNote = `${e._baseCur} · ${e._divBonus > 0 ? '+div efec.' : (e._isLive ? 'vivo' : 'precio')}`;
     return `<div class="hist-card">
       <div class="hist-top">
         <div style="min-width:0">
@@ -4237,7 +4316,7 @@ function renderHistoryView(){
             <b>${esc(e.name || e.ticker)}</b> <span class="tkr">${esc(e.ticker)}</span> ${badge}
           </div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:4px">
-            Alerta <b>${esc(e.alert_date)}</b> a <b>${fmtEur(e.alert_price, e.currency)}</b> → Hoy: <b>${fmtEur(e._liveLastP, e.currency)}</b>${e._isLive ? ' <span class="live-tag"><i></i></span>' : ''}
+            Alerta <b>${esc(e.alert_date)}</b> a <b>${alertPriceDisp}</b> → Hoy: <b>${fmtEur(e._liveLastP, e.currency)}</b>${e._isLive ? ' <span class="live-tag"><i></i></span>' : ''}
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -4412,7 +4491,7 @@ function openModal(ticker, skipLiveRefresh = false){
     ${c.oro_puro ? `<div class="notice good"><b>👑 SEÑAL ORO PURO (1-2/AÑO):</b> doble verificación superada (calidad élite + SEC MATCH ≤15% + Piotroski + Forward Check + Tribunal IA favorable).</div>` : ''}
 
     <div class="notice info">
-      <b>🛡️ Auditoría Oráculo v11.2</b>
+      <b>🛡️ Auditoría Oráculo v11.3</b>
       <div class="oracle-grid">
         <div class="oracle-cell">
           <span>Piotroski Clásico (activos medios)</span>
@@ -4719,17 +4798,21 @@ function buildAgentSystemContext(userText = ''){
     ? hEntries.map(e => {
         const lqH = liveQuotes[(e.ticker || '').toUpperCase()];
         const lp = (lqH && lqH.price > 0) ? lqH.price : e.last_price;
-        const ret = (lqH && e.alert_price > 0) ? (((lp / e.alert_price) - 1) * 100).toFixed(1) : (e.return_pct ?? 'N/D');
-        const msci = e.benchmarks?.msci_world_pct;
-        const sp = e.benchmarks?.sp500_pct;
-        return `- ${e.ticker} (${e.tier}) alerta ${e.alert_date} a ${fmtEur(e.alert_price, e.currency)} -> Hoy ${fmtEur(lp, e.currency)} (${ret >= 0 ? '+' : ''}${ret}% | MSCI World: ${msci ?? 'N/D'}% | S&P500: ${sp ?? 'N/D'}%)`;
+        const effP = (e.adjusted_alert_price > 0) ? e.adjusted_alert_price : e.alert_price;
+        const retEur = e.return_eur_pct;
+        const retLoc = (lqH && effP > 0) ? (((lp / effP) - 1) * 100).toFixed(1) : (e.return_pct ?? 'N/D');
+        const msci = e.benchmarks?.msci_world_eur_pct ?? e.benchmarks?.msci_world_pct;
+        const sp = e.benchmarks?.sp500_eur_pct ?? e.benchmarks?.sp500_pct;
+        const curLbl = (e.benchmarks?.msci_world_eur_pct !== null && e.benchmarks?.msci_world_eur_pct !== undefined) ? 'EUR' : (e.currency || 'USD');
+        const dispRet = (curLbl === 'EUR' && retEur !== null && retEur !== undefined) ? retEur : retLoc;
+        return `- ${e.ticker} (${e.tier}) alerta ${e.alert_date} a ${fmtEur(e.alert_price, e.currency)} -> Hoy ${fmtEur(lp, e.currency)} (${dispRet >= 0 ? '+' : ''}${dispRet}% ${curLbl} | MSCI World: ${msci ?? 'N/D'}% | S&P500: ${sp ?? 'N/D'}%)`;
       })
     : ['(Sin historial de alertas aún)'];
 
   return `Eres el AGENTE ORÁCULO DE BESTRADE: un gestor profesional de renta variable, analista fundamental de élite y especialista táctico en entradas escalonadas, entrenado bajo la filosofía estricta de Warren Buffett y Charlie Munger.
 
 TU MISIÓN Y REGLAS DE HIERRO (OBLIGATORIAS):
-1. Conoces de arriba a abajo TODO el sistema BesTrade v11.2: Score Buffett (0-100), Piotroski Clásico (9 señales originales con activos medios y su cobertura k/9), Piotroski Adaptado, auditoría oficial SEC EDGAR (MATCH <=15%, ACCEPTABLE 15-30%, MISMATCH >30%), Owner Earnings (FCF descontando SBC), DCF Conservador/Base/Optimista, Forward Check (previsiones de BPA e ingresos), Cuadrante Calidad vs. Valoración, Tribunal IA, Diario de Aciertos y Precios/FX en vivo.
+1. Conoces de arriba a abajo TODO el sistema BesTrade v11.3: Score Buffett (0-100), Piotroski Clásico (9 señales originales con activos medios y su cobertura k/9), Piotroski Adaptado, auditoría oficial SEC EDGAR (MATCH <=15%, ACCEPTABLE 15-30%, MISMATCH >30%), Owner Earnings (FCF descontando SBC), DCF Conservador/Base/Optimista, Forward Check (previsiones de BPA e ingresos), Cuadrante Calidad vs. Valoración, Tribunal IA, Diario de Aciertos y Precios/FX en vivo.
 2. NUNCA INVENTES DATOS NI GARANTICES RENTABILIDADES: usa EXCLUSIVAMENTE las cifras exactas que aparecen en el contexto en vivo de abajo. Si falta un dato (ej. Piotroski parcial 5/9 o SEC no verificado), señálalo abiertamente como limitación.
 3. SEPARA SIEMPRE CALIDAD DE PRECIO: distingue con claridad entre (a) Excelente a precio razonable/con margen, (b) Excelente pero cara, (c) Mediocre aparentemente barata (posible trampa de valor) y (d) Problemas fundamentales.
 4. INVERSIÓN INVERSA (CHARLIE MUNGER): antes de recomendar entrar en cualquier empresa, expón SIEMPRE el argumento bajista ("cómo podríamos perder dinero aquí") y los avisos reales (ej. FCF capado, resultados en <=10 días, Piotroski clásico bajo).
@@ -4867,7 +4950,7 @@ function renderAgentView(){
           <p style="margin:4px 0;color:var(--text2)">Toca cualquier botón rápido de arriba o pregúntame directamente por cualquier ticker (ej. <code>DECK</code>, <code>NVDA</code>, <code>ADBE</code>, <code>ITX.MC</code>) para analizar calidad, valoración, trampas y plan en 3 tramos.</p>
           ${setupWarn}
         </div>
-        <div class="msg-meta">Buffett &amp; Munger Engine · v11.2</div>
+        <div class="msg-meta">Buffett &amp; Munger Engine · v11.3</div>
       </div>`;
     return;
   }
