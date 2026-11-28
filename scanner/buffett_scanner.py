@@ -1924,18 +1924,25 @@ def _get_fx_history_to_eur(src_cur: str, start_date_str: str) -> Optional[pd.Ser
     return series_out
 
 
-def _fx_rate_on_or_before(fx_series: Optional[pd.Series], date_str: str) -> Optional[float]:
-    """Devuelve el tipo de cambio en la última sesión <= date_str (o primera en <=7 días si es festivo inicial)."""
+def _fx_rate_on_or_before(
+    fx_series: Optional[pd.Series],
+    date_str: str,
+    max_staleness_days: int = 10,
+) -> Optional[float]:
+    """Devuelve el FX en la última sesión <= date_str (rechaza cotizaciones obsoletas > max_staleness_days; tolera festivos <=7d)."""
     if fx_series is None or fx_series.empty:
         return None
     try:
         target_ts = pd.Timestamp(datetime.strptime(date_str[:10], "%Y-%m-%d").date())
         prior = fx_series[fx_series.index <= target_ts]
         if not prior.empty:
+            last_ts = prior.index[-1]
+            if (target_ts - last_ts).days > max_staleness_days:
+                return None
             val = safe_float(prior.iloc[-1])
             return val if (val and val > 0) else None
         first_ts = fx_series.index[0]
-        if (first_ts - target_ts).days <= 7:
+        if 0 <= (first_ts - target_ts).days <= 7:
             val = safe_float(fx_series.iloc[0])
             return val if (val and val > 0) else None
     except Exception:
@@ -2109,7 +2116,7 @@ def _cash_dividends_in_window(
         if getattr(idx_naive, "tz", None) is not None:
             idx_naive = idx_naive.tz_localize(None)
         idx_norm = idx_naive.normalize()
-        mask = idx_norm >= d0
+        mask = idx_norm > d0
         if d1 is not None:
             mask = mask & (idx_norm <= d1)
         vals = [safe_float(x) for x in div_s[mask].values]
@@ -2141,7 +2148,7 @@ def _cash_dividends_in_window_eur(
         if getattr(idx_naive, "tz", None) is not None:
             idx_naive = idx_naive.tz_localize(None)
         idx_norm = idx_naive.normalize()
-        mask = idx_norm >= d0
+        mask = idx_norm > d0
         if d1 is not None:
             mask = mask & (idx_norm <= d1)
         total_eur = 0.0
@@ -2260,7 +2267,7 @@ def update_alert_history(results: List[Dict[str, Any]], now_dt: Optional[datetim
         cur_p = safe_float(rec.get("price")) if rec else None
         if cur_p is None and t_obj is not None:
             try:
-                hist_t = t_obj.history(period="5d")
+                hist_t = t_obj.history(period="5d", auto_adjust=False)
                 if hist_t is not None and not hist_t.empty and "Close" in hist_t:
                     cur_p = safe_float(hist_t["Close"].dropna().iloc[-1])
             except Exception:
