@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-28T09:23:26.517191+00:00",
+  "updated_at": "2026-11-28T12:07:06.192568+00:00",
   "entries": [
     {
       "ticker": "NTES",
@@ -29,7 +29,14 @@
       },
       "benchmarks": {
         "sp500_pct": null,
+        "sp500_eur_pct": null,
+        "sp500_symbol": "SPY",
         "msci_world_pct": null,
+        "msci_world_eur_pct": null,
+        "msci_world_symbol": "URTH",
+        "alpha_msci_eur_pp": null,
+        "currency_base": "USD",
+        "methodology": "price_plus_cash_dividends_eur_homogenized",
         "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
@@ -38,7 +45,7 @@
       "last_checked": "2026-11-28",
       "current_status": "GANGA",
       "price_return_pct": -0.0,
-      "last_checked_at": "2026-11-28T09:23:26.517191+00:00",
+      "last_checked_at": "2026-11-28T12:07:06.192568+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -46,7 +53,27 @@
         "d365": null
       },
       "max_drawdown_after_alert_pct": -0.4,
-      "max_gain_after_alert_pct": 1.3
+      "max_gain_after_alert_pct": 1.3,
+      "splits_status": "NO_SPLITS",
+      "dividends_status": "OK",
+      "split_factor_since_alert": 1.0,
+      "adjusted_alert_price": 106.85,
+      "return_methodology": "price_plus_cash_dividends_split_adjusted",
+      "alert_price_eur": 97.38,
+      "adjusted_alert_price_eur": 97.3831,
+      "last_price_eur": 97.38,
+      "fx_alert_to_eur": 0.9114,
+      "fx_last_to_eur": 0.9114,
+      "fx_impact_pct": 0.0,
+      "price_return_eur_pct": -0.0,
+      "return_eur_pct": -0.0,
+      "fx_status": "OK",
+      "milestones_eur_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      }
     },
     {
       "ticker": "GDDY",
@@ -69,12 +96,19 @@
       },
       "benchmarks": {
         "sp500_pct": null,
+        "sp500_eur_pct": null,
+        "sp500_symbol": "SPY",
         "msci_world_pct": null,
+        "msci_world_eur_pct": null,
+        "msci_world_symbol": "URTH",
+        "alpha_msci_eur_pp": null,
+        "currency_base": "USD",
+        "methodology": "price_plus_cash_dividends_eur_homogenized",
         "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": -2.0,
-      "last_checked_at": "2026-11-28T09:23:26.517191+00:00",
+      "last_checked_at": "2026-11-28T12:07:06.192568+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -82,7 +116,27 @@
         "d365": null
       },
       "max_drawdown_after_alert_pct": -2.5,
-      "max_gain_after_alert_pct": 1.6
+      "max_gain_after_alert_pct": 1.6,
+      "splits_status": "NO_SPLITS",
+      "dividends_status": "OK",
+      "split_factor_since_alert": 1.0,
+      "adjusted_alert_price": 105.14,
+      "return_methodology": "price_plus_cash_dividends_split_adjusted",
+      "alert_price_eur": 95.84,
+      "adjusted_alert_price_eur": 95.8425,
+      "last_price_eur": 93.94,
+      "fx_alert_to_eur": 0.91157,
+      "fx_last_to_eur": 0.9114,
+      "fx_impact_pct": -0.0,
+      "price_return_eur_pct": -2.0,
+      "return_eur_pct": -2.0,
+      "fx_status": "OK",
+      "milestones_eur_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      }
     },
     {
       "ticker": "PRDO",
@@ -105,12 +159,19 @@
       },
       "benchmarks": {
         "sp500_pct": null,
+        "sp500_eur_pct": null,
+        "sp500_symbol": "SPY",
         "msci_world_pct": null,
+        "msci_world_eur_pct": null,
+        "msci_world_symbol": "URTH",
+        "alpha_msci_eur_pp": null,
+        "currency_base": "USD",
+        "methodology": "price_plus_cash_dividends_eur_homogenized",
         "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": 0.1,
-      "last_checked_at": "2026-11-28T09:23:26.517191+00:00",
+      "last_checked_at": "2026-11-28T12:07:06.192568+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -118,7 +179,27 @@
         "d365": null
       },
       "max_drawdown_after_alert_pct": -0.9,
-      "max_gain_after_alert_pct": 0.9
+      "max_gain_after_alert_pct": 0.9,
+      "splits_status": "NO_SPLITS",
+      "dividends_status": "OK",
+      "split_factor_since_alert": 1.0,
+      "adjusted_alert_price": 28.14,
+      "return_methodology": "price_plus_cash_dividends_split_adjusted",
+      "alert_price_eur": 25.65,
+      "adjusted_alert_price_eur": 25.6516,
+      "last_price_eur": 25.67,
+      "fx_alert_to_eur": 0.91157,
+      "fx_last_to_eur": 0.9114,
+      "fx_impact_pct": -0.0,
+      "price_return_eur_pct": 0.1,
+      "return_eur_pct": 0.7,
+      "fx_status": "OK",
+      "milestones_eur_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      }
     },
     {
       "ticker": "EXPE",
@@ -132,7 +213,7 @@
       "last_price": 246.62,
       "return_pct": 2.2,
       "last_checked": "2026-11-28",
-      "current_status": "MUY_BUENA",
+      "current_status": "ENTRADA_YA",
       "milestones_pct": {
         "d30": null,
         "d90": null,
@@ -141,12 +222,19 @@
       },
       "benchmarks": {
         "sp500_pct": null,
+        "sp500_eur_pct": null,
+        "sp500_symbol": "SPY",
         "msci_world_pct": null,
+        "msci_world_eur_pct": null,
+        "msci_world_symbol": "URTH",
+        "alpha_msci_eur_pp": null,
+        "currency_base": "USD",
+        "methodology": "price_plus_cash_dividends_eur_homogenized",
         "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": 2.2,
-      "last_checked_at": "2026-11-28T09:23:26.517191+00:00",
+      "last_checked_at": "2026-11-28T12:07:06.192568+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -154,7 +242,27 @@
         "d365": null
       },
       "max_drawdown_after_alert_pct": 0.0,
-      "max_gain_after_alert_pct": 3.6
+      "max_gain_after_alert_pct": 3.6,
+      "splits_status": "NO_SPLITS",
+      "dividends_status": "OK",
+      "split_factor_since_alert": 1.0,
+      "adjusted_alert_price": 241.27,
+      "return_methodology": "price_plus_cash_dividends_split_adjusted",
+      "alert_price_eur": 219.93,
+      "adjusted_alert_price_eur": 219.9345,
+      "last_price_eur": 224.77,
+      "fx_alert_to_eur": 0.91157,
+      "fx_last_to_eur": 0.9114,
+      "fx_impact_pct": -0.0,
+      "price_return_eur_pct": 2.2,
+      "return_eur_pct": 2.2,
+      "fx_status": "OK",
+      "milestones_eur_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      }
     },
     {
       "ticker": "ADBE",
@@ -177,12 +285,19 @@
       },
       "benchmarks": {
         "sp500_pct": 1.6,
+        "sp500_eur_pct": 1.5,
+        "sp500_symbol": "SPY",
         "msci_world_pct": 1.6,
+        "msci_world_eur_pct": 1.5,
+        "msci_world_symbol": "URTH",
+        "alpha_msci_eur_pp": -1.0,
+        "currency_base": "EUR",
+        "methodology": "price_plus_cash_dividends_eur_homogenized",
         "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": 0.5,
-      "last_checked_at": "2026-11-28T09:23:26.517191+00:00",
+      "last_checked_at": "2026-11-28T12:07:06.192568+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -190,7 +305,27 @@
         "d365": null
       },
       "max_drawdown_after_alert_pct": -2.5,
-      "max_gain_after_alert_pct": 1.5
+      "max_gain_after_alert_pct": 1.5,
+      "splits_status": "NO_SPLITS",
+      "dividends_status": "OK",
+      "split_factor_since_alert": 1.0,
+      "adjusted_alert_price": 233.52,
+      "return_methodology": "price_plus_cash_dividends_split_adjusted",
+      "alert_price_eur": 213.02,
+      "adjusted_alert_price_eur": 213.0216,
+      "last_price_eur": 213.99,
+      "fx_alert_to_eur": 0.91222,
+      "fx_last_to_eur": 0.9114,
+      "fx_impact_pct": -0.1,
+      "price_return_eur_pct": 0.5,
+      "return_eur_pct": 0.5,
+      "fx_status": "OK",
+      "milestones_eur_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      }
     },
     {
       "ticker": "DECK",
@@ -213,12 +348,19 @@
       },
       "benchmarks": {
         "sp500_pct": 1.6,
+        "sp500_eur_pct": 1.5,
+        "sp500_symbol": "SPY",
         "msci_world_pct": 1.6,
+        "msci_world_eur_pct": 1.5,
+        "msci_world_symbol": "URTH",
+        "alpha_msci_eur_pp": 0.5,
+        "currency_base": "EUR",
+        "methodology": "price_plus_cash_dividends_eur_homogenized",
         "benchmark_as_of": "2026-11-28"
       },
       "status": "ACTIVA",
       "price_return_pct": 2.1,
-      "last_checked_at": "2026-11-28T09:23:26.517191+00:00",
+      "last_checked_at": "2026-11-28T12:07:06.192568+00:00",
       "milestone_dates": {
         "d30": null,
         "d90": null,
@@ -226,7 +368,27 @@
         "d365": null
       },
       "max_drawdown_after_alert_pct": -3.6,
-      "max_gain_after_alert_pct": 3.6
+      "max_gain_after_alert_pct": 3.6,
+      "splits_status": "NO_SPLITS",
+      "dividends_status": "OK",
+      "split_factor_since_alert": 1.0,
+      "adjusted_alert_price": 85.19,
+      "return_methodology": "price_plus_cash_dividends_split_adjusted",
+      "alert_price_eur": 77.71,
+      "adjusted_alert_price_eur": 77.712,
+      "last_price_eur": 79.24,
+      "fx_alert_to_eur": 0.91222,
+      "fx_last_to_eur": 0.9114,
+      "fx_impact_pct": -0.1,
+      "price_return_eur_pct": 2.0,
+      "return_eur_pct": 2.0,
+      "fx_status": "OK",
+      "milestones_eur_pct": {
+        "d30": null,
+        "d90": null,
+        "d180": null,
+        "d365": null
+      }
     }
   ]
 }
