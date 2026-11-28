@@ -62,6 +62,8 @@ URGENT_ONLY = os.environ.get("URGENT_ONLY", "false").strip().lower() == "true"
 URGENT_DOUBLE_PING = os.environ.get("URGENT_DOUBLE_PING", "true").strip().lower() == "true"
 ALERT_COOLDOWN_DAYS = float(os.environ.get("ALERT_COOLDOWN_DAYS", "7"))
 ALERT_RETRIGGER_DROP_PCT = float(os.environ.get("ALERT_RETRIGGER_DROP_PCT", "5.0"))
+DEFAULT_TRADE_BUDGET_EUR = float(os.environ.get("DEFAULT_TRADE_BUDGET_EUR", "240.0"))
+DEFAULT_STOP_LOSS_MODE = os.environ.get("DEFAULT_STOP_LOSS_MODE", "AUTO").strip().upper()
 
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
@@ -73,6 +75,11 @@ APP_BASE_URL = os.environ.get("APP_BASE_URL", "https://carlosgomezs.github.io/Be
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite")
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+
+FALLBACK_FX_EUR: Dict[str, float] = {
+    "EUR": 1.0, "USD": 0.94, "GBP": 1.19, "CHF": 1.07, "CAD": 0.67, "JPY": 0.0061,
+    "SEK": 0.087, "NOK": 0.085, "DKK": 0.134, "HKD": 0.121, "AUD": 0.61,
+}
 
 SUBUNIT_CURRENCIES: Dict[str, Tuple[str, float]] = {
     "GBp": ("GBP", 100.0),
@@ -1206,6 +1213,135 @@ def send_fcm_push(
     return sent_ok
 
 
+def to_eur(amount: Any, currency: Optional[str]) -> Optional[float]:
+    """Convierte a EUR de forma estricta; devuelve None si no existe tipo de cambio válido (nunca falsea EUR)."""
+    val = safe_float(amount)
+    if val is None:
+        return None
+    cur = (currency or "EUR").strip().upper()
+    if cur == "EUR":
+        return val
+    fx = get_fx_rate(cur, "EUR")
+    if fx is None or fx <= 0:
+        fx = FALLBACK_FX_EUR.get(cur)
+    return (val * fx) if (fx and fx > 0) else None
+
+
+def fmt_eur(amount: Any, currency: Optional[str]) -> str:
+    raw = safe_float(amount)
+    if raw is None:
+        return "—"
+    val = to_eur(raw, currency)
+    if val is not None:
+        return f"{val:.2f} €"
+    cur = (currency or "").strip().upper()
+    return f"{raw:.2f} {cur} (sin FX)".strip()
+
+
+def compute_adaptive_stop_profile(r: Dict[str, Any], ref_entry_eur: float) -> Tuple[float, Optional[float], str]:
+    """Calcula Stop Loss adaptativo según sector, volatilidad 52s y soporte técnico."""
+    sec = str(r.get("sector") or "").lower()
+    prof = str(r.get("sector_profile") or "").lower()
+    if prof == "retail" or any(k in sec for k in ("health", "defensive", "utilities", "staple")):
+        base_pct, tag = 14.0, "Defensivo"
+    elif prof == "tech" or any(k in sec for k in ("tech", "communication", "semiconductor")):
+        base_pct, tag = 20.0, "Tech/Volátil"
+    else:
+        base_pct, tag = 17.0, "Estándar"
+
+    vol_adj = 0.0
+    h52 = safe_float(r.get("high_52w"))
+    l52 = safe_float(r.get("low_52w"))
+    if h52 and l52 and h52 > l52 > 0:
+        range52 = (h52 - l52) / h52
+        if range52 >= 0.45:
+            vol_adj = 3.0
+        elif range52 >= 0.35:
+            vol_adj = 1.5
+        elif range52 <= 0.22:
+            vol_adj = -2.0
+    pct = max(11.0, min(25.0, round(base_pct + vol_adj)))
+
+    cur = (r.get("currency") or "USD").upper()
+    low52_eur = to_eur(l52, cur) if (l52 and l52 > 0) else None
+    if low52_eur and ref_entry_eur > 0 and (ref_entry_eur * 0.76 <= low52_eur < ref_entry_eur * 0.94):
+        support_stop = low52_eur * 0.97
+        sup_pct = abs(((support_stop / ref_entry_eur) - 1.0) * 100.0)
+        if 10.0 <= sup_pct <= 26.0:
+            return round(sup_pct, 1), support_stop, f"Auto · {tag} + Soporte 52s"
+
+    stop_eur = (ref_entry_eur * (1.0 - pct / 100.0)) if ref_entry_eur > 0 else None
+    return pct, stop_eur, f"Auto · {tag}"
+
+
+def compute_trade_plan_eur(
+    r: Dict[str, Any],
+    budget_eur: float = DEFAULT_TRADE_BUDGET_EUR,
+    stop_loss_pct: Optional[float] = None,
+) -> Optional[Dict[str, Any]]:
+    """Calcula plan operativo en EUR (3 tramos de entrada, Salida 50%/100% y Stop Loss adaptativo)."""
+    cur = (r.get("currency") or "USD").upper()
+    p_now = to_eur(r.get("price"), cur)
+    if p_now is None or p_now <= 0:
+        return None
+
+    dcf = r.get("dcf") or {}
+    base_eur = to_eur(dcf.get("intrinsic_base"), cur) if dcf.get("intrinsic_base") else None
+    bear_eur = to_eur(dcf.get("intrinsic_bear"), cur) if dcf.get("intrinsic_bear") else None
+    buy_obj_eur = to_eur(dcf.get("target_price"), cur) if dcf.get("target_price") else None
+
+    in_buy_zone = (r.get("status") == "OPORTUNIDAD") or (buy_obj_eur is not None and p_now <= buy_obj_eur)
+    p1 = p_now if in_buy_zone else (buy_obj_eur if (buy_obj_eur and buy_obj_eur < p_now) else p_now)
+    p2 = bear_eur if (bear_eur and p1 * 0.55 < bear_eur < p1 * 0.96) else (p1 * 0.88)
+    p3 = p2 * 0.88
+
+    budget = max(20.0, float(budget_eur or 240.0))
+    m1, m2, m3 = budget * 0.35, budget * 0.35, budget * 0.30
+    total_shares = (m1 / p1) + (m2 / p2) + (m3 / p3)
+    avg_entry = (budget / total_shares) if total_shares > 0 else p1
+
+    exit1 = base_eur if (base_eur and base_eur > avg_entry * 1.15) else (avg_entry * 1.25)
+    exit2 = max(base_eur * 1.25, exit1 * 1.12) if base_eur else (avg_entry * 1.45)
+    exit1_pct = ((exit1 / avg_entry) - 1.0) * 100.0
+    exit2_pct = ((exit2 / avg_entry) - 1.0) * 100.0
+
+    if stop_loss_pct is not None:
+        sl_mult = 1.0 - (max(5.0, min(45.0, float(stop_loss_pct))) / 100.0)
+        stop_loss = min(avg_entry * sl_mult, p3 * 0.94)
+        sl_reason = f"Manual -{float(stop_loss_pct):.0f}%"
+    elif DEFAULT_STOP_LOSS_MODE != "AUTO" and DEFAULT_STOP_LOSS_MODE.replace(".", "", 1).isdigit():
+        sl_val = float(DEFAULT_STOP_LOSS_MODE)
+        sl_mult = 1.0 - (max(5.0, min(45.0, sl_val)) / 100.0)
+        stop_loss = min(avg_entry * sl_mult, p3 * 0.94)
+        sl_reason = f"Manual -{sl_val:.0f}%"
+    else:
+        _, adap_stop, sl_reason = compute_adaptive_stop_profile(r, avg_entry)
+        base_sl = adap_stop if adap_stop is not None else (avg_entry * 0.83)
+        stop_loss = min(base_sl, p3 * 0.94)
+
+    stop_loss_pct_calc = ((stop_loss / avg_entry) - 1.0) * 100.0
+
+    return {
+        "p_now": round(p_now, 2),
+        "budget": round(budget, 0),
+        "m1": round(m1, 0),
+        "m2": round(m2, 0),
+        "m3": round(m3, 0),
+        "p1": round(p1, 2),
+        "p2": round(p2, 2),
+        "p3": round(p3, 2),
+        "avg_entry": round(avg_entry, 2),
+        "exit1": round(exit1, 2),
+        "exit2": round(exit2, 2),
+        "exit1_pct": round(exit1_pct, 1),
+        "exit2_pct": round(exit2_pct, 1),
+        "stop_loss": round(stop_loss, 2),
+        "stop_loss_pct": round(stop_loss_pct_calc, 1),
+        "sl_reason": sl_reason,
+        "in_buy_zone": 1.0 if in_buy_zone else 0.0,
+    }
+
+
 def send_fcm_urgent_alerts(entradas_ya: List[Dict[str, Any]]) -> int:
     """Envía un push prioritario de Firebase por cada oportunidad ENTRAR YA detectada (máx. 3)."""
     if not entradas_ya or not FIREBASE_SERVICE_ACCOUNT or (not FIREBASE_DEVICE_TOKEN and not FIREBASE_TOPIC):
@@ -1214,14 +1350,18 @@ def send_fcm_urgent_alerts(entradas_ya: List[Dict[str, Any]]) -> int:
     for r in entradas_ya[:3]:
         tkr = r.get("ticker") or ""
         name = (r.get("name") or tkr)[:28]
-        price_txt = f"{r.get('price')} {r.get('currency', '')}".strip()
+        price_txt = fmt_eur(r.get("price"), r.get("currency"))
         dd_txt = f"{r['drawdown_52w_pct']}%" if r.get("drawdown_52w_pct") is not None else "—"
-        disc_txt = f"+{r['discount_vs_base_pct']}%" if r.get("discount_vs_base_pct") is not None else "—"
         oro_prefix = "👑 ORO PURO · " if r.get("oro_puro") else ""
+        plan = compute_trade_plan_eur(r)
+        plan_txt = (
+            f" · T1: {plan['m1']:.0f}€ | Salida: {plan['exit1']:.2f}€ | SL: {plan['stop_loss']:.2f}€"
+            if plan
+            else ""
+        )
         title = f"🚨 ENTRAR YA: {tkr} ({name})"
         body = (
-            f"{oro_prefix}{price_txt} (52s: {dd_txt}) · Score {r.get('quality_score', '—')}/100 "
-            f"· Desc. DCF {disc_txt} · IA: {r.get('ai_verdict') or 'OK'}"
+            f"{oro_prefix}{price_txt} (52s: {dd_txt}) · Score {r.get('quality_score', '—')}/100{plan_txt}"
         )
         total_sent += send_fcm_push(title=title, body=body, ticker=tkr, tier="ENTRADA_YA")
     return total_sent
@@ -1487,16 +1627,31 @@ def format_detailed_opp(r: Dict[str, Any], header_line: str) -> str:
     bear_tag = " 🔥 Bajo conservador" if r.get("below_bear") else ""
     ins_tag = f" · 👔 {r['insider_buys_90d']} compras directivos" if (r.get("insider_buys_90d") or 0) > 0 else ""
 
+    price_eur_txt = fmt_eur(r.get("price"), cur)
     block = [
         header_line,
-        f"• Precio: <b>{r['price']} {cur}</b> (52s: <b>{dd}</b>){bear_tag}{ins_tag}",
+        f"• Precio: <b>{price_eur_txt}</b> (52s: <b>{dd}</b>){bear_tag}{ins_tag}",
         f"• Calidad: <b>{r['quality_score']}/100</b> | ROIC: {r['roic_pct']}% | Deuda: {nde}",
         f"• Múltiplos: P/FCF <b>{pfcf}</b> | PER Futuro: <b>{fpe}</b>",
     ]
     if dcf:
         oe_note = " (caja real -SBC)" if r.get("owner_earnings_adjusted") else ""
         block.append(
-            f"• DCF Base{oe_note}: <b>{dcf['intrinsic_base']} {cur}</b> | Obj (-{int(MARGIN_OF_SAFETY_PCT)}%): <b>{dcf['target_price']} {cur}</b>{disc}"
+            f"• DCF Base{oe_note}: <b>{fmt_eur(dcf.get('intrinsic_base'), cur)}</b> | Compra (-{int(MARGIN_OF_SAFETY_PCT)}%): <b>{fmt_eur(dcf.get('target_price'), cur)}</b>{disc}"
+        )
+    plan = compute_trade_plan_eur(r)
+    if plan:
+        t1_lbl = "Hoy" if plan["in_buy_zone"] else "Al tocar obj."
+        block.append(
+            f"• 💶 <b>Entrada EUR ({plan['budget']:.0f} €):</b> "
+            f"T1 ({t1_lbl}) <b>{plan['m1']:.0f} €</b> a {plan['p1']:.2f} € | "
+            f"T2 <b>{plan['m2']:.0f} €</b> a {plan['p2']:.2f} € | "
+            f"T3 <b>{plan['m3']:.0f} €</b> a {plan['p3']:.2f} €"
+        )
+        block.append(
+            f"• 🎯 <b>Salida (TP):</b> 50% en <b>{plan['exit1']:.2f} €</b> (+{plan['exit1_pct']:.0f}%) | "
+            f"Total en <b>{plan['exit2']:.2f} €</b> (+{plan['exit2_pct']:.0f}%) | "
+            f"🛑 <b>Stop Loss:</b> <b>{plan['stop_loss']:.2f} €</b> ({plan['stop_loss_pct']:.0f}% · {esc_html(plan.get('sl_reason', 'Auto'))})"
         )
     if r.get("earnings_days") is not None and r["earnings_days"] <= 10:
         block.append(f"• 📅 <b>OJO RESULTADOS:</b> presenta en <b>{r['earnings_days']} días</b> ({r['earnings_date']}) — prudencia antes de entrar fuerte.")
@@ -1629,7 +1784,9 @@ def build_telegram_report(
             dd = f"{r['drawdown_52w_pct']}%" if r["drawdown_52w_pct"] is not None else "—"
             pfcf = f"{r['p_fcf']}x" if r["p_fcf"] is not None else "—"
             fpe = f"{r['forward_pe']}x" if r["forward_pe"] is not None else "—"
-            obj = f"{r['dcf']['target_price']} {r['currency']}" if r.get("dcf") else "—"
+            obj = fmt_eur(r['dcf']['target_price'], r['currency']) if r.get("dcf") else "—"
+            plan_b = compute_trade_plan_eur(r)
+            sl_tp = f" | TP {plan_b['exit1']:.2f} € · SL {plan_b['stop_loss']:.2f} €" if plan_b else ""
             ai_tag = ""
             if r.get("ai_verdict") == "PERMANENTE":
                 ai_tag = " · ⚠️ IA: POSIBLE TRAMPA"
@@ -1637,8 +1794,8 @@ def build_telegram_report(
                 ai_tag = f" · 🤖 IA: {r['ai_verdict']}"
             earn_tag = f" · 📅 Res.{r['earnings_days']}d" if (r.get("earnings_days") is not None and r["earnings_days"] <= 10) else ""
             lines.append(
-                f"• <b>{esc_html(r['ticker'])}</b> ({esc_html(r['name'][:22])}): <b>{r['price']} {r['currency']}</b> "
-                f"(52s: {dd}) | Score <b>{r['quality_score']}</b> | P/FCF {pfcf} | PER {fpe} | Obj: {obj}{ai_tag}{earn_tag}"
+                f"• <b>{esc_html(r['ticker'])}</b> ({esc_html(r['name'][:22])}): <b>{fmt_eur(r['price'], r['currency'])}</b> "
+                f"(52s: {dd}) | Score <b>{r['quality_score']}</b> | Obj: {obj}{sl_tp}{ai_tag}{earn_tag}"
             )
             if r.get("ai_check") and not entradas_ya and not gangas and not muy_buenas:
                 lines.append(f"  <i>{esc_html(r['ai_check'])}</i>")
@@ -1652,10 +1809,10 @@ def build_telegram_report(
         lines.append("\n━━━━━━━━━━━━━━━━━━━\n🟡 <b>EN VIGILANCIA (Acercándose)</b>\n━━━━━━━━━━━━━━━━━━━")
         for r in watch[:6]:
             dd = f"{r['drawdown_52w_pct']}%" if r["drawdown_52w_pct"] is not None else "—"
-            obj = f"{r['dcf']['target_price']} {r['currency']}" if r.get("dcf") else "—"
+            obj = fmt_eur(r['dcf']['target_price'], r['currency']) if r.get("dcf") else "—"
             lines.append(
-                f"• <b>{esc_html(r['ticker'])}</b> ({esc_html(r['name'][:20])}): {r['price']} {r['currency']} "
-                f"| 52s: {dd} | Score {r['quality_score']} | Obj: {obj}"
+                f"• <b>{esc_html(r['ticker'])}</b> ({esc_html(r['name'][:20])}): {fmt_eur(r['price'], r['currency'])} "
+                f"| 52s: {dd} | Score {r['quality_score']} | Compra: {obj}"
             )
             if not opps and r.get("ai_check"):
                 lines.append(f"  🤖 <i>IA ({esc_html(r['ticker'])}):</i> {esc_html(r['ai_check'])}")
@@ -1693,6 +1850,30 @@ def _period_return_pct(symbol: str, start_date_str: str) -> Optional[float]:
         p_end = safe_float(closes.iloc[-1])
         if p_start and p_end and p_start > 0:
             return round(((p_end / p_start) - 1.0) * 100.0, 1)
+    except Exception:
+        return None
+    return None
+
+
+def _max_drawdown_after_alert_pct(ticker: str, init_price: float, alert_date_str: str) -> Optional[float]:
+    """Calcula la máxima caída porcentual sufrida desde la fecha de alerta respecto al precio de entrada."""
+    if init_price <= 0:
+        return None
+    try:
+        d0 = datetime.strptime(alert_date_str[:10], "%Y-%m-%d")
+        h = yf.Ticker(ticker).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=False)
+        if h is None or h.empty:
+            return None
+        col = "Low" if "Low" in h else ("Close" if "Close" in h else None)
+        if not col:
+            return None
+        vals = h[col].dropna()
+        if vals.empty:
+            return None
+        min_p = safe_float(vals.min())
+        if min_p is not None and min_p > 0:
+            dd = ((min_p / init_price) - 1.0) * 100.0
+            return round(min(0.0, dd), 1)
     except Exception:
         return None
     return None
@@ -1757,6 +1938,10 @@ def update_alert_history(results: List[Dict[str, Any]]) -> None:
             entry["last_price"] = round(cur_p, 2)
             entry["price_return_pct"] = price_ret_pct
             entry["return_pct"] = tot_ret_pct
+            mdd_pct = _max_drawdown_after_alert_pct(tkr, init_p, alert_d)
+            if mdd_pct is not None:
+                prev_mdd = safe_float(entry.get("max_drawdown_after_alert_pct"))
+                entry["max_drawdown_after_alert_pct"] = min(mdd_pct, prev_mdd) if prev_mdd is not None else mdd_pct
             entry["last_checked"] = today
             entry["last_checked_at"] = now_iso
             if rec:
