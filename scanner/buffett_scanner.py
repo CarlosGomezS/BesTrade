@@ -1,4 +1,4 @@
-"""Radar Cocodrilo Pro v10.5 — Oráculo Blindado (Warren Buffett & Charlie Munger).
+"""Radar Cocodrilo Pro v11.1 — Gestor Patrimonial EUR (Warren Buffett & Charlie Munger).
 
 Novedades v9:
 - Owner Earnings reales: descuenta Stock-Based Compensation (SBC) del FCF para evitar trampas en tech.
@@ -62,7 +62,12 @@ URGENT_ONLY = os.environ.get("URGENT_ONLY", "false").strip().lower() == "true"
 URGENT_DOUBLE_PING = os.environ.get("URGENT_DOUBLE_PING", "true").strip().lower() == "true"
 ALERT_COOLDOWN_DAYS = float(os.environ.get("ALERT_COOLDOWN_DAYS", "7"))
 ALERT_RETRIGGER_DROP_PCT = float(os.environ.get("ALERT_RETRIGGER_DROP_PCT", "5.0"))
-DEFAULT_TRADE_BUDGET_EUR = float(os.environ.get("DEFAULT_TRADE_BUDGET_EUR", "240.0"))
+SCANNER_VERSION = "v11.1-oraculo"
+_RAW_BUDGET_ENV = (os.environ.get("DEFAULT_TRADE_BUDGET_EUR") or os.environ.get("CASH_POT_EUR") or "").strip()
+try:
+    DEFAULT_TRADE_BUDGET_EUR: Optional[float] = float(_RAW_BUDGET_ENV) if (_RAW_BUDGET_ENV and float(_RAW_BUDGET_ENV) > 0) else None
+except Exception:
+    DEFAULT_TRADE_BUDGET_EUR = None
 DEFAULT_STOP_LOSS_MODE = os.environ.get("DEFAULT_STOP_LOSS_MODE", "AUTO").strip().upper()
 
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
@@ -1278,7 +1283,7 @@ def compute_adaptive_stop_profile(r: Dict[str, Any], ref_entry_eur: float) -> Tu
 
 def compute_trade_plan_eur(
     r: Dict[str, Any],
-    budget_eur: float = DEFAULT_TRADE_BUDGET_EUR,
+    budget_eur: Optional[float] = None,
     stop_loss_pct: Optional[float] = None,
     stop_loss_mode: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
@@ -1298,7 +1303,9 @@ def compute_trade_plan_eur(
     p2 = bear_eur if (bear_eur and p1 * 0.55 < bear_eur < p1 * 0.96) else (p1 * 0.88)
     p3 = p2 * 0.88
 
-    budget = max(20.0, float(budget_eur or 240.0))
+    eff_budget = budget_eur if (budget_eur is not None and float(budget_eur) > 0) else DEFAULT_TRADE_BUDGET_EUR
+    is_example_budget = eff_budget is None
+    budget = max(10.0, float(eff_budget)) if not is_example_budget else 80.0
     m1, m2, m3 = budget * 0.35, budget * 0.35, budget * 0.30
     total_shares = (m1 / p1) + (m2 / p2) + (m3 / p3)
     avg_entry = (budget / total_shares) if total_shares > 0 else p1
@@ -1335,6 +1342,7 @@ def compute_trade_plan_eur(
     return {
         "p_now": round(p_now, 2),
         "budget": round(budget, 0),
+        "is_example_budget": is_example_budget,
         "m1": round(m1, 0),
         "m2": round(m2, 0),
         "m3": round(m3, 0),
@@ -1366,11 +1374,12 @@ def send_fcm_urgent_alerts(entradas_ya: List[Dict[str, Any]]) -> int:
         dd_txt = f"{r['drawdown_52w_pct']}%" if r.get("drawdown_52w_pct") is not None else "—"
         oro_prefix = "👑 ORO PURO · " if r.get("oro_puro") else ""
         plan = compute_trade_plan_eur(r)
-        plan_txt = (
-            f" · T1: {plan['m1']:.0f}€ | Salida: {plan['exit1']:.2f}€ | SL: {plan['stop_loss']:.2f}€"
-            if plan
-            else ""
-        )
+        if plan:
+            t1_str = "35% bote" if plan.get("is_example_budget") else f"{plan['m1']:.0f}€"
+            sl_str = "Solo Tesis" if plan.get("stop_loss_mode") == "THESIS" else f"SL {plan['stop_loss']:.2f}€"
+            plan_txt = f" · T1: {t1_str} | Salida: {plan['exit1']:.2f}€ | {sl_str}"
+        else:
+            plan_txt = ""
         title = f"🚨 ENTRAR YA: {tkr} ({name})"
         body = (
             f"{oro_prefix}{price_txt} (52s: {dd_txt}) · Score {r.get('quality_score', '—')}/100{plan_txt}"
@@ -1654,12 +1663,20 @@ def format_detailed_opp(r: Dict[str, Any], header_line: str) -> str:
     plan = compute_trade_plan_eur(r)
     if plan:
         t1_lbl = "Hoy" if plan["in_buy_zone"] else "Al tocar obj."
-        block.append(
-            f"• 💶 <b>Entrada EUR ({plan['budget']:.0f} €):</b> "
-            f"T1 ({t1_lbl}) <b>{plan['m1']:.0f} €</b> a {plan['p1']:.2f} € | "
-            f"T2 <b>{plan['m2']:.0f} €</b> a {plan['p2']:.2f} € | "
-            f"T3 <b>{plan['m3']:.0f} €</b> a {plan['p3']:.2f} €"
-        )
+        if plan.get("is_example_budget"):
+            block.append(
+                f"• 💶 <b>Plan entrada (35% / 35% / 30% · ajusta a tu bote real):</b> "
+                f"T1 ({t1_lbl}) a <b>{plan['p1']:.2f} €</b> | "
+                f"T2 a <b>{plan['p2']:.2f} €</b> | "
+                f"T3 a <b>{plan['p3']:.2f} €</b>"
+            )
+        else:
+            block.append(
+                f"• 💶 <b>Entrada EUR ({plan['budget']:.0f} €):</b> "
+                f"T1 ({t1_lbl}) <b>{plan['m1']:.0f} €</b> a {plan['p1']:.2f} € | "
+                f"T2 <b>{plan['m2']:.0f} €</b> a {plan['p2']:.2f} € | "
+                f"T3 <b>{plan['m3']:.0f} €</b> a {plan['p3']:.2f} €"
+            )
         block.append(
             f"• 🎯 <b>Salida (TP):</b> 50% en <b>{plan['exit1']:.2f} €</b> (+{plan['exit1_pct']:.0f}%) | "
             f"Total en <b>{plan['exit2']:.2f} €</b> (+{plan['exit2_pct']:.0f}%) | "
@@ -1705,7 +1722,7 @@ def build_urgent_telegram_alert(entradas_ya: List[Dict[str, Any]], gap_pts: Opti
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     lines = [
         "🚨🔥🚨 <b>ALERTA MÁXIMA: ENTRAR YA</b> 🚨🔥🚨",
-        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v10.5</i>",
+        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v11.1</i>",
     ]
     if gap_pts is not None and gap_pts >= 12:
         lines.append(f"⚡ <b>MUY DESPLAZADA DEL RESTO:</b> saca <b>+{gap_pts:.0f} pts</b> de ventaja al siguiente valor.")
@@ -1732,7 +1749,7 @@ def build_telegram_report(
 
     if UNIVERSE_MODE == "custom":
         lines = [
-            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v10.5 — {date_str}</b>",
+            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v11.1 — {date_str}</b>",
             f"<i>Empresas analizadas: {len(results)}/{total_scanned}</i>",
         ]
         for r in results[:10]:
@@ -1759,7 +1776,7 @@ def build_telegram_report(
     ya_txt = f"🚨 {len(entradas_ya)} ENTRAR YA · " if entradas_ya else ""
     tier_summary = f"{ya_txt}🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
-        f"🐊 <b>RADAR COCODRILO PRO v10.5 — {date_str}</b>",
+        f"🐊 <b>RADAR COCODRILO PRO v11.1 — {date_str}</b>",
         f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
     if market_ctx and (market_ctx.get("vix") is not None or market_ctx.get("us10y_pct") is not None):
@@ -2184,7 +2201,7 @@ def main() -> None:
     t0 = time.time()
 
     if MERGE_DIR:
-        print(f"🧩 Cocodrilo Pro v10.5 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
+        print(f"🧩 Cocodrilo Pro v11.1 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
         results, total_scanned, failed, shard_elapsed = load_merged_shards(Path(MERGE_DIR))
         elapsed_total = max(shard_elapsed, round(time.time() - t0))
     else:
@@ -2198,7 +2215,7 @@ def main() -> None:
         if SHARD_TOTAL > 1:
             tickers = [sym for idx, sym in enumerate(all_tickers) if idx % SHARD_TOTAL == SHARD_INDEX]
             print(
-                f"🐊 Cocodrilo Pro v10.5 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
+                f"🐊 Cocodrilo Pro v11.1 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
                 f"| Empresas: {len(tickers)} (total universo: {len(all_tickers)})"
             )
             results, failed = run_scan_batch(tickers)
@@ -2221,7 +2238,7 @@ def main() -> None:
                 raise RuntimeError(f"Shard {SHARD_INDEX} devolvió 0 empresas válidas.")
             return
 
-        print(f"🐊 Escáner Cocodrilo Pro v10.5 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
+        print(f"🐊 Escáner Cocodrilo Pro v11.1 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
         total_scanned = len(all_tickers)
         results, failed = run_scan_batch(all_tickers)
         elapsed_total = round(time.time() - t0)
@@ -2360,7 +2377,7 @@ def main() -> None:
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     summary = {
-        "scanner_version": "v10.5-oraculo",
+        "scanner_version": SCANNER_VERSION,
         "fx_rates_eur": fx_rates_eur,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe_mode": UNIVERSE_MODE,
