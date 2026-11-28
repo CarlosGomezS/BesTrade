@@ -883,5 +883,113 @@ class TestOracleV103(unittest.TestCase):
             self.assertEqual(len(to_send4), 1)
             self.assertEqual(suppressed4, [])
 
+    # --- 14) CONVERSIÓN A EUR Y PLAN OPERATIVO (ENTRADA 3 TRAMOS · SALIDA TP · STOP LOSS) ---
+    def test_trade_plan_eur_and_fcm_telegram_format(self):
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+
+        sample_rec = {
+            "ticker": "DECK",
+            "name": "Deckers Outdoor",
+            "region": "EE. UU.",
+            "price": 100.0,
+            "currency": "USD",
+            "status": "OPORTUNIDAD",
+            "drawdown_52w_pct": -30.0,
+            "quality_score": 98,
+            "roic_pct": 28.0,
+            "net_debt_ebitda": -0.5,
+            "p_fcf": 12.0,
+            "forward_pe": 13.5,
+            "discount_vs_base_pct": 45.0,
+            "dcf": {"intrinsic_base": 180.0, "intrinsic_bear": 140.0, "target_price": 135.0},
+            "ai_verdict": "TEMPORAL",
+            "oro_puro": True,
+        }
+
+        with patch.object(bs, "get_fx_rate", return_value=0.90):
+            plan = bs.compute_trade_plan_eur(sample_rec, budget_eur=240.0, stop_loss_pct=18.0)
+            self.assertIsNotNone(plan)
+            self.assertEqual(plan["p_now"], 90.0)
+            self.assertEqual(plan["m1"], 84.0)
+            self.assertEqual(plan["m2"], 84.0)
+            self.assertEqual(plan["m3"], 72.0)
+            self.assertGreater(plan["exit2"], plan["exit1"])
+            self.assertLess(plan["stop_loss"], plan["p3"])
+
+            msg = bs.format_detailed_opp(sample_rec, "🚨 ENTRAR YA")
+            self.assertIn("90.00 €", msg)
+            self.assertIn("Entrada EUR", msg)
+            self.assertIn("Salida (TP)", msg)
+            self.assertIn("Stop Loss", msg)
+            self.assertNotIn("100.0 USD", msg)
+
+    # --- 15) FX ESTRICTO (SIN FALSOS EUROS), STOP LOSS ADAPTATIVO Y MAX DRAWDOWN POST-ALERTA ---
+    def test_strict_fx_no_fake_eur_and_adaptive_stop_loss(self):
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+
+        # Divisa desconocida sin FX -> to_eur debe devolver None y fmt_eur NO puede poner €
+        with patch.object(bs, "get_fx_rate", return_value=None):
+            self.assertIsNone(bs.to_eur(100.0, "ZZZ"))
+            txt = bs.fmt_eur(100.0, "ZZZ")
+            self.assertIn("ZZZ", txt)
+            self.assertIn("sin FX", txt)
+            self.assertNotIn("€", txt)
+
+        # Stop Loss adaptativo: defensivo estable vs tech volátil
+        defensive = {
+            "ticker": "JNJ", "currency": "EUR", "price": 100.0, "status": "OPORTUNIDAD",
+            "sector": "Healthcare", "sector_profile": "general", "high_52w": 110.0, "low_52w": 92.0,
+        }
+        tech_vol = {
+            "ticker": "NVDA", "currency": "EUR", "price": 100.0, "status": "OPORTUNIDAD",
+            "sector": "Technology", "sector_profile": "tech", "high_52w": 160.0, "low_52w": 70.0,
+        }
+        pct_def, _, reason_def = bs.compute_adaptive_stop_profile(defensive, 100.0)
+        pct_tech, _, reason_tech = bs.compute_adaptive_stop_profile(tech_vol, 100.0)
+        self.assertLess(pct_def, pct_tech)
+        self.assertIn("Auto", reason_def)
+        self.assertIn("Tech", reason_tech)
+
+        # Max drawdown post-alerta
+        class MockLowTicker:
+            def __init__(self, sym):
+                self.sym = sym
+            def history(self, start=None, auto_adjust=False):
+                return pd.DataFrame({"Low": [98.0, 82.0, 91.0], "Close": [99.0, 85.0, 95.0]})
+
+        with patch.object(bs.yf, "Ticker", side_effect=MockLowTicker):
+            mdd = bs._max_drawdown_after_alert_pct("DECK", 100.0, "2026-10-01")
+        self.assertEqual(mdd, -18.0)
+
 if __name__ == "__main__":
     unittest.main()
