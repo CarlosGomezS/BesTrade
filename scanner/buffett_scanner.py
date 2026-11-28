@@ -1,4 +1,4 @@
-"""Radar Cocodrilo Pro v11.2 — Gestor Patrimonial EUR (Warren Buffett & Charlie Munger).
+"""Radar Cocodrilo Pro v11.3 — Gestor Patrimonial EUR (Warren Buffett & Charlie Munger).
 
 Novedades v9:
 - Owner Earnings reales: descuenta Stock-Based Compensation (SBC) del FCF para evitar trampas en tech.
@@ -62,7 +62,7 @@ URGENT_ONLY = os.environ.get("URGENT_ONLY", "false").strip().lower() == "true"
 URGENT_DOUBLE_PING = os.environ.get("URGENT_DOUBLE_PING", "true").strip().lower() == "true"
 ALERT_COOLDOWN_DAYS = float(os.environ.get("ALERT_COOLDOWN_DAYS", "7"))
 ALERT_RETRIGGER_DROP_PCT = float(os.environ.get("ALERT_RETRIGGER_DROP_PCT", "5.0"))
-SCANNER_VERSION = "v11.2-oraculo"
+SCANNER_VERSION = "v11.3-oraculo"
 _RAW_BUDGET_ENV = (os.environ.get("DEFAULT_TRADE_BUDGET_EUR") or os.environ.get("CASH_POT_EUR") or "").strip()
 try:
     DEFAULT_TRADE_BUDGET_EUR: Optional[float] = float(_RAW_BUDGET_ENV) if (_RAW_BUDGET_ENV and float(_RAW_BUDGET_ENV) > 0) else None
@@ -96,6 +96,7 @@ SUBUNIT_CURRENCIES: Dict[str, Tuple[str, float]] = {
 _print_lock = threading.Lock()
 _fx_lock = threading.Lock()
 _fx_cache: Dict[Tuple[str, str], Optional[float]] = {}
+_fx_hist_cache: Dict[Tuple[str, str], Optional[pd.Series]] = {}
 
 
 def safe_float(val: Any) -> Optional[float]:
@@ -1722,7 +1723,7 @@ def build_urgent_telegram_alert(entradas_ya: List[Dict[str, Any]], gap_pts: Opti
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     lines = [
         "🚨🔥🚨 <b>ALERTA MÁXIMA: ENTRAR YA</b> 🚨🔥🚨",
-        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v11.2</i>",
+        f"<i>{now_str} · Oportunidad extrema detectada por Radar Cocodrilo v11.3</i>",
     ]
     if gap_pts is not None and gap_pts >= 12:
         lines.append(f"⚡ <b>MUY DESPLAZADA DEL RESTO:</b> saca <b>+{gap_pts:.0f} pts</b> de ventaja al siguiente valor.")
@@ -1749,7 +1750,7 @@ def build_telegram_report(
 
     if UNIVERSE_MODE == "custom":
         lines = [
-            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v11.2 — {date_str}</b>",
+            f"🔎 <b>ANÁLISIS EXPRÉS COCODRILO v11.3 — {date_str}</b>",
             f"<i>Empresas analizadas: {len(results)}/{total_scanned}</i>",
         ]
         for r in results[:10]:
@@ -1776,7 +1777,7 @@ def build_telegram_report(
     ya_txt = f"🚨 {len(entradas_ya)} ENTRAR YA · " if entradas_ya else ""
     tier_summary = f"{ya_txt}🏆 {len(gangas)} Ganga · 🥇 {len(muy_buenas)} Muy buenas · 🥈 {len(buenas)} Buenas · 🟡 {len(watch)} Vigilar"
     lines = [
-        f"🐊 <b>RADAR COCODRILO PRO v11.2 — {date_str}</b>",
+        f"🐊 <b>RADAR COCODRILO PRO v11.3 — {date_str}</b>",
         f"<i>{esc_html(UNIVERSE_MODE.upper())} · {len(results)} analizadas (de {total_scanned}) · {tier_summary}</i>",
     ]
     if market_ctx and (market_ctx.get("vix") is not None or market_ctx.get("us10y_pct") is not None):
@@ -1865,8 +1866,117 @@ def build_telegram_report(
     return "\n".join(lines)
 
 
+def _extract_datetime_series(df: Optional[pd.DataFrame], col: str = "Close") -> Optional[pd.Series]:
+    """Devuelve serie ordenada con DatetimeIndex normalizado (sin tz); None si el índice no es temporal real."""
+    if df is None or df.empty or col not in df:
+        return None
+    if not isinstance(df.index, pd.DatetimeIndex):
+        try:
+            parsed_idx = pd.to_datetime(df.index, errors="coerce")
+            if parsed_idx.isna().any() or parsed_idx.min().year < 1990:
+                return None
+            s = df[col].copy()
+            s.index = parsed_idx
+        except Exception:
+            return None
+    else:
+        s = df[col].copy()
+    idx_naive = s.index.tz_localize(None) if s.index.tz is not None else s.index
+    s.index = idx_naive.normalize()
+    s = pd.to_numeric(s, errors="coerce").dropna().sort_index()
+    s = s[~s.index.duplicated(keep="last")]
+    return s if not s.empty else None
+
+
+def _get_fx_history_to_eur(src_cur: str, start_date_str: str) -> Optional[pd.Series]:
+    """Obtiene serie histórica diaria de cambio src_cur -> EUR desde 7 días antes de start_date_str."""
+    src = (src_cur or "EUR").strip().upper()
+    if src == "EUR":
+        return None
+    key = (src, start_date_str[:10])
+    with _fx_lock:
+        if key in _fx_hist_cache:
+            return _fx_hist_cache[key]
+
+    try:
+        d0 = datetime.strptime(start_date_str[:10], "%Y-%m-%d").date()
+        fetch_start = (d0 - timedelta(days=7)).strftime("%Y-%m-%d")
+    except Exception:
+        return None
+
+    series_out: Optional[pd.Series] = None
+    for pair, invert in ((f"{src}EUR=X", False), (f"EUR{src}=X", True)):
+        try:
+            h = yf.Ticker(pair).history(start=fetch_start, auto_adjust=False)
+            s = _extract_datetime_series(h, "Close")
+            if s is None or s.empty:
+                continue
+            s = s[s > 0]
+            if s.empty:
+                continue
+            series_out = (1.0 / s) if invert else s
+            break
+        except Exception:
+            continue
+
+    with _fx_lock:
+        _fx_hist_cache[key] = series_out
+    return series_out
+
+
+def _fx_rate_on_or_before(fx_series: Optional[pd.Series], date_str: str) -> Optional[float]:
+    """Devuelve el tipo de cambio en la última sesión <= date_str (o primera en <=7 días si es festivo inicial)."""
+    if fx_series is None or fx_series.empty:
+        return None
+    try:
+        target_ts = pd.Timestamp(datetime.strptime(date_str[:10], "%Y-%m-%d").date())
+        prior = fx_series[fx_series.index <= target_ts]
+        if not prior.empty:
+            val = safe_float(prior.iloc[-1])
+            return val if (val and val > 0) else None
+        first_ts = fx_series.index[0]
+        if (first_ts - target_ts).days <= 7:
+            val = safe_float(fx_series.iloc[0])
+            return val if (val and val > 0) else None
+    except Exception:
+        return None
+    return None
+
+
+def _cumulative_split_factor(
+    ticker: str,
+    alert_date_str: str,
+    end_date_str: Optional[str] = None,
+    splits_series: Optional[pd.Series] = None,
+) -> float:
+    """Factor acumulado de splits estrictamente posteriores a alert_date_str (ej. 2.0 para split 2:1)."""
+    try:
+        d0 = pd.Timestamp(datetime.strptime(alert_date_str[:10], "%Y-%m-%d").date())
+        d1 = pd.Timestamp(datetime.strptime(end_date_str[:10], "%Y-%m-%d").date()) if end_date_str else None
+        sp_s = splits_series if splits_series is not None else getattr(yf.Ticker(ticker), "splits", None)
+        if sp_s is None or not isinstance(sp_s, pd.Series) or sp_s.empty:
+            return 1.0
+        idx_naive = pd.to_datetime(sp_s.index, errors="coerce")
+        if idx_naive.isna().any():
+            return 1.0
+        if getattr(idx_naive, "tz", None) is not None:
+            idx_naive = idx_naive.tz_localize(None)
+        idx_norm = idx_naive.normalize()
+        mask = idx_norm > d0
+        if d1 is not None:
+            mask = mask & (idx_norm <= d1)
+        factor = 1.0
+        for raw_v in sp_s[mask].values:
+            v = safe_float(raw_v)
+            if v is not None and v > 0:
+                factor *= v
+        return factor if (math.isfinite(factor) and factor > 0) else 1.0
+    except Exception:
+        return 1.0
+
+
 def _period_return_pct(symbol: str, start_date_str: str) -> Optional[float]:
-    """Calcula rentabilidad % desde start_date_str hasta hoy usando historial ajustado (incluye dividendos)."""
+    """Calcula rentabilidad % en divisa local desde start_date_str usando historial ajustado (incluye dividendos)."""
     try:
         d0 = datetime.strptime(start_date_str[:10], "%Y-%m-%d")
         h = yf.Ticker(symbol).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=True)
@@ -1884,13 +1994,58 @@ def _period_return_pct(symbol: str, start_date_str: str) -> Optional[float]:
     return None
 
 
-def _max_drawdown_after_alert_pct(ticker: str, init_price: float, alert_date_str: str) -> Optional[float]:
-    """Calcula la máxima caída porcentual sufrida desde la fecha de alerta respecto al precio de entrada."""
+def _period_return_eur_pct(
+    symbol: str,
+    symbol_currency: str,
+    start_date_str: str,
+    end_date_str: Optional[str] = None,
+) -> Tuple[Optional[float], Optional[float]]:
+    """Devuelve (retorno_local_pct, retorno_eur_pct) usando FX histórico para homogeneizar comparaciones en EUR."""
+    try:
+        d0 = datetime.strptime(start_date_str[:10], "%Y-%m-%d")
+        h = yf.Ticker(symbol).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=True)
+        if h is None or h.empty or "Close" not in h:
+            return None, None
+        closes_raw = h["Close"].dropna()
+        if len(closes_raw) < 2:
+            return None, None
+        p_start = safe_float(closes_raw.iloc[0])
+        p_end = safe_float(closes_raw.iloc[-1])
+        if not (p_start and p_end and p_start > 0):
+            return None, None
+        local_ret = round(((p_end / p_start) - 1.0) * 100.0, 1)
+
+        cur = (symbol_currency or "USD").strip().upper()
+        if cur == "EUR":
+            return local_ret, local_ret
+
+        dt_series = _extract_datetime_series(h, "Close")
+        d_start_eff = dt_series.index[0].strftime("%Y-%m-%d") if dt_series is not None else start_date_str[:10]
+        d_end_eff = dt_series.index[-1].strftime("%Y-%m-%d") if dt_series is not None else (end_date_str or start_date_str)[:10]
+
+        fx_s = _get_fx_history_to_eur(cur, d_start_eff)
+        fx_start = _fx_rate_on_or_before(fx_s, d_start_eff)
+        fx_end = _fx_rate_on_or_before(fx_s, d_end_eff)
+        if fx_start and fx_end and fx_start > 0 and fx_end > 0:
+            eur_ret = round((((p_end * fx_end) / (p_start * fx_start)) - 1.0) * 100.0, 1)
+            return local_ret, eur_ret
+        return local_ret, None
+    except Exception:
+        return None, None
+
+
+def _max_drawdown_after_alert_pct(
+    ticker: str,
+    init_price: float,
+    alert_date_str: str,
+    hist_df: Optional[pd.DataFrame] = None,
+) -> Optional[float]:
+    """Calcula la máxima caída porcentual sufrida desde la fecha de alerta respecto al precio de entrada (split-ajustado)."""
     if init_price <= 0:
         return None
     try:
         d0 = datetime.strptime(alert_date_str[:10], "%Y-%m-%d")
-        h = yf.Ticker(ticker).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=False)
+        h = hist_df if hist_df is not None else yf.Ticker(ticker).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=False)
         if h is None or h.empty:
             return None
         col = "Low" if "Low" in h else ("Close" if "Close" in h else None)
@@ -1908,13 +2063,18 @@ def _max_drawdown_after_alert_pct(ticker: str, init_price: float, alert_date_str
     return None
 
 
-def _max_gain_after_alert_pct(ticker: str, init_price: float, alert_date_str: str) -> Optional[float]:
-    """Calcula la máxima subida porcentual (MFE) alcanzada desde la fecha de alerta respecto al precio de entrada."""
+def _max_gain_after_alert_pct(
+    ticker: str,
+    init_price: float,
+    alert_date_str: str,
+    hist_df: Optional[pd.DataFrame] = None,
+) -> Optional[float]:
+    """Calcula la máxima subida porcentual (MFE) alcanzada desde la fecha de alerta respecto al precio de entrada (split-ajustado)."""
     if init_price <= 0:
         return None
     try:
         d0 = datetime.strptime(alert_date_str[:10], "%Y-%m-%d")
-        h = yf.Ticker(ticker).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=False)
+        h = hist_df if hist_df is not None else yf.Ticker(ticker).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=False)
         if h is None or h.empty:
             return None
         col = "High" if "High" in h else ("Close" if "Close" in h else None)
@@ -1932,7 +2092,12 @@ def _max_gain_after_alert_pct(ticker: str, init_price: float, alert_date_str: st
     return None
 
 
-def _cash_dividends_in_window(ticker: str, start_date_str: str, end_date_str: Optional[str] = None, div_series: Optional[pd.Series] = None) -> float:
+def _cash_dividends_in_window(
+    ticker: str,
+    start_date_str: str,
+    end_date_str: Optional[str] = None,
+    div_series: Optional[pd.Series] = None,
+) -> float:
     """Suma dividendos en efectivo (sin reinversión) pagados entre start_date_str y end_date_str (inclusive)."""
     try:
         d0 = pd.Timestamp(datetime.strptime(start_date_str[:10], "%Y-%m-%d").date())
@@ -1953,7 +2118,54 @@ def _cash_dividends_in_window(ticker: str, start_date_str: str, end_date_str: Op
         return 0.0
 
 
-def _total_return_with_dividends_pct(ticker: str, init_price: float, cur_price: float, alert_date_str: str, div_series: Optional[pd.Series] = None) -> float:
+def _cash_dividends_in_window_eur(
+    ticker: str,
+    currency: str,
+    start_date_str: str,
+    end_date_str: Optional[str] = None,
+    div_series: Optional[pd.Series] = None,
+    fx_series: Optional[pd.Series] = None,
+    fallback_fx_end: Optional[float] = None,
+) -> Optional[float]:
+    """Suma dividendos en efectivo convertidos a EUR usando el FX de cada fecha de pago (o fallback_fx_end)."""
+    cur = (currency or "EUR").strip().upper()
+    if cur == "EUR":
+        return _cash_dividends_in_window(ticker, start_date_str, end_date_str, div_series)
+    try:
+        d0 = pd.Timestamp(datetime.strptime(start_date_str[:10], "%Y-%m-%d").date())
+        d1 = pd.Timestamp(datetime.strptime(end_date_str[:10], "%Y-%m-%d").date()) if end_date_str else None
+        div_s = div_series if div_series is not None else yf.Ticker(ticker).dividends
+        if div_s is None or div_s.empty:
+            return 0.0
+        idx_naive = pd.to_datetime(div_s.index, errors="coerce")
+        if getattr(idx_naive, "tz", None) is not None:
+            idx_naive = idx_naive.tz_localize(None)
+        idx_norm = idx_naive.normalize()
+        mask = idx_norm >= d0
+        if d1 is not None:
+            mask = mask & (idx_norm <= d1)
+        total_eur = 0.0
+        for dt_val, raw_div in zip(idx_norm[mask], div_s[mask].values):
+            dv = safe_float(raw_div)
+            if dv is None or dv <= 0:
+                continue
+            dt_str = pd.Timestamp(dt_val).strftime("%Y-%m-%d")
+            fx_d = _fx_rate_on_or_before(fx_series, dt_str) or fallback_fx_end
+            if fx_d is None or fx_d <= 0:
+                return None
+            total_eur += dv * fx_d
+        return total_eur
+    except Exception:
+        return None
+
+
+def _total_return_with_dividends_pct(
+    ticker: str,
+    init_price: float,
+    cur_price: float,
+    alert_date_str: str,
+    div_series: Optional[pd.Series] = None,
+) -> float:
     """Calcula rentabilidad % (precio + dividendos en efectivo, sin reinversión) desde alert_date_str."""
     base_ret = ((cur_price / init_price) - 1.0) * 100.0
     divs_sum = _cash_dividends_in_window(ticker, alert_date_str, end_date_str=None, div_series=div_series)
@@ -1968,50 +2180,52 @@ def _milestone_return_at_horizon(
     horizon_days: int,
     hist_df: Optional[pd.DataFrame] = None,
     div_series: Optional[pd.Series] = None,
-) -> Tuple[Optional[float], Optional[str]]:
-    """Calcula la rentabilidad exacta al cumplirse horizon_days (primera sesión hábil >= alert_date + horizon_days)."""
+    currency: str = "USD",
+    fx_series: Optional[pd.Series] = None,
+    fx_alert: Optional[float] = None,
+) -> Tuple[Optional[float], Optional[str], Optional[float]]:
+    """Calcula (retorno_local_pct, fecha_cierre_exacta, retorno_eur_pct) en la primera sesión >= alert_date + horizon_days."""
     if init_price <= 0:
-        return None, None
+        return None, None, None
     try:
         d0 = datetime.strptime(alert_date_str[:10], "%Y-%m-%d").date()
         target_d = d0 + timedelta(days=int(horizon_days))
         h = hist_df if hist_df is not None else yf.Ticker(ticker).history(start=d0.strftime("%Y-%m-%d"), auto_adjust=False)
-        if h is None or h.empty or "Close" not in h:
-            return None, None
-        # Exigir índice temporal real (evitar RangeIndex sintético)
-        if not isinstance(h.index, pd.DatetimeIndex):
-            try:
-                parsed_idx = pd.to_datetime(h.index, errors="coerce")
-                if parsed_idx.isna().any() or parsed_idx.min().year < 1990:
-                    return None, None
-                h = h.copy()
-                h.index = parsed_idx
-            except Exception:
-                return None, None
-        idx_naive = h.index.tz_localize(None) if h.index.tz is not None else h.index
-        closes = h["Close"].copy()
-        closes.index = idx_naive.normalize()
-        closes = closes.dropna().sort_index()
-        if closes.empty:
-            return None, None
+        closes = _extract_datetime_series(h, "Close")
+        if closes is None or closes.empty:
+            return None, None, None
         target_ts = pd.Timestamp(target_d)
         eligible = closes[closes.index >= target_ts]
         if eligible.empty:
-            return None, None
+            return None, None, None
         actual_ts = eligible.index[0]
         close_at_h = safe_float(eligible.iloc[0])
         if close_at_h is None or close_at_h <= 0:
-            return None, None
+            return None, None, None
         actual_date_str = actual_ts.strftime("%Y-%m-%d")
         divs_sum = _cash_dividends_in_window(ticker, alert_date_str, end_date_str=actual_date_str, div_series=div_series)
-        ret_h = round((((close_at_h + divs_sum) / init_price) - 1.0) * 100.0, 1)
-        return ret_h, actual_date_str
+        ret_local = round((((close_at_h + divs_sum) / init_price) - 1.0) * 100.0, 1)
+
+        cur = (currency or "USD").strip().upper()
+        ret_eur: Optional[float] = None
+        if cur == "EUR":
+            ret_eur = ret_local
+        elif fx_alert and fx_alert > 0 and fx_series is not None:
+            fx_h = _fx_rate_on_or_before(fx_series, actual_date_str)
+            if fx_h and fx_h > 0:
+                divs_eur = _cash_dividends_in_window_eur(
+                    ticker, cur, alert_date_str, end_date_str=actual_date_str,
+                    div_series=div_series, fx_series=fx_series, fallback_fx_end=fx_h
+                )
+                if divs_eur is not None:
+                    ret_eur = round(((((close_at_h * fx_h) + divs_eur) / (init_price * fx_alert)) - 1.0) * 100.0, 1)
+        return ret_local, actual_date_str, ret_eur
     except Exception:
-        return None, None
+        return None, None, None
 
 
 def update_alert_history(results: List[Dict[str, Any]], now_dt: Optional[datetime] = None) -> None:
-    """Registra alertas y actualiza rentabilidad (precio + div. efectivo), hitos exactos y benchmarks ETF homogéneos (SPY/URTH)."""
+    """Registra alertas y actualiza rentabilidad (divisa local + EUR homogeneizada), splits, hitos exactos y benchmarks SPY/URTH."""
     now_dt = now_dt or datetime.now(timezone.utc)
     today = now_dt.strftime("%Y-%m-%d")
     now_iso = now_dt.isoformat()
@@ -2032,41 +2246,108 @@ def update_alert_history(results: List[Dict[str, Any]], now_dt: Optional[datetim
         tkr = entry.get("ticker")
         init_p = safe_float(entry.get("alert_price"))
         alert_d = str(entry.get("alert_date") or today)[:10]
+        cur = (entry.get("currency") or "USD").strip().upper()
         if not tkr or not init_p or init_p <= 0:
             continue
 
+        t_obj = None
+        try:
+            t_obj = yf.Ticker(tkr)
+        except Exception:
+            t_obj = None
+
         rec = price_map.get(tkr)
         cur_p = safe_float(rec.get("price")) if rec else None
-        if cur_p is None:
+        if cur_p is None and t_obj is not None:
             try:
-                hist_t = yf.Ticker(tkr).history(period="5d")
+                hist_t = t_obj.history(period="5d")
                 if hist_t is not None and not hist_t.empty and "Close" in hist_t:
                     cur_p = safe_float(hist_t["Close"].dropna().iloc[-1])
             except Exception:
                 cur_p = None
 
         if cur_p is not None and cur_p > 0:
-            price_ret_pct = round(((cur_p / init_p) - 1.0) * 100.0, 1)
-            tot_ret_pct = _total_return_with_dividends_pct(tkr, init_p, cur_p, alert_d)
+            div_s = None
+            splits_s = None
+            hist_full = None
+            if t_obj is not None:
+                try:
+                    div_s = t_obj.dividends
+                except Exception:
+                    div_s = None
+                try:
+                    splits_s = getattr(t_obj, "splits", None)
+                except Exception:
+                    splits_s = None
+                try:
+                    hist_full = t_obj.history(start=alert_d, auto_adjust=False)
+                except Exception:
+                    hist_full = None
+
+            split_factor = _cumulative_split_factor(tkr, alert_d, splits_series=splits_s)
+            eff_init_p = init_p / split_factor if split_factor > 0 else init_p
+
+            price_ret_pct = round(((cur_p / eff_init_p) - 1.0) * 100.0, 1)
+            tot_ret_pct = _total_return_with_dividends_pct(tkr, eff_init_p, cur_p, alert_d, div_series=div_s)
+
             entry["last_price"] = round(cur_p, 2)
+            entry["split_factor_since_alert"] = round(split_factor, 4)
+            entry["adjusted_alert_price"] = round(eff_init_p, 4)
             entry["price_return_pct"] = price_ret_pct
             entry["return_pct"] = tot_ret_pct
-            entry["return_methodology"] = "price_plus_cash_dividends"
-            mdd_pct = _max_drawdown_after_alert_pct(tkr, init_p, alert_d)
+            entry["return_methodology"] = "price_plus_cash_dividends_split_adjusted"
+
+            # Homogeneización en EUR con tipo de cambio histórico
+            if cur == "EUR":
+                fx_s = None
+                fx_alert: Optional[float] = 1.0
+                fx_now: Optional[float] = 1.0
+            else:
+                fx_s = _get_fx_history_to_eur(cur, alert_d)
+                fx_alert = _fx_rate_on_or_before(fx_s, alert_d)
+                fx_now = _fx_rate_on_or_before(fx_s, today)
+
+            if fx_alert and fx_now and fx_alert > 0 and fx_now > 0:
+                divs_eur = _cash_dividends_in_window_eur(
+                    tkr, cur, alert_d, end_date_str=None,
+                    div_series=div_s, fx_series=fx_s, fallback_fx_end=fx_now
+                )
+                entry["alert_price_eur"] = round(init_p * fx_alert, 2)
+                entry["adjusted_alert_price_eur"] = round(eff_init_p * fx_alert, 4)
+                entry["last_price_eur"] = round(cur_p * fx_now, 2)
+                entry["fx_alert_to_eur"] = round(fx_alert, 6)
+                entry["fx_last_to_eur"] = round(fx_now, 6)
+                entry["fx_impact_pct"] = round(((fx_now / fx_alert) - 1.0) * 100.0, 1)
+                entry["price_return_eur_pct"] = round((((cur_p * fx_now) / (eff_init_p * fx_alert)) - 1.0) * 100.0, 1)
+                if divs_eur is not None:
+                    entry["return_eur_pct"] = round(((((cur_p * fx_now) + divs_eur) / (eff_init_p * fx_alert)) - 1.0) * 100.0, 1)
+                    entry["fx_status"] = "OK"
+                else:
+                    entry["return_eur_pct"] = None
+                    entry["fx_status"] = "UNAVAILABLE"
+            else:
+                entry["return_eur_pct"] = None
+                entry["price_return_eur_pct"] = None
+                entry["fx_status"] = "UNAVAILABLE"
+
+            mdd_pct = _max_drawdown_after_alert_pct(tkr, eff_init_p, alert_d, hist_df=hist_full)
             if mdd_pct is not None:
                 prev_mdd = safe_float(entry.get("max_drawdown_after_alert_pct"))
                 entry["max_drawdown_after_alert_pct"] = min(mdd_pct, prev_mdd) if prev_mdd is not None else mdd_pct
-            mfe_pct = _max_gain_after_alert_pct(tkr, init_p, alert_d)
+            mfe_pct = _max_gain_after_alert_pct(tkr, eff_init_p, alert_d, hist_df=hist_full)
             if mfe_pct is not None:
                 prev_mfe = safe_float(entry.get("max_gain_after_alert_pct"))
                 entry["max_gain_after_alert_pct"] = max(mfe_pct, prev_mfe) if prev_mfe is not None else mfe_pct
+
             entry["last_checked"] = today
             entry["last_checked_at"] = now_iso
             if rec:
                 entry["current_status"] = rec.get("opportunity_tier") or rec.get("status")
             entry.setdefault("milestones_pct", {"d30": None, "d90": None, "d180": None, "d365": None})
+            entry.setdefault("milestones_eur_pct", {"d30": None, "d90": None, "d180": None, "d365": None})
             entry.setdefault("milestone_dates", {"d30": None, "d90": None, "d180": None, "d365": None})
             entry.setdefault("status", "ACTIVA")
+
             try:
                 d0_date = datetime.strptime(alert_d, "%Y-%m-%d").date()
                 elapsed_days = (now_dt.date() - d0_date).days
@@ -2075,6 +2356,7 @@ def update_alert_history(results: List[Dict[str, Any]], now_dt: Optional[datetim
                     if elapsed_days < horizon:
                         continue
                     cur_ms = entry["milestones_pct"].get(key)
+                    cur_ms_eur = entry["milestones_eur_pct"].get(key)
                     cur_ms_date = entry["milestone_dates"].get(key)
                     drifted = False
                     if cur_ms is not None:
@@ -2088,35 +2370,43 @@ def update_alert_history(results: List[Dict[str, Any]], now_dt: Optional[datetim
                                     drifted = True
                             except Exception:
                                 drifted = True
-                    if cur_ms is None or drifted:
+                    missing_eur = (cur_ms_eur is None) and (fx_alert is not None)
+                    if cur_ms is None or drifted or missing_eur or split_factor != 1.0:
                         needed_horizons.append((horizon, key))
 
-                if needed_horizons:
-                    hist_full = yf.Ticker(tkr).history(start=alert_d, auto_adjust=False)
-                    div_full = None
-                    try:
-                        div_full = yf.Ticker(tkr).dividends
-                    except Exception:
-                        div_full = None
-                    for horizon, key in needed_horizons:
-                        ms_ret, ms_date = _milestone_return_at_horizon(
-                            tkr, init_p, alert_d, horizon, hist_df=hist_full, div_series=div_full
-                        )
-                        if ms_ret is not None and ms_date is not None:
-                            entry["milestones_pct"][key] = ms_ret
-                            entry["milestone_dates"][key] = ms_date
+                for horizon, key in needed_horizons:
+                    ms_ret, ms_date, ms_ret_eur = _milestone_return_at_horizon(
+                        tkr, eff_init_p, alert_d, horizon,
+                        hist_df=hist_full, div_series=div_s,
+                        currency=cur, fx_series=fx_s, fx_alert=fx_alert,
+                    )
+                    if ms_ret is not None and ms_date is not None:
+                        entry["milestones_pct"][key] = ms_ret
+                        entry["milestone_dates"][key] = ms_date
+                        if ms_ret_eur is not None:
+                            entry["milestones_eur_pct"][key] = ms_ret_eur
             except Exception:
                 pass
 
-        # Benchmarks homogéneos: ambos son ETFs ajustados con dividendos (Total Return)
-        sp_pct = _period_return_pct("SPY", alert_d)
-        msci_pct = _period_return_pct("URTH", alert_d)
+        # Benchmarks homogéneos: ETFs ajustados con dividendos en USD y homogeneizados a EUR
+        sp_pct, sp_eur_pct = _period_return_eur_pct("SPY", "USD", alert_d, today)
+        msci_pct, msci_eur_pct = _period_return_eur_pct("URTH", "USD", alert_d, today)
+        ret_eur_val = safe_float(entry.get("return_eur_pct"))
+        alpha_msci_eur = (
+            round(ret_eur_val - msci_eur_pct, 1)
+            if (ret_eur_val is not None and msci_eur_pct is not None)
+            else None
+        )
         entry["benchmarks"] = {
             "sp500_pct": sp_pct,
+            "sp500_eur_pct": sp_eur_pct,
             "sp500_symbol": "SPY",
             "msci_world_pct": msci_pct,
+            "msci_world_eur_pct": msci_eur_pct,
             "msci_world_symbol": "URTH",
-            "methodology": "total_return_etf_adjusted",
+            "alpha_msci_eur_pp": alpha_msci_eur,
+            "currency_base": "EUR" if (msci_eur_pct is not None and sp_eur_pct is not None) else "USD",
+            "methodology": "total_return_etf_adjusted_eur_homogenized",
             "benchmark_as_of": today,
         }
 
@@ -2137,14 +2427,20 @@ def update_alert_history(results: List[Dict[str, Any]], now_dt: Optional[datetim
                 except Exception:
                     pass
         if not recent_dup:
+            cur_r = (r.get("currency") or "USD").strip().upper()
+            p_eur_init = to_eur(r["price"], cur_r)
             history.insert(0, {
                 "ticker": r["ticker"],
                 "name": r["name"],
-                "currency": r["currency"],
+                "currency": cur_r,
                 "tier": "ORO_PURO" if r.get("oro_puro") else tier,
                 "alert_date": today,
                 "alert_timestamp": now_iso,
                 "alert_price": r["price"],
+                "adjusted_alert_price": r["price"],
+                "split_factor_since_alert": 1.0,
+                "alert_price_eur": round(p_eur_init, 2) if p_eur_init is not None else None,
+                "adjusted_alert_price_eur": round(p_eur_init, 4) if p_eur_init is not None else None,
                 "quality_score": r["quality_score"],
                 "ai_verdict": r.get("ai_verdict"),
                 "fundamentals_snapshot": {
@@ -2157,20 +2453,29 @@ def update_alert_history(results: List[Dict[str, Any]], now_dt: Optional[datetim
                     "fcf_latest_date": r.get("fcf_latest_date"),
                     "quadrant": (r.get("quality_valuation") or {}).get("quadrant_code"),
                 },
-                "return_methodology": "price_plus_cash_dividends",
+                "return_methodology": "price_plus_cash_dividends_split_adjusted",
                 "milestones_pct": {"d30": None, "d90": None, "d180": None, "d365": None},
+                "milestones_eur_pct": {"d30": None, "d90": None, "d180": None, "d365": None},
                 "milestone_dates": {"d30": None, "d90": None, "d180": None, "d365": None},
                 "benchmarks": {
                     "msci_world_pct": None,
+                    "msci_world_eur_pct": None,
                     "msci_world_symbol": "URTH",
                     "sp500_pct": None,
+                    "sp500_eur_pct": None,
                     "sp500_symbol": "SPY",
-                    "methodology": "total_return_etf_adjusted",
+                    "alpha_msci_eur_pp": None,
+                    "currency_base": "EUR",
+                    "methodology": "total_return_etf_adjusted_eur_homogenized",
                 },
                 "status": "ACTIVA",
                 "last_price": r["price"],
+                "last_price_eur": round(p_eur_init, 2) if p_eur_init is not None else None,
                 "price_return_pct": 0.0,
                 "return_pct": 0.0,
+                "price_return_eur_pct": 0.0 if p_eur_init is not None else None,
+                "return_eur_pct": 0.0 if p_eur_init is not None else None,
+                "fx_status": "OK" if p_eur_init is not None else "UNAVAILABLE",
                 "max_drawdown_after_alert_pct": 0.0,
                 "max_gain_after_alert_pct": 0.0,
                 "last_checked": today,
@@ -2305,7 +2610,7 @@ def main() -> None:
     t0 = time.time()
 
     if MERGE_DIR:
-        print(f"🧩 Cocodrilo Pro v11.2 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
+        print(f"🧩 Cocodrilo Pro v11.3 — Fusionando bloques de {MERGE_DIR} (modo {UNIVERSE_MODE})")
         results, total_scanned, failed, shard_elapsed = load_merged_shards(Path(MERGE_DIR))
         elapsed_total = max(shard_elapsed, round(time.time() - t0))
     else:
@@ -2319,7 +2624,7 @@ def main() -> None:
         if SHARD_TOTAL > 1:
             tickers = [sym for idx, sym in enumerate(all_tickers) if idx % SHARD_TOTAL == SHARD_INDEX]
             print(
-                f"🐊 Cocodrilo Pro v11.2 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
+                f"🐊 Cocodrilo Pro v11.3 | Modo: {UNIVERSE_MODE} | Shard {SHARD_INDEX + 1}/{SHARD_TOTAL} "
                 f"| Empresas: {len(tickers)} (total universo: {len(all_tickers)})"
             )
             results, failed = run_scan_batch(tickers)
@@ -2342,7 +2647,7 @@ def main() -> None:
                 raise RuntimeError(f"Shard {SHARD_INDEX} devolvió 0 empresas válidas.")
             return
 
-        print(f"🐊 Escáner Cocodrilo Pro v11.2 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
+        print(f"🐊 Escáner Cocodrilo Pro v11.3 | Modo: {UNIVERSE_MODE} | Empresas: {len(all_tickers)} | Hilos: {MAX_WORKERS}")
         total_scanned = len(all_tickers)
         results, failed = run_scan_batch(all_tickers)
         elapsed_total = round(time.time() - t0)
