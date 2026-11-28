@@ -537,7 +537,7 @@ class TestOracleV103(unittest.TestCase):
             self.assertTrue(hist_path.exists())
 
             published = json.loads(latest_path.read_text(encoding="utf-8"))
-            self.assertEqual(published["scanner_version"], "v11.3-oraculo")
+            self.assertEqual(published["scanner_version"], "v11.4-oraculo")
             self.assertIn("fx_rates_eur", published)
             self.assertEqual(len(published["companies"]), 1)
 
@@ -642,6 +642,7 @@ class TestOracleV103(unittest.TestCase):
             def __init__(self, sym):
                 self.sym = sym
                 self.dividends = pd.Series(dtype=float)
+                self.splits = pd.Series(dtype=float)
 
             def history(self, period="5d", start=None, auto_adjust=False):
                 if start is not None:
@@ -1043,11 +1044,12 @@ class TestOracleV103(unittest.TestCase):
             def __init__(self, sym):
                 self.sym = sym
                 self.dividends = pd.Series([2.0], index=pd.to_datetime(["2026-10-15"]))
+                self.splits = pd.Series(dtype=float)
 
             def history(self, period="5d", start=None, auto_adjust=False):
                 if self.sym == "EMPTY":
                     return pd.DataFrame()
-                if start is not None and auto_adjust:
+                if self.sym in ("SPY", "URTH"):
                     return pd.DataFrame({"Close": [100.0, 108.0]})
                 if start is not None:
                     return pd.DataFrame({"High": [105.0, 124.0, 115.0], "Low": [99.0, 88.0, 102.0], "Close": [101.0, 112.0, 110.0]})
@@ -1164,11 +1166,15 @@ class TestOracleV103(unittest.TestCase):
         class MockExactHistoryTicker:
             def __init__(self, sym: str):
                 self.sym = sym
-                # Dividendo 1 el día 20 (+1.5 USD, entra en d30), Dividendo 2 el día 40 (+3.0 USD, NO entra en d30 pero sí en return_pct hoy)
-                self.dividends = pd.Series(
-                    [1.5, 3.0],
-                    index=pd.to_datetime(["2026-10-21", "2026-11-10"]),
-                )
+                self.splits = pd.Series(dtype=float)
+                if sym == "DECK":
+                    # Dividendo 1 el día 20 (+1.5 USD, entra en d30), Dividendo 2 el día 40 (+3.0 USD, NO entra en d30 pero sí en return_pct hoy)
+                    self.dividends = pd.Series(
+                        [1.5, 3.0],
+                        index=pd.to_datetime(["2026-10-21", "2026-11-10"]),
+                    )
+                else:
+                    self.dividends = pd.Series(dtype=float)
 
             def history(self, period="5d", start=None, auto_adjust=False):
                 if self.sym in ("SPY", "URTH", "^GSPC"):
@@ -1235,12 +1241,12 @@ class TestOracleV103(unittest.TestCase):
             self.assertIn("SPY", syms_called)
             self.assertIn("URTH", syms_called)
             self.assertNotIn("^GSPC", syms_called)
-            self.assertTrue(all(adj is True for _, adj in bench_calls))
+            self.assertTrue(all(adj is False for _, adj in bench_calls))
             self.assertEqual(e["benchmarks"]["sp500_symbol"], "SPY")
             self.assertEqual(e["benchmarks"]["sp500_pct"], 5.0)
             self.assertEqual(e["benchmarks"]["msci_world_symbol"], "URTH")
             self.assertEqual(e["benchmarks"]["msci_world_pct"], 4.0)
-            self.assertEqual(e["benchmarks"]["methodology"], "total_return_etf_adjusted_eur_homogenized")
+            self.assertEqual(e["benchmarks"]["methodology"], "price_plus_cash_dividends_eur_homogenized")
 
     # --- 19) HOMOGENEIZACIÓN EN EUR PARA EMPRESAS EXTRANJERAS (EUR, GBP, JPY) Y BENCHMARKS SPY/URTH ---
     def test_eur_homogenization_foreign_stocks_and_benchmarks(self):
@@ -1491,15 +1497,25 @@ class TestOracleV103(unittest.TestCase):
             self.assertIsNone(ea["benchmarks"]["sp500_pct"])
             self.assertIsNone(ea["benchmarks"]["msci_world_eur_pct"])
 
-            # Caso B: llega precio en results[] pero falla FX histórico -> actualiza local, marca fx_status UNAVAILABLE (sin falsos EUR)
+            # Caso B: llega precio en results[], splits/dividendos OK, pero falla FX histórico -> actualiza local, marca fx_status UNAVAILABLE (sin falsos EUR)
+            class FxOnlyFailingTicker:
+                def __init__(self, sym: str):
+                    self.sym = sym
+                    self.dividends = pd.Series(dtype=float)
+                    self.splits = pd.Series(dtype=float)
+
+                def history(self, *a, **k):
+                    raise RuntimeError("FX timeout")
+
             with (
                 patch.object(bs, "OUT_HISTORY_JSON", hist_file),
-                patch.object(bs.yf, "Ticker", side_effect=FailingTicker),
+                patch.object(bs.yf, "Ticker", side_effect=FxOnlyFailingTicker),
             ):
                 bs.update_alert_history([{"ticker": "DECK", "price": 120.0, "status": "OPORTUNIDAD"}], now_dt=now_dt)
 
             saved_b = json.loads(hist_file.read_text(encoding="utf-8"))
             eb = saved_b["entries"][0]
+            self.assertEqual(eb["splits_status"], "NO_SPLITS")
             self.assertEqual(eb["last_price"], 120.0)
             self.assertEqual(eb["return_pct"], 20.0)
             self.assertEqual(eb["fx_status"], "UNAVAILABLE")
@@ -1608,6 +1624,159 @@ class TestOracleV103(unittest.TestCase):
             stale = by_t["STALE.CH"]
             self.assertEqual(stale["fx_status"], "UNAVAILABLE")
             self.assertIsNone(stale["return_eur_pct"])
+
+    # --- 23) V11.4: FALLO DE SPLITS NO ASUME 1.0, CERO FALLBACK FX EN DIVIDENDOS Y BENCHMARKS HOMOGÉNEOS ---
+    def test_v114_splits_error_no_fallback_dividend_fx_and_homogeneous_benchmarks(self):
+        from datetime import datetime, timezone
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+        bs._fx_hist_cache.clear()
+        bs._fx_cache.clear()
+
+        # A) _cumulative_split_factor diferencia claramente NO_SPLITS vs SPLITS_APPLIED vs ERROR/UNAVAILABLE
+        f_none, st_none = bs._cumulative_split_factor("X", "2026-10-01", splits_series=pd.Series(dtype=float), splits_provided=True)
+        self.assertEqual((f_none, st_none), (1.0, "NO_SPLITS"))
+        f_app, st_app = bs._cumulative_split_factor(
+            "X", "2026-10-01",
+            splits_series=pd.Series([2.0], index=pd.to_datetime(["2026-10-15"])),
+            splits_provided=True,
+        )
+        self.assertEqual((f_app, st_app), (2.0, "SPLITS_APPLIED"))
+        f_unav, st_unav = bs._cumulative_split_factor("X", "2026-10-01", splits_series=None, splits_provided=True)
+        self.assertEqual((f_unav, st_unav), (None, "UNAVAILABLE"))
+
+        # B) Prueba integrada de los 3 casos v11.4 en update_alert_history()
+        all_auto_adjust = []
+
+        class MockV114Ticker:
+            def __init__(self, sym: str):
+                self.sym = sym
+
+            @property
+            def splits(self):
+                if self.sym == "SPLITERR":
+                    raise RuntimeError("Yahoo splits endpoint 503")
+                return pd.Series(dtype=float)
+
+            @property
+            def dividends(self):
+                if self.sym == "DIVFXGAP":
+                    # Dividendo pagado el 2026-10-20, fecha sin FX reciente (>10 días sin dato FX antes de esa fecha)
+                    return pd.Series([5.0], index=pd.to_datetime(["2026-10-20"]))
+                if self.sym == "SPY":
+                    # SPY paga 10 USD de dividendo en efectivo el 2026-11-01 (con FX 0.90 -> 9 EUR)
+                    return pd.Series([10.0], index=pd.to_datetime(["2026-11-01"]))
+                if self.sym == "URTH":
+                    # URTH paga 2 USD de dividendo en efectivo el 2026-11-01 (con FX 0.90 -> 1.8 EUR)
+                    return pd.Series([2.0], index=pd.to_datetime(["2026-11-01"]))
+                return pd.Series(dtype=float)
+
+            def history(self, period="5d", start=None, auto_adjust=False):
+                all_auto_adjust.append((self.sym, auto_adjust))
+                if self.sym == "USDEUR=X":
+                    return pd.DataFrame(
+                        {"Close": [0.90, 0.90, 0.90]},
+                        index=pd.to_datetime(["2026-10-01", "2026-11-01", "2026-11-15"]),
+                    )
+                if self.sym == "GBPEUR=X":
+                    # Tiene FX en alert_date (2026-10-01) y en today (2026-11-15), pero NINGÚN dato entre el 10-02 y el 11-14
+                    # -> para el dividendo del 2026-10-20 el último FX (10-01) tiene 19 días (>10d) -> debe fallar SIN usar fx_now!
+                    return pd.DataFrame(
+                        {"Close": [1.15, 1.25]},
+                        index=pd.to_datetime(["2026-10-01", "2026-11-15"]),
+                    )
+                if self.sym == "SPY":
+                    # Precio 500 -> 520 (+4% precio) + 10 USD div = +6.0% local y +6.0% EUR (sin reinversión)
+                    return pd.DataFrame(
+                        {"Close": [500.0, 520.0]},
+                        index=pd.to_datetime(["2026-10-01", "2026-11-15"]),
+                    )
+                if self.sym == "URTH":
+                    # Precio 100 -> 103 (+3% precio) + 2 USD div = +5.0% local y +5.0% EUR (sin reinversión)
+                    return pd.DataFrame(
+                        {"Close": [100.0, 103.0]},
+                        index=pd.to_datetime(["2026-10-01", "2026-11-15"]),
+                    )
+                if self.sym == "DIVFXGAP":
+                    return pd.DataFrame(
+                        {"High": [110.0, 110.0], "Low": [100.0, 100.0], "Close": [100.0, 110.0]},
+                        index=pd.to_datetime(["2026-10-01", "2026-11-15"]),
+                    )
+                if self.sym == "SPLITERR":
+                    return pd.DataFrame(
+                        {"High": [120.0, 120.0], "Low": [55.0, 55.0], "Close": [100.0, 60.0]},
+                        index=pd.to_datetime(["2026-10-01", "2026-11-15"]),
+                    )
+                return pd.DataFrame()
+
+        now_d45 = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            hist_file = Path(td) / "history.json"
+            hist_file.write_text(json.dumps({
+                "updated_at": "2026-11-10T10:00:00+00:00",
+                "entries": [
+                    {
+                        "ticker": "SPLITERR", "name": "Split Error Corp", "currency": "USD", "tier": "ORO_PURO",
+                        "alert_date": "2026-10-01", "alert_price": 100.0, "quality_score": 95,
+                        "last_price": 115.0, "return_pct": 15.0, "return_eur_pct": 15.0,
+                        "milestones_pct": {"d30": 10.0, "d90": None, "d180": None, "d365": None},
+                        "milestone_dates": {"d30": "2026-11-02", "d90": None, "d180": None, "d365": None},
+                    },
+                    {
+                        "ticker": "DIVFXGAP", "name": "Div FX Gap PLC", "currency": "GBP", "tier": "GANGA",
+                        "alert_date": "2026-10-01", "alert_price": 100.0, "quality_score": 91,
+                        "last_price": 100.0, "return_pct": 0.0,
+                    },
+                ]
+            }), encoding="utf-8")
+
+            with (
+                patch.object(bs, "OUT_HISTORY_JSON", hist_file),
+                patch.object(bs.yf, "Ticker", side_effect=MockV114Ticker),
+            ):
+                bs.update_alert_history([{"ticker": "SPLITERR", "price": 60.0, "status": "OPORTUNIDAD"}], now_dt=now_d45)
+
+            saved = json.loads(hist_file.read_text(encoding="utf-8"))
+            by_t = {x["ticker"]: x for x in saved["entries"]}
+
+            # 1) SPLITERR: como falló splits, NO sobrescribe last_price ni return_pct ni return_eur_pct ni d30 con un falso -40%
+            se = by_t["SPLITERR"]
+            self.assertEqual(se["splits_status"], "ERROR")
+            self.assertEqual(se["last_price"], 115.0)
+            self.assertEqual(se["return_pct"], 15.0)
+            self.assertEqual(se["return_eur_pct"], 15.0)
+            self.assertEqual(se["milestones_pct"]["d30"], 10.0)
+            self.assertIsNone(se["benchmarks"]["alpha_msci_eur_pp"])
+
+            # 2) DIVFXGAP: faltaba FX histórico en la fecha del dividendo (2026-10-20) -> NO usa fx_now (1.25), devuelve None!
+            dg = by_t["DIVFXGAP"]
+            self.assertEqual(dg["splits_status"], "NO_SPLITS")
+            self.assertEqual(dg["return_pct"], 15.0)  # +10% precio + 5% div en GBP sí es exacto
+            self.assertEqual(dg["fx_status"], "DIVIDEND_FX_UNAVAILABLE")
+            self.assertIsNone(dg["return_eur_pct"])
+            self.assertIsNone(dg["benchmarks"]["alpha_msci_eur_pp"])
+
+            # 3) Benchmarks SPY y URTH 100% homogéneos: auto_adjust=False + dividendos en efectivo sin reinversión
+            self.assertTrue(all(adj is False for _, adj in all_auto_adjust))
+            self.assertEqual(dg["benchmarks"]["sp500_pct"], 6.0)
+            self.assertEqual(dg["benchmarks"]["sp500_eur_pct"], 6.0)
+            self.assertEqual(dg["benchmarks"]["msci_world_pct"], 5.0)
+            self.assertEqual(dg["benchmarks"]["msci_world_eur_pct"], 5.0)
+            self.assertEqual(dg["benchmarks"]["methodology"], "price_plus_cash_dividends_eur_homogenized")
 
 if __name__ == "__main__":
     unittest.main()
