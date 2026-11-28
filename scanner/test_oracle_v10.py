@@ -537,7 +537,7 @@ class TestOracleV103(unittest.TestCase):
             self.assertTrue(hist_path.exists())
 
             published = json.loads(latest_path.read_text(encoding="utf-8"))
-            self.assertEqual(published["scanner_version"], "v11.2-oraculo")
+            self.assertEqual(published["scanner_version"], "v11.3-oraculo")
             self.assertIn("fx_rates_eur", published)
             self.assertEqual(len(published["companies"]), 1)
 
@@ -1157,6 +1157,7 @@ class TestOracleV103(unittest.TestCase):
             sys.modules["universe"] = stub_u
 
         import buffett_scanner as bs
+        bs._fx_hist_cache.clear()
 
         bench_calls = []
 
@@ -1228,7 +1229,7 @@ class TestOracleV103(unittest.TestCase):
             # Retorno actual incluye ambos dividendos en efectivo: (130 + 1.5 + 3.0) / 100 - 1 = +34.5%
             self.assertEqual(e["price_return_pct"], 30.0)
             self.assertEqual(e["return_pct"], 34.5)
-            self.assertEqual(e["return_methodology"], "price_plus_cash_dividends")
+            self.assertEqual(e["return_methodology"], "price_plus_cash_dividends_split_adjusted")
             # Benchmarks homogéneos SPY y URTH (nunca ^GSPC), ambos con auto_adjust=True
             syms_called = [s for s, _ in bench_calls]
             self.assertIn("SPY", syms_called)
@@ -1239,7 +1240,270 @@ class TestOracleV103(unittest.TestCase):
             self.assertEqual(e["benchmarks"]["sp500_pct"], 5.0)
             self.assertEqual(e["benchmarks"]["msci_world_symbol"], "URTH")
             self.assertEqual(e["benchmarks"]["msci_world_pct"], 4.0)
-            self.assertEqual(e["benchmarks"]["methodology"], "total_return_etf_adjusted")
+            self.assertEqual(e["benchmarks"]["methodology"], "total_return_etf_adjusted_eur_homogenized")
+
+    # --- 19) HOMOGENEIZACIÓN EN EUR PARA EMPRESAS EXTRANJERAS (EUR, GBP, JPY) Y BENCHMARKS SPY/URTH ---
+    def test_eur_homogenization_foreign_stocks_and_benchmarks(self):
+        from datetime import datetime, timezone
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "Europa"
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+        bs._fx_hist_cache.clear()
+        bs._fx_cache.clear()
+
+        dates = pd.to_datetime(["2026-09-28", "2026-10-01", "2026-10-15", "2026-11-02", "2026-11-15"])
+
+        class MockForeignTicker:
+            def __init__(self, sym: str):
+                self.sym = sym
+                self.splits = pd.Series(dtype=float)
+                if sym == "7203.T":
+                    # Dividendo en JPY pagado el 2026-10-15: 50 JPY
+                    self.dividends = pd.Series([50.0], index=pd.to_datetime(["2026-10-15"]))
+                else:
+                    self.dividends = pd.Series(dtype=float)
+
+            def history(self, period="5d", start=None, auto_adjust=False):
+                # FX USD->EUR: cae de 0.90 a 0.81 (-10% efecto divisa en USD)
+                if self.sym == "USDEUR=X":
+                    return pd.DataFrame({"Close": [0.90, 0.90, 0.85, 0.84, 0.81]}, index=dates)
+                # FX GBP->EUR: sube de 1.15 a 1.265 (+10% efecto divisa en GBP)
+                if self.sym == "GBPEUR=X":
+                    return pd.DataFrame({"Close": [1.15, 1.15, 1.20, 1.21, 1.265]}, index=dates)
+                # FX JPY->EUR: plano a 0.0060
+                if self.sym == "JPYEUR=X":
+                    return pd.DataFrame({"Close": [0.006, 0.006, 0.006, 0.006, 0.006]}, index=dates)
+                # Benchmarks USD: SPY +10% en USD -> con USD cayendo -10%, en EUR es (1.10 * 0.90 - 1) = -1.0%
+                if self.sym == "SPY":
+                    return pd.DataFrame({"Close": [500.0, 550.0]}, index=pd.to_datetime(["2026-10-01", "2026-11-15"]))
+                if self.sym == "URTH":
+                    return pd.DataFrame({"Close": [100.0, 110.0]}, index=pd.to_datetime(["2026-10-01", "2026-11-15"]))
+                # Acción europea en EUR: ASML.AS sube +10% en EUR
+                if self.sym == "ASML.AS":
+                    return pd.DataFrame({"High": [660.0]*5, "Low": [590.0]*5, "Close": [600.0, 600.0, 620.0, 630.0, 660.0]}, index=dates)
+                # Acción británica en GBP: AZN.L plana (100 -> 100 GBP), pero GBP sube +10% -> +10.0% en EUR
+                if self.sym == "AZN.L":
+                    return pd.DataFrame({"High": [102.0]*5, "Low": [98.0]*5, "Close": [100.0, 100.0, 100.0, 100.0, 100.0]}, index=dates)
+                # Acción japonesa en JPY: 7203.T (1000 -> 1050 JPY + 50 JPY div = +10.0% local y +10.0% EUR)
+                if self.sym == "7203.T":
+                    return pd.DataFrame({"High": [1060.0]*5, "Low": [990.0]*5, "Close": [1000.0, 1000.0, 1020.0, 1040.0, 1050.0]}, index=dates)
+                return pd.DataFrame()
+
+        now_d45 = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            hist_file = Path(td) / "history.json"
+            hist_file.write_text(json.dumps({
+                "updated_at": "2026-10-01T10:00:00+00:00",
+                "entries": [
+                    {"ticker": "ASML.AS", "name": "ASML", "currency": "EUR", "tier": "ORO_PURO", "alert_date": "2026-10-01", "alert_price": 600.0, "quality_score": 96, "last_price": 600.0, "return_pct": 0.0},
+                    {"ticker": "AZN.L", "name": "AstraZeneca", "currency": "GBP", "tier": "GANGA", "alert_date": "2026-10-01", "alert_price": 100.0, "quality_score": 91, "last_price": 100.0, "return_pct": 0.0},
+                    {"ticker": "7203.T", "name": "Toyota", "currency": "JPY", "tier": "GANGA", "alert_date": "2026-10-01", "alert_price": 1000.0, "quality_score": 88, "last_price": 1000.0, "return_pct": 0.0},
+                ]
+            }), encoding="utf-8")
+
+            with (
+                patch.object(bs, "OUT_HISTORY_JSON", hist_file),
+                patch.object(bs.yf, "Ticker", side_effect=MockForeignTicker),
+            ):
+                bs.update_alert_history([], now_dt=now_d45)
+
+            saved = json.loads(hist_file.read_text(encoding="utf-8"))
+            by_t = {x["ticker"]: x for x in saved["entries"]}
+
+            # ASML (EUR): +10% EUR vs URTH -1% EUR -> Alpha EUR = +11.0 pp (no 0.0 pp falso de comparar EUR vs USD!)
+            asml = by_t["ASML.AS"]
+            self.assertEqual(asml["return_pct"], 10.0)
+            self.assertEqual(asml["return_eur_pct"], 10.0)
+            self.assertEqual(asml["benchmarks"]["sp500_pct"], 10.0)
+            self.assertEqual(asml["benchmarks"]["sp500_eur_pct"], -1.0)
+            self.assertEqual(asml["benchmarks"]["msci_world_eur_pct"], -1.0)
+            self.assertEqual(asml["benchmarks"]["alpha_msci_eur_pp"], 11.0)
+            self.assertEqual(asml["milestones_eur_pct"]["d30"], 5.0)
+
+            # AZN.L (GBP): 0% en GBP pero +10.0% en EUR por apreciación de la libra
+            azn = by_t["AZN.L"]
+            self.assertEqual(azn["return_pct"], 0.0)
+            self.assertEqual(azn["return_eur_pct"], 10.0)
+            self.assertEqual(azn["fx_impact_pct"], 10.0)
+            self.assertEqual(azn["benchmarks"]["alpha_msci_eur_pp"], 11.0)
+
+            # 7203.T (JPY): +5% precio + 5% dividendo efectivo = +10.0% local y EUR
+            jp = by_t["7203.T"]
+            self.assertEqual(jp["price_return_pct"], 5.0)
+            self.assertEqual(jp["return_pct"], 10.0)
+            self.assertEqual(jp["return_eur_pct"], 10.0)
+
+    # --- 20) AJUSTE AUTOMÁTICO POR SPLITS POSTERIORES A LA ALERTA (SIN FALSO -50%) ---
+    def test_stock_split_after_alert_preserves_true_return_and_milestones(self):
+        from datetime import datetime, timezone
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+        bs._fx_hist_cache.clear()
+
+        dates = pd.to_datetime(["2026-10-01", "2026-10-15", "2026-11-02", "2026-11-15"])
+
+        class MockSplitTicker:
+            def __init__(self, sym: str):
+                self.sym = sym
+                if sym == "NVDA":
+                    # Split 2:1 el 2026-10-20 (posterior a la alerta 2026-10-01 a 100.0 pre-split)
+                    self.splits = pd.Series([2.0], index=pd.to_datetime(["2026-10-20"]))
+                    # Dividendo post-split de 1.0 USD por acción nueva (= 2.0 USD por acción original -> +2%)
+                    self.dividends = pd.Series([1.0], index=pd.to_datetime(["2026-10-25"]))
+                else:
+                    self.splits = pd.Series(dtype=float)
+                    self.dividends = pd.Series(dtype=float)
+
+            def history(self, period="5d", start=None, auto_adjust=False):
+                if self.sym == "USDEUR=X":
+                    return pd.DataFrame({"Close": [0.90, 0.90, 0.90, 0.90]}, index=dates)
+                if self.sym in ("SPY", "URTH"):
+                    return pd.DataFrame({"Close": [100.0, 105.0]}, index=pd.to_datetime(["2026-10-01", "2026-11-15"]))
+                if self.sym == "NVDA":
+                    # Yahoo devuelve toda la serie split-ajustada (base 50.0 -> 55.0 el día 30 -> 60.0 hoy = +20% precio)
+                    return pd.DataFrame(
+                        {"High": [52.0, 56.0, 58.0, 62.0], "Low": [48.0, 45.0, 54.0, 59.0], "Close": [50.0, 52.0, 55.0, 60.0]},
+                        index=dates,
+                    )
+                return pd.DataFrame()
+
+        now_d45 = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            hist_file = Path(td) / "history.json"
+            hist_file.write_text(json.dumps({
+                "updated_at": "2026-10-01T10:00:00+00:00",
+                "entries": [{
+                    "ticker": "NVDA", "name": "Nvidia", "currency": "USD", "tier": "ORO_PURO",
+                    "alert_date": "2026-10-01", "alert_price": 100.0, "quality_score": 99,
+                    "last_price": 100.0, "return_pct": 0.0,
+                }]
+            }), encoding="utf-8")
+
+            with (
+                patch.object(bs, "OUT_HISTORY_JSON", hist_file),
+                patch.object(bs.yf, "Ticker", side_effect=MockSplitTicker),
+            ):
+                bs.update_alert_history([], now_dt=now_d45)
+
+            saved = json.loads(hist_file.read_text(encoding="utf-8"))
+            e = saved["entries"][0]
+            # Conserva alert_price original (100.0), registra split 2.0x y adjusted_alert_price = 50.0
+            self.assertEqual(e["alert_price"], 100.0)
+            self.assertEqual(e["split_factor_since_alert"], 2.0)
+            self.assertEqual(e["adjusted_alert_price"], 50.0)
+            # 60 / 50 - 1 = +20% precio; +1 USD div -> +22% total (NO -40% falso!)
+            self.assertEqual(e["price_return_pct"], 20.0)
+            self.assertEqual(e["return_pct"], 22.0)
+            self.assertEqual(e["return_eur_pct"], 22.0)
+            # MAE: 45 / 50 - 1 = -10.0%; MFE: 62 / 50 - 1 = +24.0%
+            self.assertEqual(e["max_drawdown_after_alert_pct"], -10.0)
+            self.assertEqual(e["max_gain_after_alert_pct"], 24.0)
+            # Hito d30 (2026-11-02): Close 55.0 + div 1.0 = 56 / 50 - 1 = +12.0%
+            self.assertEqual(e["milestones_pct"]["d30"], 12.0)
+            self.assertEqual(e["milestones_eur_pct"]["d30"], 12.0)
+
+    # --- 21) RESILIENCIA ANTE FALLOS DE DESCARGA (YAHOO CAÍDO / FX CAÍDO) SIN CORROMPER HISTORIAL ---
+    def test_history_download_and_fx_failures_preserve_existing_data(self):
+        from datetime import datetime, timezone
+        try:
+            import yfinance  # noqa: F401
+        except ImportError:
+            stub_yf = types.ModuleType("yfinance")
+            stub_yf.Ticker = object
+            sys.modules["yfinance"] = stub_yf
+        try:
+            import universe  # noqa: F401
+        except ImportError:
+            stub_u = types.ModuleType("universe")
+            stub_u.detect_region = lambda t: "EE. UU."
+            stub_u.get_universe = lambda *a, **k: []
+            stub_u.parse_custom_tickers = lambda s: []
+            sys.modules["universe"] = stub_u
+
+        import buffett_scanner as bs
+        bs._fx_hist_cache.clear()
+
+        class FailingTicker:
+            def __init__(self, sym: str):
+                self.sym = sym
+
+            @property
+            def dividends(self):
+                raise RuntimeError("Yahoo 503 Service Unavailable")
+
+            @property
+            def splits(self):
+                raise RuntimeError("Yahoo 503 Service Unavailable")
+
+            def history(self, *a, **k):
+                raise RuntimeError("Network timeout")
+
+        now_dt = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            hist_file = Path(td) / "history.json"
+            hist_file.write_text(json.dumps({
+                "updated_at": "2026-11-10T10:00:00+00:00",
+                "entries": [{
+                    "ticker": "DECK", "name": "Deckers", "currency": "USD", "tier": "ORO_PURO",
+                    "alert_date": "2026-10-01", "alert_price": 100.0, "quality_score": 98,
+                    "last_price": 115.0, "return_pct": 15.0,
+                }]
+            }), encoding="utf-8")
+
+            # Caso A: Yahoo completamente caído -> NO crashea y conserva last_price y return_pct previos
+            with (
+                patch.object(bs, "OUT_HISTORY_JSON", hist_file),
+                patch.object(bs.yf, "Ticker", side_effect=FailingTicker),
+            ):
+                bs.update_alert_history([], now_dt=now_dt)
+
+            saved_a = json.loads(hist_file.read_text(encoding="utf-8"))
+            ea = saved_a["entries"][0]
+            self.assertEqual(ea["last_price"], 115.0)
+            self.assertEqual(ea["return_pct"], 15.0)
+            self.assertIsNone(ea["benchmarks"]["sp500_pct"])
+            self.assertIsNone(ea["benchmarks"]["msci_world_eur_pct"])
+
+            # Caso B: llega precio en results[] pero falla FX histórico -> actualiza local, marca fx_status UNAVAILABLE (sin falsos EUR)
+            with (
+                patch.object(bs, "OUT_HISTORY_JSON", hist_file),
+                patch.object(bs.yf, "Ticker", side_effect=FailingTicker),
+            ):
+                bs.update_alert_history([{"ticker": "DECK", "price": 120.0, "status": "OPORTUNIDAD"}], now_dt=now_dt)
+
+            saved_b = json.loads(hist_file.read_text(encoding="utf-8"))
+            eb = saved_b["entries"][0]
+            self.assertEqual(eb["last_price"], 120.0)
+            self.assertEqual(eb["return_pct"], 20.0)
+            self.assertEqual(eb["fx_status"], "UNAVAILABLE")
+            self.assertIsNone(eb["return_eur_pct"])
 
 if __name__ == "__main__":
     unittest.main()
