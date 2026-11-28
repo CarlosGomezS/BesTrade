@@ -1629,7 +1629,7 @@ const FALLBACK_FX_EUR = { EUR: 1.0, USD: 0.94, GBP: 1.19, CHF: 1.07, CAD: 0.67, 
 
 const DEMO_PAYLOAD = {
   is_demo: true,
-  scanner_version: "v10.5-oraculo",
+  scanner_version: "v11.1-oraculo",
   generated_at: new Date().toISOString(),
   universe_mode: "demo (ejemplo)",
   total_scanned: 2150,
@@ -2708,7 +2708,7 @@ async function cloudPush(showMsg = false, retryCount = 0){
       checks
     };
     const body = {
-      message: 'Sync Cocodrilo user-db v10.5',
+      message: 'Sync Cocodrilo user-db v11.1',
       content: toBase64Utf8(JSON.stringify(dbObj, null, 2))
     };
     if(cloudSha) body.sha = cloudSha;
@@ -2882,7 +2882,7 @@ function buildBuffettPrompt(c){
     : '';
   return `Actúa como analista siguiendo estrictamente el método de Warren Buffett y Charlie Munger. Invierto en EUR en Trade Republic.
 Analiza ${liveC.name} (${liveC.ticker}), sector ${liveC.sector} (${liveC.region}).
-Datos del Radar Cocodrilo v10.11 (convertidos a EUR):
+Datos del Radar Cocodrilo v11.1 (convertidos a EUR):
 - Precio actual: ${fmtEur(liveC.price, liveC.currency)} (caída 52s: ${liveC.drawdown_52w_pct ?? 'N/D'}%)
 - Calidad: ${liveC.quality_score}/100 | Cuadrante: ${quad}
 - Piotroski Clásico: ${pioCls} | Adaptado: ${liveC.piotroski_score ?? 'N/D'}/${liveC.piotroski_max ?? 9}
@@ -2901,7 +2901,7 @@ function copyPrompt(ticker){
   if(!c) return;
   const txt = buildBuffettPrompt(c);
   if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(() => toast('Prompt Buffett v10.5 copiado.')).catch(() => prompt('Copia:', txt));
+    navigator.clipboard.writeText(txt).then(() => toast('Prompt Buffett v11.1 copiado.')).catch(() => prompt('Copia:', txt));
   } else prompt('Copia:', txt);
 }
 
@@ -4393,7 +4393,7 @@ function openModal(ticker, skipLiveRefresh = false){
     ${c.oro_puro ? `<div class="notice good"><b>👑 SEÑAL ORO PURO (1-2/AÑO):</b> doble verificación superada (calidad élite + SEC MATCH ≤15% + Piotroski + Forward Check + Tribunal IA favorable).</div>` : ''}
 
     <div class="notice info">
-      <b>🛡️ Auditoría Oráculo v10.5</b>
+      <b>🛡️ Auditoría Oráculo v11.1</b>
       <div class="oracle-grid">
         <div class="oracle-cell">
           <span>Piotroski Clásico (activos medios)</span>
@@ -4710,7 +4710,7 @@ function buildAgentSystemContext(userText = ''){
   return `Eres el AGENTE ORÁCULO DE BESTRADE: un gestor profesional de renta variable, analista fundamental de élite y especialista táctico en entradas escalonadas, entrenado bajo la filosofía estricta de Warren Buffett y Charlie Munger.
 
 TU MISIÓN Y REGLAS DE HIERRO (OBLIGATORIAS):
-1. Conoces de arriba a abajo TODO el sistema BesTrade v10.8: Score Buffett (0-100), Piotroski Clásico (9 señales originales con activos medios y su cobertura k/9), Piotroski Adaptado, auditoría oficial SEC EDGAR (MATCH <=15%, ACCEPTABLE 15-30%, MISMATCH >30%), Owner Earnings (FCF descontando SBC), DCF Conservador/Base/Optimista, Forward Check (previsiones de BPA e ingresos), Cuadrante Calidad vs. Valoración, Tribunal IA, Diario de Aciertos y Precios/FX en vivo.
+1. Conoces de arriba a abajo TODO el sistema BesTrade v11.1: Score Buffett (0-100), Piotroski Clásico (9 señales originales con activos medios y su cobertura k/9), Piotroski Adaptado, auditoría oficial SEC EDGAR (MATCH <=15%, ACCEPTABLE 15-30%, MISMATCH >30%), Owner Earnings (FCF descontando SBC), DCF Conservador/Base/Optimista, Forward Check (previsiones de BPA e ingresos), Cuadrante Calidad vs. Valoración, Tribunal IA, Diario de Aciertos y Precios/FX en vivo.
 2. NUNCA INVENTES DATOS NI GARANTICES RENTABILIDADES: usa EXCLUSIVAMENTE las cifras exactas que aparecen en el contexto en vivo de abajo. Si falta un dato (ej. Piotroski parcial 5/9 o SEC no verificado), señálalo abiertamente como limitación.
 3. SEPARA SIEMPRE CALIDAD DE PRECIO: distingue con claridad entre (a) Excelente a precio razonable/con margen, (b) Excelente pero cara, (c) Mediocre aparentemente barata (posible trampa de valor) y (d) Problemas fundamentales.
 4. INVERSIÓN INVERSA (CHARLIE MUNGER): antes de recomendar entrar en cualquier empresa, expón SIEMPRE el argumento bajista ("cómo podríamos perder dinero aquí") y los avisos reales (ej. FCF capado, resultados en <=10 días, Piotroski clásico bajo).
@@ -4848,7 +4848,7 @@ function renderAgentView(){
           <p style="margin:4px 0;color:var(--text2)">Toca cualquier botón rápido de arriba o pregúntame directamente por cualquier ticker (ej. <code>DECK</code>, <code>NVDA</code>, <code>ADBE</code>, <code>ITX.MC</code>) para analizar calidad, valoración, trampas y plan en 3 tramos.</p>
           ${setupWarn}
         </div>
-        <div class="msg-meta">Buffett &amp; Munger Engine · v10.8</div>
+        <div class="msg-meta">Buffett &amp; Munger Engine · v11.1</div>
       </div>`;
     return;
   }
